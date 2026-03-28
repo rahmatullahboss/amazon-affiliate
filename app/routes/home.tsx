@@ -76,7 +76,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                  <div className="relative z-10 bg-white/95 p-6 md:p-10 m-4 md:mr-10 xl:mr-16 max-w-sm rounded-xl shadow-lg backdrop-blur-sm transform transition-transform hover:-translate-y-1">
                     <span className="text-primary text-sm uppercase font-extrabold tracking-widest block mb-2">HOT TRENDING</span>
                     <h2 className="text-3xl md:text-5xl font-light text-gray-800 leading-tight mb-4">
-                      The best home <br/> <strong className="font-extrabold text-[#333e48]">entertainment</strong> <br/> system
+                      The best home <br/> <strong className="font-extrabold text-gray-800">entertainment</strong> <br/> system
                     </h2>
                     <p className="text-gray-500 text-sm mb-6 max-w-xs leading-relaxed">
                       Upgrade your living room with premium 4k displays and immersive surround sound systems today.

@@ -156,7 +156,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                  <ul className="space-y-3">
                    {features.map((f: string, i: number) => (
                      <li key={i} className="flex gap-3 text-gray-700 text-sm">
-                       <span className="text-[#2c9cb4] flex-shrink-0">✓</span>
+                       <span className="text-primary flex-shrink-0">✓</span>
                        <span>{f}</span>
                      </li>
                    ))}

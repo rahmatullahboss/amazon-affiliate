@@ -15,7 +15,7 @@ export default function AffiliateDisclosure() {
           <h1 className="text-3xl md:text-4xl font-extrabold mb-8 text-gray-800 border-b border-gray-100 pb-4">Affiliate Disclosure</h1>
           
           <div className="prose prose-blue max-w-none text-gray-600 text-sm leading-relaxed">
-            <div className="p-5 bg-blue-50 border-l-4 border-[#2c9cb4] rounded-r mb-8">
+            <div className="p-5 bg-blue-50 border-l-4 border-primary rounded-r mb-8">
               <p className="text-gray-700 italic font-medium m-0">
                 "DealsRky is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com."
               </p>

@@ -15,8 +15,8 @@ export default function About() {
         <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-8 md:p-12">
           
           <div className="text-center mb-12 border-b border-gray-100 pb-8">
-             <div className="w-20 h-20 bg-[#2c9cb4]/10 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🛒</div>
-             <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-4">About <span className="text-[#2c9cb4]">DealsRKY</span></h1>
+             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🛒</div>
+             <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-4">About <span className="text-primary">DealsRKY</span></h1>
              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
                Your trusted destination for navigating the vast landscape of online shopping and discovering the most valuable deals available on Amazon.
              </p>
@@ -38,7 +38,7 @@ export default function About() {
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-12 not-prose">
               <div className="bg-gray-50 border border-gray-100 p-6 rounded-lg text-center shadow-sm">
-                <div className="w-12 h-12 bg-white border border-gray-200 text-[#2c9cb4] rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <div className="w-12 h-12 bg-white border border-gray-200 text-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
                 </div>
                 <h3 className="text-gray-800 font-bold mb-2 text-sm">Curated Selection</h3>
@@ -46,7 +46,7 @@ export default function About() {
               </div>
               
               <div className="bg-gray-50 border border-gray-100 p-6 rounded-lg text-center shadow-sm">
-                <div className="w-12 h-12 bg-white border border-gray-200 text-[#2c9cb4] rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <div className="w-12 h-12 bg-white border border-gray-200 text-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/></svg>
                 </div>
                 <h3 className="text-gray-800 font-bold mb-2 text-sm">Trusted Links</h3>
@@ -54,15 +54,15 @@ export default function About() {
               </div>
               
               <div className="bg-gray-50 border border-gray-100 p-6 rounded-lg text-center shadow-sm">
-                <div className="w-12 h-12 bg-white border border-gray-200 text-[#2c9cb4] rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <div className="w-12 h-12 bg-white border border-gray-200 text-primary rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
                 </div>
                 <h3 className="text-gray-800 font-bold mb-2 text-sm">Full Transparency</h3>
-                <p className="text-gray-500 text-xs leading-relaxed">We are upfront about our <Link to="/disclosure" className="text-[#2c9cb4] hover:underline font-medium">affiliate relationships</Link> and data practices.</p>
+                <p className="text-gray-500 text-xs leading-relaxed">We are upfront about our <Link to="/disclosure" className="text-primary hover:underline font-medium">affiliate relationships</Link> and data practices.</p>
               </div>
             </div>
 
-            <p className="mt-8 font-medium text-gray-800 text-center text-lg bg-[#2c9cb4]/5 py-6 px-4 rounded-lg">
+            <p className="mt-8 font-medium text-gray-800 text-center text-lg bg-primary/5 py-6 px-4 rounded-lg">
               Thank you for trusting DealsRky. We continually strive to be your go-to resource for honest recommendations and great finds.
             </p>
           </div>

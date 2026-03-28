@@ -28,8 +28,8 @@ export function Header() {
         <div className="container mx-auto px-4 flex justify-between items-center gap-6">
           {/* Logo */}
           <Link to="/" className="shrink-0 flex items-center gap-2">
-            <img src="/dealsrky-logo.png" alt="DealsRky" className="h-9" onError={(e) => {
-              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 30'%3E%3Ctext y='20' fill='white' font-family='sans-serif' font-weight='bold' font-size='20'%3EDealsRky%3C/text%3E%3C/svg%3E";
+            <img src="/dealsrky-logo.svg" alt="DealsRky" className="h-9" onError={(e) => {
+              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 40'%3E%3Ctext y='30' fill='white' font-family='sans-serif' font-weight='800' font-size='28'%3EDeals%3Ctspan fill='%23facc15'%3ERky%3C/tspan%3E%3C/text%3E%3C/svg%3E";
             }} />
           </Link>
 

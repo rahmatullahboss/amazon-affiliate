@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for Amazon affiliate. 2 conventions, 4 fixes."
+description: "Typescript for amazon-affiliate. 2 conventions, 4 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **41 real patterns** in **Amazon affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **41 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## 🔧 Problem Playbooks
 

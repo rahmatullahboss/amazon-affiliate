@@ -6,11 +6,11 @@ export function HeroBanner() {
           
           {/* Text Content */}
           <div className="w-full md:w-1/2 text-center md:text-left z-10">
-            <div className="inline-block bg-[#2c9cb4]/10 text-[#2c9cb4] font-semibold px-3 py-1 rounded mb-6 text-sm">
+            <div className="inline-block bg-primary/10 text-primary font-semibold px-3 py-1 rounded mb-6 text-sm">
               Today's Featured Deals
             </div>
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-black text-[#333333] mb-6 leading-tight">
-              Upgrade Your Home With The Best <span className="text-[#2c9cb4]">Amazon Deals</span>
+              Upgrade Your Home With The Best <span className="text-primary">Amazon Deals</span>
             </h1>
             <p className="text-lg text-gray-600 mb-8 max-w-xl mx-auto md:mx-0 leading-relaxed">
               We hunt down the biggest discounts on top-rated electronics, gadgets, and home appliances so you never pay full price again.
@@ -18,7 +18,7 @@ export function HeroBanner() {
             <div className="flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
               <a 
                 href="/deals" 
-                className="bg-[#2c9cb4] hover:bg-[#248196] text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-[#2c9cb4]/30 transition-all text-lg w-full sm:w-auto text-center"
+                className="bg-primary hover:bg-primary-hover text-white font-bold py-4 px-10 rounded-full shadow-lg shadow-primary/30 transition-all text-lg w-full sm:w-auto text-center"
               >
                 Shop Now Collection
               </a>
@@ -35,7 +35,7 @@ export function HeroBanner() {
           <div className="w-full md:w-1/2 relative">
              <div className="aspect-[4/3] bg-gray-50 rounded-2xl border border-gray-100 shadow-xl overflow-hidden relative flex items-center justify-center">
                  {/* Placeholder for a lifestyle/product collage image that DealsRky uses */}
-                 <div className="absolute inset-0 bg-gradient-to-tr from-[#2c9cb4]/20 to-transparent"></div>
+                 <div className="absolute inset-0 bg-gradient-to-tr from-primary/20 to-transparent"></div>
                  <div className="text-center p-8 bg-white/80 backdrop-blur-sm rounded-xl border border-white/50 shadow-sm z-10">
                     <span className="text-5xl mb-4 block">📦</span>
                     <h3 className="text-xl font-bold text-gray-800">Fresh Deals Uploaded Daily</h3>

@@ -1,847 +1,742 @@
-# Amazon Affiliate Bridge Page System — Enterprise Architecture
+# Amazon Affiliate Platform — Final Implementation Plan
 
-## 1. Executive Summary
+## 1. Product Definition
 
-A **Cloudflare-native bridge page system** that enables multiple agents to share unique landing page URLs. When a buyer clicks the link, they see a clean product page (image + title) with a **"Buy on Amazon"** button that dynamically injects the correct agent-specific tracking ID — fully compliant with Amazon Associates policies.
+This project is no longer a copy of the old `DealsRky` WordPress site and no longer depends on Google Sheets.
 
-### Core Flow
-```
-Agent shares link → Buyer clicks → Bridge Page loads (image + title + CTA)
-                                    → Buyer clicks "Buy on Amazon"
-                                    → Redirect to Amazon with agent's tracking ID
-```
+The final product is a **fully in-house Amazon affiliate platform** with:
 
-### URL Pattern
-```
-https://yourdomain.com/{agent-slug}/{ASIN}
-```
+- a custom public affiliate frontend
+- an admin panel for business operations
+- an agent portal for ASIN submission and link generation
+- a bridge landing page + redirect engine
+- app-side traffic tracking
+- Amazon report-based sales attribution
 
----
+### Core Business Goal
 
-## 2. User Review Required
+Enable 30-40 agents to promote Amazon products through a custom site while keeping:
 
-> [!IMPORTANT]
-> **Amazon Creators API Eligibility**: The new Amazon Creators API (replacing PAAPI 5.0, which is being retired May 2026) requires **10 qualifying sales in the last 30 days** to access. If your client doesn't meet this threshold, we'll use a **dual-strategy** approach: manual product data entry via admin panel + optional third-party API fallback (ASIN Data API / RapidAPI). Please confirm your client's API eligibility.
+- agent-specific landing links
+- fast and compliant buyer flow
+- client-owned affiliate attribution
+- agent-level performance visibility
+- low operational friction
 
-> [!IMPORTANT]
-> **Google Sheets vs D1 Database**: Your client mentioned Google Sheets for agent/tracking data. I recommend **migrating agent + tracking ID data into D1** (our database) for speed & reliability, with an **optional Google Sheets sync** as a convenience layer. Reading from Google Sheets on every request adds ~200-500ms latency and introduces a single point of failure. Please confirm if this approach is acceptable.
+### Canonical Buyer Flow
 
-> [!WARNING]
-> **Amazon Policy Compliance**: Per Amazon's Operating Agreement:
-> - ✅ Bridge/landing pages with original content (image, title, CTA) are **allowed**
-> - ✅ Affiliate links that clearly lead to Amazon are **allowed**
-> - ❌ Link cloaking, shortening, or disguising Amazon URLs is **prohibited**
-> - ❌ Displaying static prices is **prohibited** (use "Check Price on Amazon")
-> - ❌ Pop-ups or forced redirects are **prohibited**
-> - ✅ Affiliate disclosure must be visible on every page
->
-> Our system is designed to be **100% compliant** with all these rules.
-
-> [!IMPORTANT]
-> **Domain**: What domain will you use? (e.g., `shopbridge.xyz`, `bestdeals.shop`, etc.)
-
----
-
-## 3. System Architecture
-
-```mermaid
-graph TB
-    subgraph "Buyer Journey"
-        A["Agent sends link<br/>yourdomain.com/agent-x/B09V3KXJPB"] --> B["Cloudflare CDN Edge<br/>(Global PoP ~50ms)"]
-        B --> C["React Router v7<br/>on Cloudflare Pages"]
-        C --> D["Landing Page Renders<br/>Product Image + Title + CTA"]
-        D --> E{"Buyer clicks<br/>'Buy on Amazon'"}
-        E --> F["Hono API Worker<br/>Resolves Tracking ID"]
-        F --> G["302 Redirect →<br/>amazon.com/dp/ASIN?tag=TRACKING_ID"]
-    end
-
-    subgraph "Admin Flow"
-        H["Admin Panel<br/>(React Router v7)"] --> I["Hono API"]
-        I --> J["D1 Database"]
-        I --> K["KV Cache"]
-    end
-
-    subgraph "Data Layer"
-        J --- L["Agents Table"]
-        J --- M["Products Table"]
-        J --- N["Tracking IDs Table"]
-        J --- O["Click Analytics Table"]
-        K --- P["Product Cache<br/>(TTL: 24h)"]
-        K --- Q["Agent-Tracking Cache<br/>(TTL: 1h)"]
-    end
-
-    subgraph "External"
-        R["Amazon Creators API<br/>(or 3rd Party API)"] -.-> I
-        S["Google Sheets<br/>(Optional Sync)"] -.-> I
-    end
-
-    style B fill:#f97316,color:#fff
-    style C fill:#3b82f6,color:#fff
-    style F fill:#8b5cf6,color:#fff
-    style J fill:#10b981,color:#fff
-    style K fill:#f59e0b,color:#fff
-```
-
-### Architecture Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| **Monorepo** | Single repo, 2 apps | Shared types, easier deployment |
-| **Frontend** | React Router v7 (Framework Mode) | SSR on Cloudflare Pages, type-safe loaders |
-| **Backend API** | Hono on Cloudflare Workers | Ultra-fast, D1/KV native bindings |
-| **Database** | Cloudflare D1 (SQLite) | Zero egress cost, edge-local reads |
-| **Cache** | Cloudflare KV | Global edge cache, sub-ms reads |
-| **Product Data** | Creators API + Manual Fallback | Future-proof, Amazon-compliant |
-| **Auth** | Hono JWT middleware | Admin panel protection |
-| **Deployment** | Cloudflare Pages + Workers | Single platform, CI/CD via Wrangler |
-
----
-
-## 4. Project Structure
-
-```
-amazon-affiliate/
-├── apps/
-│   ├── api/                          # Hono API (Cloudflare Workers)
-│   │   ├── src/
-│   │   │   ├── index.ts              # Main Hono app entry
-│   │   │   ├── routes/
-│   │   │   │   ├── agents.ts         # CRUD: agents
-│   │   │   │   ├── products.ts       # CRUD: products + ASIN fetch
-│   │   │   │   ├── tracking.ts       # Agent-Tracking ID mapping
-│   │   │   │   ├── redirect.ts       # The redirect engine (core)
-│   │   │   │   ├── analytics.ts      # Click tracking & stats
-│   │   │   │   ├── sheets-sync.ts    # Google Sheets import
-│   │   │   │   └── auth.ts           # Admin login
-│   │   │   ├── services/
-│   │   │   │   ├── amazon.ts         # Amazon Creators API / fallback
-│   │   │   │   ├── cache.ts          # KV cache layer
-│   │   │   │   ├── sheets.ts         # Google Sheets reader
-│   │   │   │   └── analytics.ts      # Click event processing
-│   │   │   ├── schemas/
-│   │   │   │   ├── agent.ts          # Zod: agent validation
-│   │   │   │   ├── product.ts        # Zod: product validation
-│   │   │   │   └── tracking.ts       # Zod: tracking ID validation
-│   │   │   ├── middleware/
-│   │   │   │   ├── auth.ts           # JWT verification
-│   │   │   │   ├── cors.ts           # CORS configuration
-│   │   │   │   └── rate-limit.ts     # Rate limiting
-│   │   │   └── utils/
-│   │   │       ├── amazon-url.ts     # Amazon URL builder
-│   │   │       └── types.ts          # Shared types
-│   │   ├── migrations/
-│   │   │   └── 0001_init.sql         # Database schema
-│   │   ├── wrangler.jsonc            # Cloudflare config
-│   │   ├── package.json
-│   │   └── tsconfig.json
-│   │
-│   └── web/                          # React Router v7 (Cloudflare Pages)
-│       ├── app/
-│       │   ├── root.tsx              # Root layout
-│       │   ├── routes.ts             # Route definitions
-│       │   ├── routes/
-│       │   │   ├── home.tsx           # Homepage (optional)
-│       │   │   ├── bridge.$agent.$asin.tsx  # Bridge Landing Page
-│       │   │   ├── admin/
-│       │   │   │   ├── layout.tsx     # Admin layout
-│       │   │   │   ├── dashboard.tsx  # Dashboard overview
-│       │   │   │   ├── agents.tsx     # Manage agents
-│       │   │   │   ├── products.tsx   # Manage products
-│       │   │   │   ├── tracking.tsx   # Manage tracking IDs
-│       │   │   │   ├── sheets-sync.tsx # Sheets import UI
-│       │   │   │   └── analytics.tsx  # Click analytics
-│       │   │   └── login.tsx          # Admin login
-│       │   ├── components/
-│       │   │   ├── bridge/
-│       │   │   │   ├── ProductCard.tsx
-│       │   │   │   ├── BuyButton.tsx
-│       │   │   │   └── AffiliateDisclosure.tsx
-│       │   │   ├── admin/
-│       │   │   │   ├── DataTable.tsx
-│       │   │   │   ├── StatsCard.tsx
-│       │   │   │   └── Sidebar.tsx
-│       │   │   └── ui/
-│       │   │       ├── Button.tsx
-│       │   │       ├── Input.tsx
-│       │   │       └── Modal.tsx
-│       │   └── lib/
-│       │       ├── api.ts            # API client
-│       │       └── utils.ts          # Helper functions
-│       ├── public/
-│       │   └── favicon.ico
-│       ├── react-router.config.ts
-│       ├── vite.config.ts
-│       ├── wrangler.jsonc
-│       ├── package.json
-│       └── tsconfig.json
-│
-├── packages/
-│   └── shared/                       # Shared types & schemas
-│       ├── src/
-│       │   ├── types.ts
-│       │   └── schemas.ts
-│       ├── package.json
-│       └── tsconfig.json
-│
-├── package.json                      # Root workspace
-├── pnpm-workspace.yaml
-└── turbo.json                        # Turborepo config
+```text
+Agent logs in -> adds/selects ASIN -> gets unique link
+Buyer opens agent link -> sees compliant landing page
+Buyer clicks "Buy on Amazon" -> redirect engine injects agent tracking ID
+Amazon receives visitor under client's affiliate setup
+Amazon reports later show sales by tracking ID
+Admin imports report -> system reconciles sales to agent
 ```
 
 ---
 
-## 5. Database Schema (D1)
+## 2. Final Strategic Decisions
 
-### Migration: `0001_init.sql`
+### 2.1 What We Are Building
 
-```sql
--- ============================================
--- AGENTS: People who share affiliate links
--- ============================================
-CREATE TABLE IF NOT EXISTS agents (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    slug            TEXT NOT NULL UNIQUE,          -- URL-safe: "agent-karim"
-    name            TEXT NOT NULL,                 -- Display: "Karim Ahmed"
-    email           TEXT,
-    phone           TEXT,
-    is_active       INTEGER NOT NULL DEFAULT 1,    -- 1=active, 0=disabled
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-);
+We are building a **custom Amazon affiliate platform**, not a generic e-commerce clone.
 
-CREATE UNIQUE INDEX idx_agents_slug ON agents(slug);
+### 2.2 What We Are Not Building
 
--- ============================================
--- PRODUCTS: Cached Amazon product data
--- ============================================
-CREATE TABLE IF NOT EXISTS products (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    asin            TEXT NOT NULL UNIQUE,           -- Amazon ASIN
-    title           TEXT NOT NULL,                  -- Product title
-    image_url       TEXT NOT NULL,                  -- Product image
-    marketplace     TEXT NOT NULL DEFAULT 'US',     -- US, UK, etc.
-    category        TEXT,                           -- Optional category
-    is_active       INTEGER NOT NULL DEFAULT 1,
-    fetched_at      TEXT,                           -- Last API fetch
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-);
+- no WordPress clone
+- no DealsRky theme copy
+- no Google Sheet driven production workflow
+- no static price-heavy storefront
+- no fake product catalog disconnected from affiliate reality
 
-CREATE UNIQUE INDEX idx_products_asin ON products(asin);
+### 2.3 Source of Truth
 
--- ============================================
--- TRACKING_IDS: Amazon Associate tracking tags
--- Each agent can have a unique tracking ID per sheet/campaign
--- ============================================
-CREATE TABLE IF NOT EXISTS tracking_ids (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id        INTEGER NOT NULL,
-    tag             TEXT NOT NULL,                  -- "agent-karim-20"
-    label           TEXT,                           -- "Sheet 1 - Electronics"
-    marketplace     TEXT NOT NULL DEFAULT 'US',
-    is_default      INTEGER NOT NULL DEFAULT 0,    -- Default tag for agent
-    is_active       INTEGER NOT NULL DEFAULT 1,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
-);
+- `D1` is the operational database
+- `KV` is the performance cache layer
+- `Amazon tracking IDs` are the source of truth for actual sale attribution
 
-CREATE INDEX idx_tracking_agent ON tracking_ids(agent_id);
-CREATE UNIQUE INDEX idx_tracking_tag ON tracking_ids(tag);
+### 2.4 Tracking Model
 
--- ============================================
--- AGENT_PRODUCTS: Which agent promotes which product with which tag
--- ============================================
-CREATE TABLE IF NOT EXISTS agent_products (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id        INTEGER NOT NULL,
-    product_id      INTEGER NOT NULL,
-    tracking_id     INTEGER NOT NULL,              -- Which tracking tag to use
-    custom_title    TEXT,                           -- Override product title
-    is_active       INTEGER NOT NULL DEFAULT 1,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-    FOREIGN KEY (tracking_id) REFERENCES tracking_ids(id) ON DELETE CASCADE
-);
+The platform should assume **one client-owned Amazon Associates setup** with **multiple tracking IDs**, ideally one per agent and marketplace where needed.
 
-CREATE UNIQUE INDEX idx_agent_product ON agent_products(agent_id, product_id);
+This is the cleanest model because:
 
--- ============================================
--- CLICKS: Analytics for every button click
--- ============================================
-CREATE TABLE IF NOT EXISTS clicks (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id        INTEGER NOT NULL,
-    product_id      INTEGER NOT NULL,
-    tracking_tag    TEXT NOT NULL,
-    ip_hash         TEXT,                          -- Hashed for privacy
-    user_agent      TEXT,
-    referer         TEXT,
-    country         TEXT,                          -- From CF headers
-    clicked_at      TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (agent_id) REFERENCES agents(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
+- the client remains the affiliate owner
+- agents remain internal sales/acquisition contributors
+- app-side traffic and Amazon-side sales can be reconciled
 
-CREATE INDEX idx_clicks_agent ON clicks(agent_id);
-CREATE INDEX idx_clicks_product ON clicks(product_id);
-CREATE INDEX idx_clicks_date ON clicks(clicked_at);
+If the client does not create separate tracking IDs per agent, then the system can still track traffic but **cannot reliably attribute real sales per agent**.
 
--- ============================================
--- PAGE_VIEWS: Landing page view analytics
--- ============================================
-CREATE TABLE IF NOT EXISTS page_views (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    agent_id        INTEGER NOT NULL,
-    product_id      INTEGER NOT NULL,
-    ip_hash         TEXT,
-    user_agent      TEXT,
-    referer         TEXT,
-    country         TEXT,
-    viewed_at       TEXT NOT NULL DEFAULT (datetime('now')),
-    FOREIGN KEY (agent_id) REFERENCES agents(id),
-    FOREIGN KEY (product_id) REFERENCES products(id)
-);
+---
 
-CREATE INDEX idx_views_agent ON page_views(agent_id);
-CREATE INDEX idx_views_date ON page_views(viewed_at);
+## 3. Current Codebase Review
 
--- ============================================
--- ADMIN_USERS: Admin panel authentication
--- ============================================
-CREATE TABLE IF NOT EXISTS admin_users (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    username        TEXT NOT NULL UNIQUE,
-    password_hash   TEXT NOT NULL,
-    role            TEXT NOT NULL DEFAULT 'admin', -- admin, viewer
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
-);
+## 3.1 What Already Exists
 
--- ============================================
--- SHEETS_SYNC_LOG: Google Sheets sync history
--- ============================================
-CREATE TABLE IF NOT EXISTS sheets_sync_log (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    sheet_id        TEXT NOT NULL,
-    sheet_name      TEXT,
-    rows_synced     INTEGER NOT NULL DEFAULT 0,
-    status          TEXT NOT NULL,                 -- success, partial, failed
-    error_message   TEXT,
-    synced_at       TEXT NOT NULL DEFAULT (datetime('now'))
-);
+The current repo already provides a solid technical foundation:
+
+- Cloudflare Worker entrypoint
+- React Router SSR application
+- Hono API
+- D1 schema for agents, products, tracking IDs, mappings, clicks, page views
+- admin authentication
+- product CRUD
+- agent CRUD
+- tracking ID CRUD
+- mapping CRUD
+- redirect route
+- bridge route
+- click/view analytics foundation
+
+## 3.2 What Is Incorrect or Outdated
+
+The current implementation has several direction-level problems:
+
+- the public UI drifted toward copying the old DealsRky site
+- implementation planning still assumes Google Sheets as a major workflow
+- there is no agent portal
+- the analytics layer does not solve real business attribution
+- the dedicated analytics UI is incomplete
+- the buyer bridge CTA currently bypasses the redirect engine on the main landing page path
+- parts of the product ingestion pipeline still rely on placeholder/mock-style product data
+
+## 3.3 Current Maturity Assessment
+
+Current state is best described as:
+
+**Foundation complete, business workflow incomplete**
+
+That means:
+
+- infra and backend patterns are usable
+- the final product model is not yet encoded in the app
+- the public frontend needs redesign
+- the portal and sales attribution systems still need to be built
+
+---
+
+## 4. Final System Scope
+
+The final system has four major modules.
+
+## 4.1 Public Affiliate Frontend
+
+Purpose:
+
+- host original, compliant affiliate pages
+- render bridge landing pages for agent links
+- provide enough trust and content for legitimacy
+
+Must include:
+
+- homepage
+- product detail pages
+- category/index pages if needed
+- bridge landing pages
+- disclosure page
+- privacy page
+- contact page
+
+## 4.2 Redirect and Tracking Engine
+
+Purpose:
+
+- resolve agent + product to the correct Amazon URL
+- inject the correct tracking ID
+- track views and CTA clicks
+- protect the redirect path
+
+Must include:
+
+- tracked landing page -> tracked redirect flow
+- rate limiting
+- bot detection
+- duplicate-click suppression for analytics quality
+- KV-cached redirect context
+
+## 4.3 Admin Operations Panel
+
+Purpose:
+
+- manage users, agents, products, tracking IDs, reports, analytics
+
+Must include:
+
+- admin login
+- admin user management
+- agent management
+- tracking ID management
+- product moderation
+- analytics dashboard
+- report import/export
+- audit logging
+
+## 4.4 Agent Portal
+
+Purpose:
+
+- replace Google Sheets completely
+- let agents work inside the system
+
+Must include:
+
+- agent login
+- ASIN submission
+- agent product list
+- link copy/generation
+- traffic stats
+- later: order/commission view
+
+---
+
+## 5. Final Information Architecture
+
+## 5.1 Public Routes
+
+```text
+/                          Home
+/products                  Product listing/search
+/products/:asin            Product detail
+/category/:slug            Category page
+/:agentSlug/:asin          Agent bridge page
+/disclosure                Affiliate disclosure
+/privacy                   Privacy policy
+/contact                   Contact page
 ```
 
-### Entity Relationship
+## 5.2 Admin Routes
 
-```mermaid
-erDiagram
-    AGENTS ||--o{ TRACKING_IDS : "has many"
-    AGENTS ||--o{ AGENT_PRODUCTS : "promotes"
-    PRODUCTS ||--o{ AGENT_PRODUCTS : "promoted by"
-    TRACKING_IDS ||--o{ AGENT_PRODUCTS : "used in"
-    AGENTS ||--o{ CLICKS : "generates"
-    PRODUCTS ||--o{ CLICKS : "receives"
-    AGENTS ||--o{ PAGE_VIEWS : "generates"
-    PRODUCTS ||--o{ PAGE_VIEWS : "receives"
-
-    AGENTS {
-        int id PK
-        text slug UK "URL-safe identifier"
-        text name
-        text email
-        bool is_active
-    }
-
-    PRODUCTS {
-        int id PK
-        text asin UK
-        text title
-        text image_url
-        text marketplace
-    }
-
-    TRACKING_IDS {
-        int id PK
-        int agent_id FK
-        text tag UK "agent-karim-20"
-        text label
-        bool is_default
-    }
-
-    AGENT_PRODUCTS {
-        int id PK
-        int agent_id FK
-        int product_id FK
-        int tracking_id FK
-        text custom_title
-    }
-
-    CLICKS {
-        int id PK
-        int agent_id FK
-        int product_id FK
-        text tracking_tag
-        text country
-        text clicked_at
-    }
+```text
+/admin/login
+/admin
+/admin/users
+/admin/agents
+/admin/tracking
+/admin/products
+/admin/product-submissions
+/admin/analytics
+/admin/reports
+/admin/audit
 ```
 
----
+## 5.3 Agent Routes
 
-## 6. API Design (Hono Workers)
-
-### 6.1 Core Redirect Engine (The Heart)
-
-```typescript
-// routes/redirect.ts — The most critical route
-app.get('/go/:agentSlug/:asin', async (c) => {
-  const { agentSlug, asin } = c.req.param();
-  
-  // 1. Check KV cache first (sub-ms)
-  const cacheKey = `redirect:${agentSlug}:${asin}`;
-  const cached = await c.env.KV.get(cacheKey);
-  if (cached) {
-    // Log click asynchronously (non-blocking)
-    c.executionCtx.waitUntil(logClick(c, agentSlug, asin, cached));
-    return c.redirect(cached, 302);
-  }
-  
-  // 2. Resolve from D1
-  const result = await c.env.DB.prepare(`
-    SELECT t.tag, p.asin
-    FROM agent_products ap
-    JOIN agents a ON a.id = ap.agent_id
-    JOIN products p ON p.id = ap.product_id
-    JOIN tracking_ids t ON t.id = ap.tracking_id
-    WHERE a.slug = ? AND p.asin = ? AND a.is_active = 1
-  `).bind(agentSlug, asin).first();
-  
-  if (!result) {
-    return c.json({ error: 'Link not found' }, 404);
-  }
-  
-  // 3. Build Amazon URL (compliant, no cloaking)
-  const amazonUrl = `https://www.amazon.com/dp/${result.asin}?tag=${result.tag}`;
-  
-  // 4. Cache for 1 hour
-  c.executionCtx.waitUntil(
-    c.env.KV.put(cacheKey, amazonUrl, { expirationTtl: 3600 })
-  );
-  
-  // 5. Log click asynchronously
-  c.executionCtx.waitUntil(logClick(c, agentSlug, asin, result.tag));
-  
-  return c.redirect(amazonUrl, 302);
-});
-```
-
-### 6.2 Full API Route Map
-
-| Method | Endpoint | Description | Auth |
-|--------|----------|-------------|------|
-| **Redirect Engine** ||||
-| `GET` | `/go/:agent/:asin` | Redirect to Amazon with tracking ID | Public |
-| **Products** ||||
-| `GET` | `/api/products` | List all products | Admin |
-| `POST` | `/api/products` | Add product (by ASIN or manual) | Admin |
-| `PUT` | `/api/products/:id` | Update product | Admin |
-| `DELETE` | `/api/products/:id` | Delete product | Admin |
-| `POST` | `/api/products/fetch-asin` | Fetch product data from Amazon API | Admin |
-| `POST` | `/api/products/bulk` | Bulk add products by ASIN list | Admin |
-| **Agents** ||||
-| `GET` | `/api/agents` | List all agents | Admin |
-| `POST` | `/api/agents` | Create agent | Admin |
-| `PUT` | `/api/agents/:id` | Update agent | Admin |
-| `DELETE` | `/api/agents/:id` | Deactivate agent | Admin |
-| **Tracking** ||||
-| `GET` | `/api/tracking` | List all tracking IDs | Admin |
-| `POST` | `/api/tracking` | Add tracking ID to agent | Admin |
-| `DELETE` | `/api/tracking/:id` | Remove tracking ID | Admin |
-| **Agent-Product Mapping** ||||
-| `GET` | `/api/mappings` | List all agent-product mappings | Admin |
-| `POST` | `/api/mappings` | Map agent + product + tracking ID | Admin |
-| `POST` | `/api/mappings/bulk` | Bulk map from sheet data | Admin |
-| `DELETE` | `/api/mappings/:id` | Remove mapping | Admin |
-| **Analytics** ||||
-| `GET` | `/api/analytics/overview` | Dashboard stats | Admin |
-| `GET` | `/api/analytics/agent/:id` | Per-agent click stats | Admin |
-| `GET` | `/api/analytics/product/:id` | Per-product click stats | Admin |
-| **Sheets** ||||
-| `POST` | `/api/sheets/sync` | Import data from Google Sheet | Admin |
-| `GET` | `/api/sheets/log` | Sync history | Admin |
-| **Auth** ||||
-| `POST` | `/api/auth/login` | Admin login → JWT | Public |
-| **Landing Page Data** ||||
-| `GET` | `/api/page/:agent/:asin` | Get landing page data (SSR) | Public |
-
----
-
-## 7. Product Data Strategy
-
-### Strategy: Three-Tier Data Resolution
-
-```mermaid
-flowchart TD
-    A["ASIN Input"] --> B{"Product in D1<br/>& not stale?"}
-    B -->|Yes| C["Return cached data<br/>(instant)"]
-    B -->|No| D{"Amazon Creators API<br/>available?"}
-    D -->|Yes| E["Fetch from API<br/>→ Save to D1 + KV"]
-    D -->|No/Error| F{"3rd Party API<br/>(ASIN Data API)?"}
-    F -->|Yes| G["Fetch from 3rd party<br/>→ Save to D1 + KV"]
-    F -->|No/Error| H["Manual Entry<br/>via Admin Panel"]
-    
-    E --> I["Return product data"]
-    G --> I
-    H --> I
-
-    style C fill:#10b981,color:#fff
-    style E fill:#3b82f6,color:#fff
-    style G fill:#f59e0b,color:#fff
-    style H fill:#ef4444,color:#fff
-```
-
-| Tier | Source | Speed | Reliability | Cost |
-|------|--------|-------|-------------|------|
-| **1** | D1 + KV Cache | <5ms | Highest | Free |
-| **2** | Amazon Creators API | ~200ms | High | Free (with eligibility) |
-| **3** | 3rd Party API (ASIN Data) | ~300ms | Medium | ~$50/month |
-| **Fallback** | Manual Admin Entry | N/A | Manual | Free |
-
-> [!TIP]
-> **Recommended approach**: Start with **Tier 1 (manual entry via admin)** + **Tier 3 (3rd party API)**. Once the client qualifies for the Creators API (10 sales/30 days), integrate **Tier 2** as the primary source.
-
----
-
-## 8. Landing Page Design
-
-### Bridge Page Layout (Buyer-Facing)
-
-```
-┌──────────────────────────────────────────┐
-│  [Logo]        yourdomain.com            │
-├──────────────────────────────────────────┤
-│                                          │
-│        ┌────────────────────┐           │
-│        │                    │           │
-│        │   Product Image    │           │
-│        │   (High Quality)   │           │
-│        │                    │           │
-│        └────────────────────┘           │
-│                                          │
-│   Product Title Goes Here                │
-│   (Fetched from Amazon)                  │
-│                                          │
-│  ┌──────────────────────────────────┐   │
-│  │  🛒  Buy on Amazon              │   │
-│  │  (Big, Orange, Amazon-colored)    │   │
-│  └──────────────────────────────────┘   │
-│                                          │
-│  ✓ Amazon Verified  ✓ Secure Checkout    │
-│                                          │
-├──────────────────────────────────────────┤
-│  Affiliate Disclosure: This site is a    │
-│  participant in the Amazon Associates    │
-│  Program...                              │
-└──────────────────────────────────────────┘
-```
-
-### Key Design Principles
-- **Minimal & Fast**: Only image + title + button. No fluff.
-- **Amazon Trust Signals**: Use Amazon orange (#FF9900) for CTA button.
-- **Mobile-First**: 70%+ traffic will be mobile.
-- **Sub-second load**: SSR on edge + KV cache = <200ms total.
-- **Compliant**: Visible affiliate disclosure, no static prices.
-
----
-
-## 9. Google Sheets Sync Strategy
-
-### How It Works
-
-Instead of reading Sheets in real-time (slow, fragile), we implement a **sync-on-demand** pattern:
-
-1. Admin clicks "Sync from Sheet" in admin panel
-2. System reads the Google Sheet via Sheets API
-3. Data is parsed, validated, and upserted into D1
-4. KV cache is invalidated for affected entries
-5. Sync log is recorded
-
-### Expected Sheet Format
-
-| Agent Name | Agent Slug | Tracking ID | ASIN | Product Title (optional) |
-|------------|------------|-------------|------|--------------------------|
-| Karim | agent-karim | karim-amz-20 | B09V3KXJPB | Wireless Earbuds |
-| Rahim | agent-rahim | rahim-amz-20 | B09V3KXJPB | Wireless Earbuds |
-
-### Authentication
-- Google Service Account with Sheets API read access
-- Service Account JSON stored as Cloudflare Worker Secret (`GOOGLE_SA_KEY`)
-
----
-
-## 10. Caching Strategy
-
-```mermaid
-flowchart LR
-    subgraph "KV Cache Keys"
-        A["product:{asin}"] --> |TTL 24h| B["Product data JSON"]
-        C["redirect:{agent}:{asin}"] --> |TTL 1h| D["Amazon URL with tag"]
-        E["agent:{slug}"] --> |TTL 1h| F["Agent data JSON"]
-    end
-
-    subgraph "Cache Invalidation"
-        G["ASIN Updated"] --> H["Delete product:* keys"]
-        I["Agent Updated"] --> J["Delete agent:* + redirect:*"]
-        K["Tracking Changed"] --> L["Delete redirect:* keys"]
-        M["Sheets Sync"] --> N["Selective invalidation"]
-    end
-```
-
-| Cache Key Pattern | Data | TTL | Invalidation |
-|-------------------|------|-----|--------------|
-| `product:{asin}` | Product image, title | 24 hours | ASIN update, manual refresh |
-| `redirect:{agent}:{asin}` | Full Amazon URL with tag | 1 hour | Agent/tracking change |
-| `agent:{slug}` | Agent details + default tag | 1 hour | Agent update |
-| `page:{agent}:{asin}` | Full landing page data | 30 min | Any related update |
-
----
-
-## 11. Admin Panel Features
-
-### Dashboard
-- Total clicks today / this week / this month
-- Top performing agents
-- Top performing products
-- Conversion funnel (views → clicks)
-
-### Agent Management
-- Add/Edit/Deactivate agents
-- Assign multiple tracking IDs per agent
-- Generate shareable links
-
-### Product Management
-- Add by ASIN (auto-fetch title + image)
-- Bulk import ASINs
-- Manual edit title/image override
-
-### Tracking ID Management
-- Map agent → tracking ID → product
-- Set default tracking ID per agent
-- Bulk operations
-
-### Google Sheets Sync
-- Enter Sheet URL → Preview data → Confirm sync
-- Sync history log
-- Scheduled sync (via Cloudflare Cron Triggers)
-
-### Analytics
-- Per-agent click breakdown
-- Per-product performance
-- Geographic distribution
-- Time-series charts
-
----
-
-## 12. Security & Compliance
-
-### Amazon Compliance Checklist
-- [x] Affiliate disclosure on every landing page
-- [x] No static prices displayed (use "Check Price" pattern)
-- [x] Links clearly lead to Amazon (no cloaking)
-- [x] No pop-ups or forced redirects
-- [x] Original content on landing pages
-- [x] No framing of Amazon pages
-
-### Application Security
-- JWT-based admin authentication
-- Rate limiting on redirect endpoint (prevent abuse)
-- IP hashing for analytics (privacy-preserving)
-- CORS restricted to own domain
-- All secrets via Cloudflare Worker Secrets
-- Input validation via Zod on every endpoint
-- Prepared statements for all D1 queries (SQL injection prevention)
-
----
-
-## 13. Cloudflare Configuration
-
-### `wrangler.jsonc` (API Worker)
-
-```jsonc
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "affiliate-api",
-  "main": "src/index.ts",
-  "compatibility_date": "2026-03-27",
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "affiliate-db",
-      "database_id": "<generated>"
-    }
-  ],
-  "kv_namespaces": [
-    {
-      "binding": "KV",
-      "id": "<generated>"
-    }
-  ],
-  "vars": {
-    "ENVIRONMENT": "production",
-    "AMAZON_MARKETPLACE": "US"
-  },
-  // Secrets (set via `wrangler secret put`):
-  // - JWT_SECRET
-  // - GOOGLE_SA_KEY
-  // - AMAZON_API_KEY (if using 3rd party)
-}
+```text
+/portal/login
+/portal
+/portal/asins/new
+/portal/products
+/portal/links
+/portal/analytics
 ```
 
 ---
 
-## 14. Performance Targets
+## 6. Data Model
 
-| Metric | Target | How |
-|--------|--------|-----|
-| Landing page load | <200ms | SSR on edge + KV cache |
-| Redirect latency | <50ms | KV cache hit → 302 |
-| Admin panel load | <500ms | Client-side SPA after SSR shell |
-| ASIN fetch | <300ms | API → D1 + KV cache |
-| Concurrent users | 10,000+ | Cloudflare Workers auto-scale |
-| Availability | 99.99% | Cloudflare global network |
+## 6.1 Core Tables
+
+### users
+
+Used for authentication and authorization.
+
+Fields:
+
+- `id`
+- `email`
+- `password_hash`
+- `role` (`super_admin`, `admin`, `agent`)
+- `agent_id` nullable
+- `is_active`
+- `created_at`
+- `updated_at`
+
+### agents
+
+Business identity of the internal agent.
+
+Fields:
+
+- `id`
+- `slug`
+- `name`
+- `email`
+- `phone`
+- `status`
+- `created_at`
+- `updated_at`
+
+### tracking_ids
+
+Client-owned Amazon tracking IDs mapped to agents.
+
+Fields:
+
+- `id`
+- `agent_id`
+- `marketplace`
+- `tracking_tag`
+- `label`
+- `is_default`
+- `is_active`
+- `created_at`
+- `updated_at`
+
+### products
+
+Canonical product rows, unique by `asin + marketplace`.
+
+Fields:
+
+- `id`
+- `asin`
+- `marketplace`
+- `title`
+- `image_url`
+- `description`
+- `features`
+- `category`
+- `brand`
+- `status` (`pending`, `active`, `rejected`, `archived`)
+- `source` (`api`, `manual`)
+- `fetched_at`
+- `created_at`
+- `updated_at`
+
+### agent_products
+
+Controls which agents can promote which products.
+
+Fields:
+
+- `id`
+- `agent_id`
+- `product_id`
+- `tracking_id`
+- `custom_title`
+- `status`
+- `submitted_by_user_id`
+- `created_at`
+- `updated_at`
+
+### page_views
+
+Landing page view events.
+
+### clicks
+
+CTA click events routed through the redirect engine.
+
+### amazon_reports
+
+Metadata for uploaded/imported Amazon reports.
+
+Fields:
+
+- `id`
+- `marketplace`
+- `report_type`
+- `period_start`
+- `period_end`
+- `source_file_name`
+- `imported_by_user_id`
+- `imported_at`
+
+### amazon_conversions
+
+Parsed report rows tied to tracking IDs.
+
+Fields:
+
+- `id`
+- `report_id`
+- `tracking_tag`
+- `marketplace`
+- `asin`
+- `ordered_items`
+- `shipped_items`
+- `revenue_amount`
+- `commission_amount`
+- `raw_date`
+
+### audit_logs
+
+Tracks important admin and system actions.
 
 ---
 
-## 15. Deployment Strategy
+## 7. End-to-End Workflow
 
-### Phase 1: Foundation (Week 1)
-- Set up monorepo (pnpm + Turborepo)
-- Initialize Hono API worker
-- Create D1 database + run migrations
-- Create KV namespace
-- Build core redirect engine
-- Deploy API to Cloudflare Workers
+## 7.1 Agent Product Submission
 
-### Phase 2: Landing Page (Week 1-2)
-- Initialize React Router v7 on Cloudflare Pages
-- Build bridge page component (SSR)
-- Implement product display (image + title + CTA)
-- Add affiliate disclosure
-- Mobile-responsive design
-- Deploy to Cloudflare Pages
-
-### Phase 3: Admin Panel (Week 2-3)
-- Admin authentication (login/JWT)
-- Agent CRUD
-- Product CRUD (manual + ASIN fetch)
-- Tracking ID management
-- Agent-Product mapping
-
-### Phase 4: Automation (Week 3)
-- Google Sheets sync integration
-- Product data auto-fetch (API integration)
-- Cron-based cache refresh
-- Bulk operations
-
-### Phase 5: Analytics & Polish (Week 3-4)
-- Click tracking implementation
-- Analytics dashboard
-- Performance optimization
-- Security hardening
-- Production deployment
-
----
-
-## 16. E-commerce UI Overhaul (dealsrky.com Replica)
-
-Instead of using AI-generated designs, we will natively replicate the exact design, layout, and color scheme of the reference site (`https://dealsrky.com/`) using **React Router (v7)** and **Tailwind CSS**, while ensuring strict Amazon TOS compliance.
-
-### Approach
-We will manually engineer the frontend to match the reference site pixel-by-pixel, using our existing `app/` structure.
-
-1. **Establish the DealsRKY Design System in Tailwind:**
-   - **Primary Color:** Teal (`#0B8080` / custom teal).
-   - **Secondary Colors:** Yellow accents, warm white backgrounds (`#f3f4f6`).
-   - **Typography:** Clean sans-serif (Inter / Roboto).
-   
-2. **Implement Core Layout Components:**
-   - **Header:** Top strip (contact info), Main Search bar (Teal), Logo (Left), "All Departments" vertical dropdown trigger, Main Navigation bar.
-   - **Footer:** Exact replica of the dealsrky footer, including the necessary **Amazon Affiliate Disclosure**.
-
-3. **Replicate the Home/Storefront Page:**
-   - **Hero Section:** Left vertical category menu, central promotional slider/banner.
-   - **Product Grids:** "Deal of the Day" and "Top Brands" horizontal sliders and grid layouts.
-   - **Product Cards:** White cards with hover effects. 
-   - **CRITICAL TOS COMPLIANCE:** No static prices, no fake 5-star icons. Replace "Add to Cart" with "View Deal".
-
-4. **Replicate the Product Detail (Bridge) Page:**
-   - Left gallery view, right detail pane with features.
-   - A massive "See latest price on Amazon" CTA button.
-   - Secure redirect message.
-
-5. **Responsiveness (Mobile View):**
-   - Hamburger menu, bottom sticky navigation bar (if any), and stacked product cards.
-
-> [!IMPORTANT]  
-> User Review Required: I have updated the plan to completely drop Stitch and natively recreate your reference site (`dealsrky.com`) in our project using React & Tailwind. Do you approve this new plan? If yes, I will start implementing the Header and Layout right away!
-
----
-
-## 17. Cost Analysis (Monthly)
-
-| Service | Free Tier | Estimated Usage | Cost |
-|---------|-----------|-----------------|------|
-| Cloudflare Workers | 100K req/day | ~500K req/day | $5/month |
-| Cloudflare D1 | 5M reads/day | ~1M reads/day | Free |
-| Cloudflare KV | 100K reads/day | ~200K reads/day | $0.50/month |
-| Cloudflare Pages | Unlimited | — | Free |
-| 3rd Party Product API | — | ~1000 lookups/month | ~$30/month |
-| **Total** | | | **~$35.50/month** |
-
-> [!NOTE]
-> Cloudflare's free tier is extremely generous. For most use cases with <100K daily clicks, the infrastructure cost will be **$0-5/month** total.
-
----
-
-## Open Questions
-
-> [!IMPORTANT]
-> 1. **Amazon Creators API Access**: Does your client have 10+ sales/month to qualify? If not, shall we start with manual entry + ASIN Data API?
-> 2. **Google Sheets Format**: Can you share a sample Google Sheet so I can design the sync parser precisely?
-> 3. **Marketplace**: Is this US-only (amazon.com) or multi-marketplace (UK, DE, etc.)?
-> 4. **Domain**: What domain name will be used?
-> 5. **Number of agents**: Roughly how many agents? (Affects schema design for scale)
-> 6. **Admin users**: Just the client, or should agents also have limited access?
-> 7. **Branding**: Any logo/brand name for the bridge page, or keep it minimal?
-
----
-
-## Verification Plan
-
-### Automated Tests
-```bash
-# Run Vitest tests
-npm test
-
-# Test redirect engine
-curl -I https://yourdomain.com/go/agent-karim/B09V3KXJPB
-# Expected: 302 → amazon.com/dp/B09V3KXJPB?tag=karim-amz-20
-
-# Load test (using wrk)
-wrk -t4 -c100 -d30s https://yourdomain.com/go/agent-karim/B09V3KXJPB
+```text
+Agent logs in
+-> submits ASIN + marketplace
+-> system checks if product already exists
+-> if not, fetches metadata from allowed source
+-> creates/updates product
+-> creates agent_product row for that agent
+-> assigns correct tracking ID
+-> link becomes available for copy
 ```
 
-### Manual Verification
-- [ ] Bridge page renders correctly on mobile
-- [ ] "Buy on Amazon" redirects with correct tracking ID
-- [ ] Different agents get different tracking IDs for same product
-- [ ] Admin panel CRUD operations work
-- [ ] Google Sheets sync imports correctly
-- [ ] Analytics track views and clicks
-- [ ] Page loads in <200ms (Lighthouse audit)
-- [ ] Amazon affiliate link format is compliant
+## 7.2 Buyer Journey
 
-### Browser Testing
-- Test landing page on Chrome, Safari, Firefox (mobile + desktop)
-- Verify redirect works on iOS Safari and Android Chrome
-- Test admin panel responsiveness
+```text
+Buyer opens /:agentSlug/:asin
+-> SSR landing page renders image/title/disclosure
+-> page view is logged
+-> CTA points to /go/:agentSlug/:asin
+-> redirect engine resolves tracking tag
+-> click is logged
+-> buyer is redirected to Amazon
+```
+
+## 7.3 Sales Attribution
+
+```text
+Client downloads Amazon tracking report
+-> admin imports report into platform
+-> system maps tracking_tag to agent
+-> orders, revenue, commission become visible per agent
+```
+
+---
+
+## 8. Amazon Compliance Guardrails
+
+The system should be built around policy-safe behavior, not shortcuts.
+
+### Required
+
+- visible affiliate disclosure
+- original landing page content
+- explicit Amazon CTA
+- no forced redirects
+- privacy/contact/disclosure pages
+- clear destination behavior
+
+### Avoid
+
+- cloaked or disguised destination URLs
+- fake urgency widgets
+- static cached prices from unofficial sources
+- thin copy-paste storefront pages
+- bulk low-quality autogenerated content
+
+### Product Page Content Rule
+
+Every buyer-facing page should contain enough original presentation to look like a legitimate affiliate destination:
+
+- product title
+- product image
+- short descriptive copy
+- basic trust messaging
+- affiliate disclosure
+- clear CTA to Amazon
+
+Bridge pages should stay minimal, but not empty.
+
+---
+
+## 9. Security and Reliability
+
+## 9.1 Security
+
+- role-based authorization
+- JWT/session validation
+- brute-force protection on login
+- rate limits on sensitive endpoints
+- input validation through Zod
+- prepared SQL statements only
+- no hardcoded secrets in repo
+- audit logs for sensitive operations
+
+## 9.2 Performance
+
+- D1 for canonical reads/writes
+- KV cache for hot redirect/page data
+- SSR for public pages
+- cache invalidation on product/tag/mapping changes
+- lightweight bridge rendering
+
+## 9.3 Reliability
+
+- health endpoint
+- import error handling
+- product fetch retry strategy
+- graceful fallback if product fetch fails
+- soft-delete for business-critical records
+
+---
+
+## 10. Implementation Phases
+
+## Phase 0 — Direction Reset
+
+Goal:
+
+Remove outdated assumptions and align the repo with the final product.
+
+Tasks:
+
+- rewrite implementation plan
+- freeze Google Sheet assumptions
+- stop cloning the old DealsRky storefront
+- define new site architecture and route map
+- define final data ownership model
+
+Status:
+
+- in progress now via this document
+
+## Phase 1 — Core Engine Correction
+
+Goal:
+
+Make the existing redirect/bridge system technically correct.
+
+Tasks:
+
+- change bridge CTA so it always routes through `/go/:agentSlug/:asin`
+- ensure page views and clicks are both tracked
+- normalize redirect and bridge data contracts
+- improve cache invalidation on agent/product/mapping changes
+- remove secret exposure and hardcoded API credentials
+- harden redirect middleware behavior
+
+Current repo status:
+
+- partially built
+- requires correction, not greenfield work
+
+## Phase 2 — Schema Upgrade
+
+Goal:
+
+Move from prototype schema to final production schema.
+
+Tasks:
+
+- add `users`
+- extend `agents`
+- normalize `tracking_ids`
+- extend `products`
+- extend `agent_products`
+- add `amazon_reports`
+- add `amazon_conversions`
+- add `audit_logs`
+- add indexes and soft-delete/status fields where needed
+
+Current repo status:
+
+- partial schema exists
+- final production schema not implemented
+
+## Phase 3 — Auth and Roles
+
+Goal:
+
+Support both admins and agents cleanly.
+
+Tasks:
+
+- implement role-based auth model
+- create admin and agent login flows
+- attach users to agents
+- protect route groups by role
+- add session expiry and token handling cleanup
+
+Current repo status:
+
+- admin auth exists
+- agent auth does not exist
+
+## Phase 4 — Admin Panel Completion
+
+Goal:
+
+Turn current admin screens into a real operations console.
+
+Tasks:
+
+- finish dashboard
+- add admin user management
+- improve agents/tracking/product CRUD UX
+- add product approval states
+- add analytics pages
+- add report import UI
+- add audit log UI
+
+Current repo status:
+
+- partial admin exists
+- analytics/reporting incomplete
+
+## Phase 5 — Agent Portal
+
+Goal:
+
+Replace Google Sheets with in-house workflow.
+
+Tasks:
+
+- agent dashboard
+- ASIN submission form
+- product submission status
+- link generation screen
+- own analytics screen
+- own profile/settings if needed
+
+Current repo status:
+
+- not built yet
+
+## Phase 6 — Product Ingestion Pipeline
+
+Goal:
+
+Make product creation reliable and operationally safe.
+
+Tasks:
+
+- ASIN validation endpoint
+- fetch metadata from approved source
+- duplicate reuse by `asin + marketplace`
+- moderation states
+- manual override fields
+- re-fetch/refresh workflow
+
+Current repo status:
+
+- partial product fetch exists
+- pipeline is not production-ready
+
+## Phase 7 — New Public Frontend
+
+Goal:
+
+Build the actual branded affiliate site.
+
+Tasks:
+
+- remove cloned storefront direction
+- create original homepage
+- create original product page design
+- create compliant bridge landing page design
+- create legal/support pages
+- keep site mobile-first and fast
+
+Current repo status:
+
+- public site exists
+- direction is wrong and needs redesign
+
+## Phase 8 — Sales Attribution
+
+Goal:
+
+Support real agent-level business reporting.
+
+Tasks:
+
+- define Amazon report import format
+- implement report parser
+- map `tracking_tag -> agent`
+- aggregate orders/revenue/commission
+- show per-agent and per-product sales metrics
+
+Current repo status:
+
+- not built
+- currently only traffic analytics exist
+
+## Phase 9 — QA, Compliance, Deployment
+
+Goal:
+
+Ship safely.
+
+Tasks:
+
+- full role-based route testing
+- redirect correctness testing
+- marketplace correctness testing
+- analytics integrity checks
+- compliance review checklist
+- production deploy and smoke tests
+
+---
+
+## 11. Immediate Build Priorities
+
+The best next implementation order inside the repo is:
+
+1. fix bridge CTA and redirect tracking flow
+2. redesign schema and create new migrations
+3. add role-based `users` system
+4. complete admin data model and screens
+5. build agent portal
+6. redesign public frontend away from the old clone
+7. add Amazon report import and sales attribution
+
+This order minimizes rework because:
+
+- redirect correctness is a blocker for trustworthy analytics
+- schema affects all future route and UI work
+- auth/roles affect admin and portal design
+- sales attribution depends on tracking ID discipline and import pipeline
+
+---
+
+## 12. Success Criteria
+
+The project is complete when all of the following are true:
+
+- agents no longer need Google Sheets
+- agents can log in and get their own links
+- admins can manage agents, products, and tracking IDs
+- buyers see a fast, compliant landing page
+- all CTA clicks are logged through the redirect engine
+- the correct Amazon tracking ID is always injected
+- sales can be reconciled per agent from Amazon reports
+- the frontend is original and no longer a clone
+- the full system runs under a clean, in-house workflow
+
+---
+
+## 13. Non-Negotiable Engineering Rules
+
+- one canonical product row per `asin + marketplace`
+- all buyer CTA clicks go through redirect route
+- no public page should depend on Google Sheets
+- no hardcoded secrets in repo
+- no fake pricing
+- no cloned UI direction
+- no missing error/empty/loading states in portal/admin flows
+- all important business records should be soft-delete or status-based
+
+---
+
+## 14. Final Direction Summary
+
+The final system is:
+
+- a custom Amazon affiliate platform
+- owned and operated fully in-house
+- agent-driven, not Google Sheet driven
+- sales-attributable through Amazon tracking IDs
+- fast through Cloudflare edge architecture
+- compliant through clean bridge patterns and original content
+
+The current repo is a strong foundation, but it still needs:
+
+- flow correction
+- schema evolution
+- role expansion
+- portal implementation
+- frontend redesign
+- sales attribution layer
+
+That is now the official implementation direction.

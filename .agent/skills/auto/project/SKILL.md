@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for Amazon affiliate. 19 gotchas, 33 conventions, 5 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 41 conventions, 9 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **85 real patterns** in **Amazon affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **165 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -18,6 +18,7 @@ Auto-compiled from **85 real patterns** in **Amazon affiliate**. This skill is a
 
 | ❌ Don't | Details |
 |----------|----------|
+| gotcha in flow-c-ascii.md | File updated (external): .qwen/skills/wds-4-ux-design/data/page-creation-flows/flow-c-ascii.md  Cont |
 | Agent: follow existing project patterns — don't in | Agent: follow existing project patterns — don't introduce a different style |
 | Agent: don't generate code with "any" type — defin | Agent: don't generate code with "any" type — define proper TypeScript types |
 | Agent: always handle loading/error states — don't  | Agent: always handle loading/error states — don't just render data |
@@ -39,6 +40,70 @@ Auto-compiled from **85 real patterns** in **Amazon affiliate**. This skill is a
 | Never force push to main, master, or production br | Never force push to main, master, or production branches |
 
 ## 🔧 Problem Playbooks
+
+### problem-fix in step-04-generate-tests.md
+File updated (external): .qwen/skills/bmad-testarch-atdd/steps-c/step-04-generate-tests.md
+
+Content summary (335 lines):
+---
+name: 'step-04-generate-tests'
+description: 'Orchestrate adaptive FAILING test generation (TDD red phase)'
+nextStepFile: './step-04c-aggregate.md'
+---
+
+# Step 4: Orchestrate Adaptive FAILING Test Generation
+
+## STEP GOAL
+
+Select execution mode deterministically, then generat
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in template-substitution-rules.md
+File updated (external): _bmad/bmb/bmad-workflow-builder/references/template-substitution-rules.md
+
+Content summary (33 lines):
+# Template Substitution Rules
+
+The SKILL-template provides a minimal skeleton: frontmatter, overview, and activation with config loading. Everything beyond that is crafted by the builder based on what was learned during discovery and requirements phases.
+
+## Frontmatter
+
+
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in scratchpad_zgx4ynez.md
+- - [ ] Navigate to http://localhost:5173/
++ - [x] Navigate to http://localhost:5173/
+-     - [ ] Screenshot captured
++     - [x] Screenshot captured
+-     - [ ] Logo "DealsRky" verified
++     - [x] Logo "DealsRky" verified (SVG text fallback works)
+- - [ ] Navigate to http://localhost:5173/category/kitchen
++ - [x] Navigate to http://localhost:5173/category/kitchen
+-     - [ ] Screenshot captured
+
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in scratchpad_e348z4wk.md
+- - [ ] Open `http://localhost:5175/` and wait for page load.
++ - [x] Open `http://localhost:5175/` and wait for page load.
+- - [ ] Capture screenshot of the UI/Error.
++ - [x] Capture screenshot of the UI/Error.
+- - [ ] Capture browser console logs.
++ - [x] Capture browser console logs.
+- - [ ] Analyze the error and report findings.
++ - [x] Analyze the error and report findings.
+- 
++ - [ ] Investi
+
+**Actionable Steps:**
+1. Modified 1 files
 
 ### problem-fix in scratchpad_3pekeu96.md
 - - [ ] Scroll to "Latest Deals" section and take screenshot `product_cards_check`
@@ -109,6 +174,14 @@ Auto-compiled from **85 real patterns** in **Amazon affiliate**. This skill is a
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **Strengthened types Compatible — ensures atomic multi-step database operations** — - Q: Can I use this in a canister filter?A: Yes. Cut to fit any filter (canister, HOB, sump, waterfa
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x**
+- 📐 **Updated Wireless database schema — ensures atomic multi-step database operations — confirmed 5x**
+- 📐 **Updated and database schema — ensures atomic multi-step database operations — confirmed 3x**
+- 📐 **Strengthened types Quality**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 7x**
+- 📐 **Updated page_views database schema — confirmed 3x**
 - 📐 **Strengthened types Overhaul — offloads heavy computation off the main thread** — - ## 16. Cost Analysis (Monthly)
 + ## 16. E-commerce UI Overhaul (StitchMCP) Plan
 - | Service | Free
@@ -150,21 +223,6 @@ CLAUDE.md
 - 📐 **Hash passwords with cost factor ≥12 (bcrypt) or memory ≥64MB (argon2)** — Hash passwords with cost factor ≥12 (bcrypt) or memory ≥64MB (argon2)
 - 📐 **Implement rate limiting on login endpoints to prevent brute force** — Implement rate limiting on login endpoints to prevent brute force
 - 📐 **Use constants for magic numbers and strings** — Use constants for magic numbers and strings
-- 📐 **Handle edge cases: empty arrays, empty strings, null, undefined, 0, NaN** — Handle edge cases: empty arrays, empty strings, null, undefined, 0, NaN
-- 📐 **Keep functions under 50 lines and single-responsibility** — Keep functions under 50 lines and single-responsibility
-- 📐 **Remove unused imports, variables, and dead code** — Remove unused imports, variables, and dead code
-- 📐 **Always pull before push to avoid conflicts** — Always pull before push to avoid conflicts
-- 📐 **Use meaningful commit messages in imperative mood: "Add feature" not "Added feature"** — Use meaningful commit messages in imperative mood: "Add feature" not "Added feature"
-- 📐 **Don't commit node_modules, __pycache__, build/, dist/ — add to .gitignore** — Don't commit node_modules, __pycache__, build/, dist/ — add to .gitignore
+- 📐 **Handle edge cases: empty arrays, empty strings, null, undefined, 0, N
 
-## 🤔 Decisions & Trade-offs
-
-- **Optimized Argument — offloads heavy computation off the main thread** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- **Optimized Argument — hardens HTTP security headers** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- **Optimized Refactor — hardens HTTP security headers** — - # Amazon Affiliate Bridge Page System — Enterprise Architecture
-+ # Refactor: Single Worker App wi
-- **Optimized Amazon — hardens HTTP security headers** — - # Temporary Amazon Affiliate Bridge MVP — Implementation Plan
-+ # Amazon Affiliate MVP — Main Plan
-
----
-*Auto-generated by BrainSync 🧠 | 85 patterns | 2026-03-28*
+... [Truncated — see individual observations for full content]

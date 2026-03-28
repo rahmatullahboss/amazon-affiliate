@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for Amazon affiliate. 1 gotchas, 6 conventions, 1 fixes."
+description: "Typescript React for amazon-affiliate. 1 gotchas, 6 conventions, 1 fixes."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,7 +12,7 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **15 real patterns** in **Amazon affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **15 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 

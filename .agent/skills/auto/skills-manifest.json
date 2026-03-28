@@ -1,19 +1,19 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.001Z",
-    "observationCount": 85,
+    "lastGenerated": "2026-03-28T08:35:11.341Z",
+    "observationCount": 165,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Project for Amazon affiliate. 19 gotchas, 33 conventions, 5 fixes."
+    "description": "Project for amazon-affiliate. 20 gotchas, 41 conventions, 9 fixes."
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.003Z",
-    "observationCount": 3,
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
+    "observationCount": 10,
     "skillCount": 0,
     "domain": "config",
     "triggerGlobs": [
@@ -22,11 +22,11 @@
       "**/*.json",
       "**/*.toml"
     ],
-    "description": "Config for Amazon affiliate. ."
+    "description": "Config for amazon-affiliate. 1 conventions."
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.002Z",
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
     "observationCount": 41,
     "skillCount": 0,
     "domain": "typescript",
@@ -34,22 +34,22 @@
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for Amazon affiliate. 2 conventions, 4 fixes."
+    "description": "Typescript for amazon-affiliate. 2 conventions, 4 fixes."
   },
   "typescript-react": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.001Z",
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
     "observationCount": 15,
     "skillCount": 0,
     "domain": "typescript-react",
     "triggerGlobs": [
       "**/*.tsx"
     ],
-    "description": "Typescript React for Amazon affiliate. 1 gotchas, 6 conventions, 1 fixes."
+    "description": "Typescript React for amazon-affiliate. 1 gotchas, 6 conventions, 1 fixes."
   },
   "css": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.002Z",
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
     "observationCount": 3,
     "skillCount": 0,
     "domain": "css",
@@ -57,11 +57,11 @@
       "**/*.css",
       "**/*.scss"
     ],
-    "description": "Css for Amazon affiliate. ."
+    "description": "Css for amazon-affiliate. ."
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T05:45:12.003Z",
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
     "observationCount": 2,
     "skillCount": 0,
     "domain": "javascript",
@@ -69,6 +69,28 @@
       "**/*.js",
       "**/*.jsx"
     ],
-    "description": "Javascript for Amazon affiliate. ."
+    "description": "Javascript for amazon-affiliate. ."
+  },
+  "convention": {
+    "enabled": true,
+    "lastGenerated": "2026-03-28T08:35:11.342Z",
+    "observationCount": 0,
+    "skillCount": 2,
+    "domain": "convention",
+    "triggerGlobs": [
+      "**/*"
+    ],
+    "description": "Convention for amazon-affiliate. ."
+  },
+  "decision": {
+    "enabled": true,
+    "lastGenerated": "2026-03-28T08:35:11.343Z",
+    "observationCount": 0,
+    "skillCount": 2,
+    "domain": "decision",
+    "triggerGlobs": [
+      "**/*"
+    ],
+    "description": "Decision for amazon-affiliate. ."
   }
 }

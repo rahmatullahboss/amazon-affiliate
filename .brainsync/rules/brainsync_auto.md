@@ -1,7 +1,7 @@
 
 
 # Project Memory — Amazon affiliate
-> 150 notes | Score threshold: >40
+> 238 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -18,20 +18,21 @@
 
 **Stack:** Unknown stack
 
-## Important Warnings
+## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
+- **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
 - **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
 
 ## Project Standards
 
+- what-changed in manifest.yaml — confirmed 3x
+- Strengthened types Compatible — ensures atomic multi-step database operations
 - Strengthened types Overhaul — offloads heavy computation off the main thread
 - Fixed null crash in Mapping — confirmed 3x
 - Strengthened types Navigate
 - Strengthened types Contact
 - Updated API endpoint Annotations — reduces initial bundle size with code spli... — confirmed 5x
 - Strengthened types Route — wraps unsafe operation in error boundary
-- Strengthened types Route — parallelizes async operations for speed
-- Strengthened types HeroBanner — parallelizes async operations for speed
 
 ## Known Fixes
 
@@ -39,13 +40,16 @@
 
 ## Recent Decisions
 
-- decision in product-detail.tsx
-- decision in home.tsx
-- Optimized Argument — offloads heavy computation off the main thread
-- Optimized Argument — hardens HTTP security headers
+- Optimized Amazon — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
+- decision in SKILL.md
+- decision in booking-example.md
 
-## Verified Best Practices
+## Learned Patterns
 
+- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x (seen 2x)
+- Decision: Optimized Argument — offloads heavy computation off the main thread (seen 2x)
+- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x (seen 3x)
 - Agent generates new migration for every change (squash related changes)
 - Agent installs packages without checking if already installed
 
