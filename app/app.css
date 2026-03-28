@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0B8080;
+  --color-primary-hover: #086666;
+  --color-accent: #facc15; /* Yellow accent */
+  --color-surface: #ffffff;
+  --color-surface-hover: #f3f4f6;
+  --color-bg-page: #f9fafb;
+  --color-text-main: #111827;
+  --color-text-muted: #6b7280;
+  --color-footer-bg: #1a1a1a;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-bg-page);
+    color: var(--color-text-main);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}

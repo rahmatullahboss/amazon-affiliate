@@ -1,0 +1,36 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dealsrky-bridge",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "main": "./workers/app.ts",
+  "observability": { "enabled": true },
+
+  // D1 Database
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dealsrky-db",
+      "database_id": "a4f5fc8a-dddb-4a9b-8cbb-eaaaa05e793a"
+    }
+  ],
+
+  // KV Cache
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "bc7a677541964c47964f2bfefb50e319"
+    }
+  ],
+
+  // Environment Variables
+  "vars": {
+    "ENVIRONMENT": "production",
+    "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES"
+  }
+
+  // Secrets (set via `wrangler secret put`):
+  // - JWT_SECRET
+  // - AMAZON_API_KEY (optional)
+}

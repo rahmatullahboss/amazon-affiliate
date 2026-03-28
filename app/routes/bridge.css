@@ -1,0 +1,376 @@
+/* ============================================
+   Bridge Landing Page — Premium Buyer Experience
+   Mobile-first, fast, Amazon-compliant
+   ============================================ */
+
+.bridge-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--gradient-dark);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ambient background glow */
+.bridge-page::before {
+  content: '';
+  position: absolute;
+  top: -200px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(255, 153, 0, 0.08), transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Header ──────────────────────────────────── */
+.bridge-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+  background: rgba(10, 10, 15, 0.7);
+  position: relative;
+  z-index: 10;
+}
+
+.bridge-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.bridge-logo-icon {
+  width: 28px;
+  height: 28px;
+  background: var(--gradient-amazon);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  color: #000;
+}
+
+/* ─── Main Content ────────────────────────────── */
+.bridge-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Product Card ────────────────────────────── */
+.product-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--gradient-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  overflow: hidden;
+  animation: fadeInScale 0.6s ease-out forwards;
+  box-shadow: var(--shadow-xl);
+  position: relative;
+}
+
+.product-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-2xl);
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 153, 0, 0.3),
+    transparent 50%,
+    rgba(99, 102, 241, 0.2)
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Product Image ───────────────────────────── */
+.product-image-container {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(145deg, #fff, #f8f8f8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  overflow: hidden;
+}
+
+.product-image {
+  max-width: 85%;
+  max-height: 85%;
+  object-fit: contain;
+  transition: transform var(--transition-slow);
+  filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.15));
+}
+
+.product-card:hover .product-image {
+  transform: scale(1.05);
+}
+
+.product-badge {
+  position: absolute;
+  top: var(--space-4);
+  left: var(--space-4);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ─── Product Info ────────────────────────────── */
+.product-info {
+  padding: var(--space-6);
+}
+
+.product-title {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: var(--leading-tight);
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-4);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ─── Buy Button ──────────────────────────────── */
+.buy-button-container {
+  padding: 0 var(--space-6) var(--space-6);
+}
+
+.buy-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-4) var(--space-6);
+  background: var(--gradient-amazon);
+  color: #000;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  animation: glow 3s infinite;
+}
+
+.buy-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+.buy-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-amazon), var(--shadow-glow);
+}
+
+.buy-button:hover::before {
+  transform: translateX(100%);
+}
+
+.buy-button:active {
+  transform: translateY(0);
+}
+
+.buy-button-icon {
+  font-size: var(--text-xl);
+}
+
+.buy-button-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.buy-button-label {
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.buy-button-subtitle {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+/* ─── Trust Signals ───────────────────────────── */
+.trust-signals {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-6);
+  padding: var(--space-4) var(--space-6) var(--space-6);
+}
+
+.trust-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.trust-icon {
+  color: var(--color-success);
+  font-size: var(--text-base);
+}
+
+/* ─── Footer / Disclosure ─────────────────────── */
+.bridge-footer {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.affiliate-disclosure {
+  max-width: 520px;
+  margin: 0 auto;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: var(--leading-relaxed);
+  opacity: 0.7;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+/* ─── Loading State ───────────────────────────── */
+.bridge-loading {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-dark);
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border);
+  border-top-color: var(--color-amazon-orange);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Error State ─────────────────────────────── */
+.bridge-error {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  text-align: center;
+  background: var(--gradient-dark);
+}
+
+.bridge-error h1 {
+  font-size: var(--text-4xl);
+  font-weight: 800;
+  background: var(--gradient-amazon);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: var(--space-4);
+}
+
+.bridge-error p {
+  color: var(--color-text-secondary);
+  font-size: var(--text-lg);
+  max-width: 400px;
+}
+
+/* ─── Responsive ──────────────────────────────── */
+@media (max-width: 480px) {
+  .product-card {
+    border-radius: var(--radius-xl);
+    margin: 0 var(--space-2);
+  }
+
+  .product-image-container {
+    padding: var(--space-6);
+  }
+
+  .product-info {
+    padding: var(--space-4);
+  }
+
+  .product-title {
+    font-size: var(--text-lg);
+  }
+
+  .buy-button-container {
+    padding: 0 var(--space-4) var(--space-4);
+  }
+
+  .buy-button {
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-base);
+    border-radius: var(--radius-lg);
+  }
+
+  .trust-signals {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+}
+
+@media (min-width: 768px) {
+  .product-card {
+    max-width: 500px;
+  }
+
+  .product-title {
+    font-size: var(--text-2xl);
+  }
+
+  .bridge-main {
+    padding: var(--space-12) var(--space-4);
+  }
+}
