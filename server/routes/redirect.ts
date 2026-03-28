@@ -62,8 +62,7 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   }
 
   if (!ctx) {
-    // 2. Fallback to D1 query — single query, gets EVERYTHING we need
-    const row = await c.env.DB.prepare(
+    let row = await c.env.DB.prepare(
       `SELECT p.asin, t.tag, t.marketplace, a.id as agent_id, p.id as product_id
        FROM agent_products ap
        JOIN agents a ON a.id = ap.agent_id
@@ -75,6 +74,19 @@ redirect.get('/:agentSlug/:asin', async (c) => {
     )
       .bind(agentSlug, asin)
       .first<{ asin: string; tag: string; marketplace: string; agent_id: number; product_id: number }>();
+
+    // 2.1 Fallback to default tracking tag if original agent link is invalid/inactive
+    if (!row) {
+      row = await c.env.DB.prepare(
+        `SELECT p.asin, t.tag, t.marketplace, t.agent_id as agent_id, p.id as product_id
+         FROM products p
+         JOIN tracking_ids t ON t.is_default = 1
+         WHERE p.asin = ? AND p.is_active = 1 AND p.status = 'active' AND t.is_active = 1
+         LIMIT 1`
+      )
+        .bind(asin)
+        .first<{ asin: string; tag: string; marketplace: string; agent_id: number; product_id: number }>();
+    }
 
     if (!row) {
       throw new HTTPException(404, { message: 'Link not found' });

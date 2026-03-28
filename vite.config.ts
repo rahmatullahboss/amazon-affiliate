@@ -7,8 +7,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [
     cloudflare({ viteEnvironment: { name: "ssr" } }),
-    reactRouter(),
+    !process.env.VITEST && reactRouter(),
     tsconfigPaths(),
     tailwindcss(),
-  ],
+  ].filter(Boolean) as any,
 });

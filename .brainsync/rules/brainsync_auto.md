@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 339 notes | Score threshold: >40
+> 368 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,26 +20,31 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
+- **⚠️ GOTCHA: Fixed null crash in AppEnv — offloads heavy computation off the main thread** — - import type { AppEnv } from '../server/utils/types';
++ import { env 
+- **⚠️ GOTCHA: Strengthened types Failed — evolves the database schema to support new requir...** — -       .replace(/\/\*[\s\S]*?\*\//g, '')
++       .replace(/\/\*[\s\S]
 - **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
 - **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
 
-## Active: `server/services`
+## Active: `.`
 
-- **what-changed in google-sheets.ts**
-- **Fixed null crash in SheetSyncConfig — prevents null/undefined runtime crashes**
-- **what-changed in sheet-sync.ts**
-- **what-changed in product-ingestion.ts**
+- **Optimized package — offloads heavy computation off the main thread**
+- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
+- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
+- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
+- **Strengthened types Overhaul — offloads heavy computation off the main thread**
 
 ## Project Standards
 
-- what-changed in analytics.ts — confirmed 3x
-- Fixed null crash in SELECT — parallelizes async operations for speed — confirmed 5x
-- Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x
-- Fixed null crash in HTTPException — parallelizes async operations for speed — confirmed 3x
-- what-changed in products.ts — confirmed 3x
-- what-changed in login.ts — confirmed 3x
-- what-changed in layout.ts — confirmed 3x
-- what-changed in dashboard.ts — confirmed 3x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
+- Strengthened types Overhaul — offloads heavy computation off the main thread
+- convention in .gitignore
+- convention in .gitignore
+- Updated clicks database schema — parallelizes async operations for speed — confirmed 3x
+- Strengthened types Failed — evolves the database schema to support new requir...
 
 ## Known Fixes
 
@@ -49,9 +54,9 @@
 
 ## Recent Decisions
 
-- decision in index.ts
+- Optimized package — offloads heavy computation off the main thread
+- Optimized vitest.config — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized Step — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
 
 ## Learned Patterns

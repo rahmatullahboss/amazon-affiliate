@@ -64,6 +64,7 @@ app.route('/api/public', publicRoutes);
 // ─── Protected Routes (Admin Only) ───────────────────────
 const admin = new Hono<AppEnv>();
 admin.use('*', authMiddleware);
+admin.use('*', requireRole('admin', 'super_admin'));
 
 admin.route('/agents', agents);
 admin.route('/users', users);
