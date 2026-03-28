@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 416 notes | Score threshold: >40
+> 443 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,6 +20,9 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
+- **⚠️ GOTCHA: Fixed null crash in UPDATE — prevents null/undefined runtime crashes** — -       await ensureProductRecord({
++       try {
+-         db: input.
 - **⚠️ GOTCHA: Fixed null crash in AppEnv — offloads heavy computation off the main thread** — - import type { AppEnv } from '../server/utils/types';
 + import { env 
 - **⚠️ GOTCHA: Strengthened types Failed — evolves the database schema to support new requir...** — -       .replace(/\/\*[\s\S]*?\*\//g, '')
@@ -29,27 +32,29 @@
 
 ## Project Standards
 
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
+- what-changed in tracking.ts — confirmed 3x
+- Fixed null crash in Link — formalizes the data contract with explicit types — confirmed 5x
+- Fixed null crash in HTTPException — improves module reusability — confirmed 4x
+- convention in index.ts
 - what-changed in home.tsx — confirmed 3x
 - Fixed null crash in ProductRecord — prevents null/undefined runtime crashes — confirmed 3x
 - Updated clicks database schema — parallelizes async operations for speed — confirmed 3x
-- Strengthened types Failed — evolves the database schema to support new requir...
-- Strengthened types Also — offloads heavy computation off the main thread
-- Added JWT tokens authentication — confirmed 3x
-- Optimized Step — offloads heavy computation off the main thread — confirmed 4x
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
 
 ## Known Fixes
 
 - ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
 - ❌ -     throw new HTTPException(400, { message: 'Missing agent or ASIN' }); → ✅ Fixed null crash in SELECT — parallelizes async operations for speed
+- ❌ -   } catch (error) { → ✅ Fixed null crash in Product — parallelizes async operations for speed
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
+- ❌ +     throw new HTTPException(403, { message: 'Only linked agent accounts can view performance' }); → ✅ Fixed null crash in HTTPException — prevents null/undefined runtime crashes
 
 ## Recent Decisions
 
-- Optimized Product — offloads heavy computation off the main thread
-- Optimized vitest.config — offloads heavy computation off the main thread
-- Optimized DealsRKY — offloads heavy computation off the main thread
-- Optimized Step — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized Frontend — offloads heavy computation off the main thread
 
 ## Learned Patterns
 

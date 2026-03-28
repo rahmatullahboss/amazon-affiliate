@@ -204,16 +204,22 @@ export async function syncProductsFromSheet(
         .bind(asin, marketplace)
         .first<{ id: number }>();
 
-      await ensureProductRecord({
-        db: input.db,
-        asin,
-        marketplace,
-        apiKey: input.apiKey,
-        title: normalizeCell(row.title) || null,
-        category: normalizeCell(row.category) || null,
-        status,
-        updateExistingFromInput: true,
-      });
+      try {
+        await ensureProductRecord({
+          db: input.db,
+          asin,
+          marketplace,
+          apiKey: input.apiKey,
+          title: normalizeCell(row.title) || null,
+          category: normalizeCell(row.category) || null,
+          status,
+          updateExistingFromInput: true,
+          requireRealProductData: true,
+        });
+      } catch {
+        skippedCount += 1;
+        continue;
+      }
 
       if (existing) {
         updatedCount += 1;

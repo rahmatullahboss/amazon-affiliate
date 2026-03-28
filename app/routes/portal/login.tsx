@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 export default function PortalLoginPage() {
   const navigate = useNavigate();
@@ -67,6 +67,10 @@ export default function PortalLoginPage() {
         <button type="submit" style={styles.button} disabled={loading}>
           {loading ? "Signing in..." : "Sign In"}
         </button>
+
+        <p style={styles.switchText}>
+          Need an account? <Link style={styles.link} to="/portal/register">Create agent account</Link>
+        </p>
       </form>
     </main>
   );
@@ -110,6 +114,8 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "0.9rem 1rem",
     cursor: "pointer",
   },
+  switchText: { margin: 0, color: "#cbd5e1", fontSize: "0.9rem" },
+  link: { color: "#fbbf24", textDecoration: "none", fontWeight: 600 },
   error: {
     margin: 0,
     color: "#fecaca",

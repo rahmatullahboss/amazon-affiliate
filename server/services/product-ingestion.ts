@@ -34,6 +34,7 @@ interface EnsureProductInput {
   aplusImages?: string[] | null;
   status?: string;
   updateExistingFromInput?: boolean;
+  requireRealProductData?: boolean;
 }
 
 interface ParsedSheetProductRow {
@@ -46,6 +47,11 @@ interface ParsedSheetProductRow {
 }
 
 const VALID_ASIN_REGEX = /^B[0-9A-Z]{9}$/;
+const AMAZON_ASIN_PATTERNS = [
+  /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i,
+  /\/gp\/product\/([A-Z0-9]{10})(?:[/?]|$)/i,
+  /[?&]asin=([A-Z0-9]{10})(?:[&#]|$)/i,
+];
 
 export function normalizeAsin(rawAsin: string): string {
   return rawAsin.trim().toUpperCase();
@@ -53,6 +59,23 @@ export function normalizeAsin(rawAsin: string): string {
 
 export function isValidAsin(asin: string): boolean {
   return VALID_ASIN_REGEX.test(normalizeAsin(asin));
+}
+
+export function extractAsinFromInput(rawInput: string): string | null {
+  const normalized = normalizeAsin(rawInput);
+  if (isValidAsin(normalized)) {
+    return normalized;
+  }
+
+  for (const pattern of AMAZON_ASIN_PATTERNS) {
+    const match = rawInput.match(pattern);
+    const extracted = match?.[1]?.toUpperCase() || "";
+    if (isValidAsin(extracted)) {
+      return extracted;
+    }
+  }
+
+  return null;
 }
 
 export function buildFallbackImageUrl(asin: string): string {
@@ -132,6 +155,10 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       (!explicitTitle || !explicitImageUrl) && input.apiKey
         ? await fetchAmazonProductData(input.apiKey, asin, marketplace)
         : null;
+
+    if (!explicitTitle && !explicitImageUrl && input.requireRealProductData && !fetched) {
+      throw new Error("Real product data could not be fetched for this ASIN.");
+    }
 
     const title = explicitTitle || fetched?.title || `Product ${asin}`;
     const imageUrl = explicitImageUrl || fetched?.imageUrl || buildFallbackImageUrl(asin);

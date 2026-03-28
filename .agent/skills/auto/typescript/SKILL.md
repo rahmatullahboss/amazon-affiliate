@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 2 gotchas, 15 conventions, 11 fixes."
+description: "Typescript for amazon-affiliate. 3 gotchas, 18 conventions, 16 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,40 +11,129 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **146 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
 > **CRITICAL:** These are real gotchas from this project. Ignoring them WILL cause bugs.
 
-### ❌ ⚠️ GOTCHA: Fixed null crash in AppEnv — offloads heavy computation off the main thread
-- import type { AppEnv } from '../server/utils/types';
-+ import { env } from 'cloudflare:workers';
-- 
-+ import type { AppEnv } from '../server/utils/types';
-- export async function setupTestDatabase(env: AppEnv['Bindings']) {
-+ 
--   if (!env.DB) retu
-- Modified 1 files
-- identifier: AppEnv
-- identifier: Dynamically
-
-### ❌ ⚠️ GOTCHA: Strengthened types Failed — evolves the database schema to support new requir...
--       .replace(/\/\*[\s\S]*?\*\//g, '')
-+       .replace(/\/\*[\s\S]*?\*\//g, '');
--       .trim();
-+ 
--     if (cleanSchema) {
-+     const statements = cleanSchema
--       await (env.DB as any).exec(cleanSchema);
-+       .split(';')
--     }
-+     
-- Modified 1 files
-- identifier: Failed
-
+| ❌ Don't | Details |
+|----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in UPDATE — prevents n | -       await ensureProductRecord({ +       try { -         db: input.db, +         await ensureProd |
+| ⚠️ GOTCHA: Fixed null crash in AppEnv — offloads h | - import type { AppEnv } from '../server/utils/types'; + import { env } from 'cloudflare:workers'; - |
+| ⚠️ GOTCHA: Strengthened types Failed — evolves the | -       .replace(/\/\*[\s\S]*?\*\//g, '') +       .replace(/\/\*[\s\S]*?\*\//g, ''); -       .trim() |
 
 ## 🔧 Problem Playbooks
+
+### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
+- import { portalAsinSubmissionSchema } from '../schemas';
++ import { portalAsinSubmissionSchema, portalTrackingSetupSchema } from '../schemas';
+- portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
++ portal.get('/tracking', async (c) => {
+-   const userId = c.get('userId');
++ 
+- 
++   if (role !== 'agent' || !agentId) {
+-   if (role !== 'agent' || !agentI
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: HTTPException
+3. identifier: Only
+4. identifier: IDs
+5. identifier: SELECT
+
+### Fixed null crash in INSERT — improves module reusability
+- import { loginSchema, setupSchema } from '../schemas';
++ import { agentRegistrationSchema, loginSchema, setupSchema } from '../schemas';
+- export default auth;
++ auth.post('/register-agent', zValidator('json', agentRegistrationSchema), async (c) => {
+- 
++   const body = c.req.valid('json');
++   const passwordHash = await hashPassword(body.password);
++ 
++   try {
++     await c.env.DB.prepare(
++  
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: INSERT
+3. identifier: INTO
+4. identifier: VALUES
+5. identifier: Error
+
+### Fixed null crash in Product — parallelizes async operations for speed
+-     });
++       requireRealProductData: true,
+- 
++     });
+-     return c.json({ product, message: 'Product fetched and saved' }, 201);
++ 
+-   } catch (error) {
++     return c.json({ product, message: 'Product fetched and saved' }, 201);
+-     if (error instanceof HTTPException) throw error;
++   } catch (error) {
+-     console.error('[Products] ASIN fetch error:', error);
++     if (error instanc
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Product
+3. identifier: HTTPException
+4. identifier: Products
+5. identifier: ASIN
+
+### Fixed null crash in ParsedSheetProductRow — prevents null/undefined runtime c...
+- }
++   requireRealProductData?: boolean;
+- 
++ }
+- interface ParsedSheetProductRow {
++ 
+-   asin: string;
++ interface ParsedSheetProductRow {
+-   marketplace: string;
++   asin: string;
+-   title: string | null;
++   marketplace: string;
+-   imageUrl: string | null;
++   title: string | null;
+-   category: string | null;
++   imageUrl: string | null;
+-   status: string;
++   category: string | null;
+- 
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: ParsedSheetProductRow
+3. identifier: Promise
+4. identifier: AmazonProductData
+5. identifier: RapidAPI
+
+### Fixed null crash in Promise — prevents null/undefined runtime crashes
+- 
++ const AMAZON_ASIN_PATTERNS = [
+- export function normalizeAsin(rawAsin: string): string {
++   /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i,
+-   return rawAsin.trim().toUpperCase();
++   /\/gp\/product\/([A-Z0-9]{10})(?:[/?]|$)/i,
+- }
++   /[?&]asin=([A-Z0-9]{10})(?:[&#]|$)/i,
+- 
++ ];
+- export function isValidAsin(asin: string): boolean {
++ 
+-   return VALID_ASIN_REGEX.test(normalizeAsin(asin));
++ export f
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Promise
+3. identifier: AmazonProductData
+4. identifier: RapidAPI
+5. identifier: Key
 
 ### Fixed null crash in Only — reduces initial bundle size with code splitting
 -  * for all existing products in the REMOTE D1 database.
@@ -284,6 +373,13 @@ Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is 
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **what-changed in tracking.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/portal/+types/tracking.ts
+
+Content summary (
+- 📐 **Fixed null crash in HTTPException — improves module reusability — confirmed 4x** — - import { ensureProductRecord } from '../services/product-ingestion';
++ import { ensureProductRecor
+- 📐 **convention in index.ts** — -   asin: z.string().length(10, 'ASIN must be 10 characters'),
++   asin: z.string().min(1, 'ASIN or 
 - 📐 **Fixed null crash in ProductRecord — prevents null/undefined runtime crashes — confirmed 3x** — - }
 +   productImages: string[];
 - 
@@ -297,48 +393,6 @@ Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is 
 +     const cleanSchema = schema
 -   } catch (err) {
 +    
-- 📐 **Strengthened types Also — offloads heavy computation off the main thread** — -   const migrationPath = path.resolve(process.cwd(), 'migrations/0001_init.sql');
-+   let migration
-- 📐 **convention in bot-guard.ts** — -  * Check if this click is a duplicate (same IP + same product within 30 seconds).
-+  * Check if th
-- 📐 **what-changed in analytics.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/portal/+types/analytics.ts
+- 📐 **Strengthened types Also — offloads heavy computation off
 
-Content summary 
-- 📐 **Fixed null crash in SELECT — parallelizes async operations for speed — confirmed 5x** — -   const updates: string[] = [];
-+   const relatedAgents = await c.env.DB.prepare(
--   const values
-- 📐 **Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x** — -   "/portal/login": {
-+   "/admin/audit-logs": {
--   "/portal": {
-+   "/portal/login": {
--   "/port
-- 📐 **Fixed null crash in HTTPException — parallelizes async operations for speed — confirmed 3x** — - portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
-+ p
-- 📐 **what-changed in products.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/products.ts
-
-Content summary (6
-- 📐 **what-changed in login.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/login.ts
-
-Content summary (62 l
-- 📐 **what-changed in layout.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/layout.ts
-
-Content summary (62 
-- 📐 **what-changed in dashboard.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/dashboard.ts
-
-Content summary (
-- 📐 **Updated API endpoint Annotations — reduces initial bundle size with code spli... — confirmed 5x** — -   id: "routes/about";
-+   id: "routes/public-layout";
--   module: typeof import("../about.js");
-+ 
-- 📐 **Fixed null crash in Hono — prevents null/undefined runtime crashes — confirmed 3x** — - import { CacheService } from '../services/cache';
-+ import { recordClick, hashIp } from '../servic
-
-## 🤔 Decisions & Trade-offs
-
-- **Optimized vitest.config — offloads heavy computation off the main thread** — -     environment: "node", // vitest-pool-workers takes over the environment.
-+     setupFiles: ["./
-- **decision in index.ts** — -   default_marketplace: z.enum(MARKETPLACES).default('US'),
-+   sheet_tab_name: z.string().min(1).m
-
----
-*Auto-generated by BrainSync 🧠 | 132 patterns | 2026-03-28*
+... [Truncated — see individual observations for full content]

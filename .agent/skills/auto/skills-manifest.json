@@ -1,18 +1,18 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.825Z",
-    "observationCount": 232,
+    "lastGenerated": "2026-03-28T16:20:47.962Z",
+    "observationCount": 239,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Project for amazon-affiliate. 20 gotchas, 51 conventions, 11 fixes."
+    "description": "Project for amazon-affiliate. 20 gotchas, 53 conventions, 11 fixes."
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 13,
     "skillCount": 0,
     "domain": "config",
@@ -26,30 +26,30 @@
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
-    "observationCount": 132,
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
+    "observationCount": 146,
     "skillCount": 0,
     "domain": "typescript",
     "triggerGlobs": [
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for amazon-affiliate. 2 gotchas, 15 conventions, 11 fixes."
+    "description": "Typescript for amazon-affiliate. 3 gotchas, 18 conventions, 16 fixes."
   },
   "typescript-react": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
-    "observationCount": 31,
+    "lastGenerated": "2026-03-28T16:20:47.962Z",
+    "observationCount": 37,
     "skillCount": 0,
     "domain": "typescript-react",
     "triggerGlobs": [
       "**/*.tsx"
     ],
-    "description": "Typescript React for amazon-affiliate. 1 gotchas, 10 conventions, 5 fixes."
+    "description": "Typescript React for amazon-affiliate. 1 gotchas, 11 conventions, 8 fixes."
   },
   "css": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 3,
     "skillCount": 0,
     "domain": "css",
@@ -61,7 +61,7 @@
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 2,
     "skillCount": 0,
     "domain": "javascript",
@@ -73,9 +73,9 @@
   },
   "convention": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 0,
-    "skillCount": 9,
+    "skillCount": 10,
     "domain": "convention",
     "triggerGlobs": [
       "**/*"
@@ -84,7 +84,7 @@
   },
   "decision": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 0,
     "skillCount": 3,
     "domain": "decision",
@@ -95,7 +95,7 @@
   },
   "database": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T15:30:47.826Z",
+    "lastGenerated": "2026-03-28T16:20:47.963Z",
     "observationCount": 2,
     "skillCount": 0,
     "domain": "database",

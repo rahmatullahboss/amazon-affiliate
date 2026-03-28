@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router";
 
 interface PortalProduct {
   id: number;
@@ -12,6 +13,19 @@ interface PortalProduct {
   tracking_tag: string;
 }
 
+interface SubmissionResponse {
+  message: string;
+  link: string;
+  redirectLink: string;
+  status: string;
+  product: {
+    asin: string;
+    marketplace: string;
+    title: string;
+    imageUrl: string;
+  };
+}
+
 export default function PortalProductsPage() {
   const [products, setProducts] = useState<PortalProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +34,7 @@ export default function PortalProductsPage() {
   const [marketplace, setMarketplace] = useState("US");
   const [customTitle, setCustomTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [success, setSuccess] = useState<SubmissionResponse | null>(null);
 
   const loadProducts = async () => {
     const token = localStorage.getItem("auth_token");
@@ -45,6 +60,7 @@ export default function PortalProductsPage() {
     event.preventDefault();
     setSubmitting(true);
     setError("");
+    setSuccess(null);
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -66,9 +82,12 @@ export default function PortalProductsPage() {
         throw new Error(data.error || "Submission failed");
       }
 
+      const data = (await response.json()) as SubmissionResponse;
+
       setAsin("");
       setMarketplace("US");
       setCustomTitle("");
+      setSuccess(data);
       await loadProducts();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submission failed");
@@ -81,15 +100,18 @@ export default function PortalProductsPage() {
     <section style={styles.wrap}>
       <article style={styles.card}>
         <h1 style={styles.title}>Submit ASIN</h1>
-        <p style={styles.copy}>Add a product inside the system. A unique tracked link will be generated for your account.</p>
+        <p style={styles.copy}>Paste an ASIN or full Amazon product link. If live product data is fetched successfully, your tracked link will be ready instantly.</p>
+        <p style={styles.helper}>
+          First time here? Add your marketplace tracking ID in <Link style={styles.link} to="/portal/tracking">Tracking IDs</Link>.
+        </p>
 
         <form onSubmit={handleSubmit} style={styles.form}>
           <input
             style={styles.input}
-            placeholder="ASIN"
+            placeholder="ASIN or Amazon product link"
             value={asin}
             onChange={(e) => setAsin(e.target.value)}
-            maxLength={10}
+            maxLength={1000}
             required
           />
           <select style={styles.input} value={marketplace} onChange={(e) => setMarketplace(e.target.value)}>
@@ -109,6 +131,24 @@ export default function PortalProductsPage() {
         </form>
 
         {error ? <p style={styles.error}>{error}</p> : null}
+        {success ? (
+          <div style={styles.success}>
+            <p style={styles.successTitle}>{success.message}</p>
+            <p style={styles.copy}>
+              {success.product.asin} · {success.product.marketplace}
+            </p>
+            <div style={styles.linkRow}>
+              <input style={styles.input} readOnly value={success.link} />
+              <button
+                style={styles.button}
+                type="button"
+                onClick={() => navigator.clipboard.writeText(success.link).catch(console.error)}
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        ) : null}
       </article>
 
       <article style={styles.card}>
@@ -158,6 +198,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   title: { margin: "0 0 0.75rem", color: "#f9fafb", fontSize: "1.25rem", fontWeight: 700 },
   copy: { margin: "0 0 0.5rem", color: "#cbd5e1", lineHeight: 1.6 },
+  helper: { margin: "0 0 0.75rem", color: "#93c5fd", lineHeight: 1.6 },
+  link: { color: "#fbbf24", textDecoration: "none", fontWeight: 600 },
   form: { display: "grid", gap: "0.75rem" },
   input: {
     borderRadius: "0.75rem",
@@ -183,7 +225,20 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "0.75rem",
     padding: "0.85rem 1rem",
   },
+  success: {
+    marginTop: "0.85rem",
+    background: "rgba(16,185,129,0.12)",
+    border: "1px solid rgba(16,185,129,0.25)",
+    borderRadius: "0.85rem",
+    padding: "1rem",
+  },
+  successTitle: {
+    margin: "0 0 0.5rem",
+    color: "#d1fae5",
+    fontWeight: 700,
+  },
   list: { display: "grid", gap: "0.75rem" },
+  linkRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: "0.75rem", marginTop: "0.75rem" },
   item: {
     display: "grid",
     gridTemplateColumns: "72px 1fr",

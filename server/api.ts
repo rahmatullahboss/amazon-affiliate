@@ -66,6 +66,13 @@ const admin = new Hono<AppEnv>();
 admin.use('*', authMiddleware);
 admin.use('*', requireRole('admin', 'super_admin'));
 
+const portalApi = new Hono<AppEnv>();
+portalApi.use('*', authMiddleware);
+portalApi.use('*', requireRole('agent', 'admin', 'super_admin'));
+portalApi.route('/', portal);
+
+app.route('/api/portal', portalApi);
+
 admin.route('/agents', agents);
 admin.route('/users', users);
 admin.route('/products', products);
@@ -76,13 +83,6 @@ admin.route('/sheets', sheets);
 admin.route('/audit-logs', auditLogs);
 
 app.route('/api', admin);
-
-const portalApi = new Hono<AppEnv>();
-portalApi.use('*', authMiddleware);
-portalApi.use('*', requireRole('agent', 'admin', 'super_admin'));
-portalApi.route('/', portal);
-
-app.route('/api/portal', portalApi);
 
 // ─── Global Error Handler ─────────────────────────────────
 app.onError(async (err, c) => {

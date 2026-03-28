@@ -90,10 +90,33 @@ export const setupSchema = z.object({
   password: z.string().min(8),
 });
 
+export const agentRegistrationSchema = z.object({
+  agent_name: z.string().min(1).max(100),
+  agent_slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  email: z.string().email().optional().nullable(),
+  phone: z.string().max(20).optional().nullable(),
+  username: z.string().min(3).max(50),
+  password: z.string().min(8),
+});
+
 export const portalAsinSubmissionSchema = z.object({
-  asin: z.string().length(10, 'ASIN must be 10 characters'),
+  asin: z.string().min(1, 'ASIN or Amazon link is required').max(1000),
   marketplace: z.enum(MARKETPLACES).default('US'),
   custom_title: z.string().max(500).optional().nullable(),
+});
+
+export const portalTrackingSetupSchema = z.object({
+  tag: z
+    .string()
+    .min(1, 'Tracking ID is required')
+    .max(50)
+    .regex(/^[a-zA-Z0-9-]+$/, 'Tracking ID must be alphanumeric with hyphens'),
+  label: z.string().max(100).optional().nullable(),
+  marketplace: z.enum(MARKETPLACES).default('US'),
 });
 
 export const createUserSchema = z.object({

@@ -1,104 +1,178 @@
 import { Form, Link, useLocation } from "react-router";
+import { useState } from "react";
 
 const navLinks = [
   { name: "Home", path: "/" },
   { name: "Browse Deals", path: "/deals" },
-  { name: "About", path: "/about" },
   { name: "Disclosure", path: "/disclosure" },
+  { name: "About", path: "/about" },
   { name: "Contact", path: "/contact" },
 ];
 
 export function Header() {
   const location = useLocation();
+  const [isBannerOpen, setIsBannerOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white/95 backdrop-blur">
-      <div className="border-b border-gray-100 bg-[#f3f7f7]">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-3 text-xs text-gray-600 sm:flex-row sm:items-center sm:justify-between lg:px-6">
-          <p>
-            Curated Amazon affiliate storefront with transparent product pages and
-            direct Amazon checkout.
-          </p>
-          <div className="flex items-center gap-4">
-            <Link to="/disclosure" className="font-semibold text-primary hover:text-primary-hover">
-              Affiliate disclosure
-            </Link>
-            <Link to="/privacy" className="hover:text-gray-900">
-              Privacy
-            </Link>
+    <header className="sticky top-0 z-40 bg-white/95 shadow-sm backdrop-blur">
+      {/* Dismissible Top Banner */}
+      {isBannerOpen && (
+        <div className="relative border-b border-gray-100 bg-[#f3f7f7] py-2">
+          <div className="mx-auto max-w-7xl px-4 text-center text-[11px] font-medium text-gray-600 sm:text-xs lg:px-6">
+            <p className="pr-6 sm:pr-0">
+              Curated Amazon affiliate storefront with transparent product pages and
+              direct Amazon checkout.{" "}
+              <Link to="/disclosure" className="font-semibold text-primary hover:underline">
+                Affiliate disclosure
+              </Link>
+            </p>
+            <button
+              onClick={() => setIsBannerOpen(false)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-900 sm:right-4"
+              aria-label="Dismiss banner"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 lg:px-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-lg font-black text-white">
+      <div className="mx-auto max-w-7xl px-4 py-3 lg:px-6 lg:py-4">
+        {/* Main Desktop & Top Mobile Row */}
+        <div className="flex items-center justify-between gap-4">
+          
+          {/* Logo */}
+          <Link to="/" className="flex shrink-0 items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-base font-black text-white">
               D
             </div>
-            <div>
-              <p className="text-lg font-black tracking-tight text-gray-950">DealsRky</p>
-              <p className="text-xs uppercase tracking-[0.25em] text-gray-400">
-                Amazon affiliate hub
+            <div className="flex flex-col">
+              <p className="text-[17px] font-black leading-none tracking-tight text-gray-950">DealsRky</p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-gray-400 lg:tracking-[0.2em]">
+                Amazon Hub
               </p>
             </div>
           </Link>
 
-          <Form
-            action="/deals"
-            method="GET"
-            className="flex w-full max-w-2xl items-center rounded-full border border-gray-200 bg-gray-50 px-2 py-2 shadow-sm"
-          >
-            <input
-              type="text"
-              name="q"
-              placeholder="Search curated products"
-              className="w-full bg-transparent px-4 text-sm text-gray-800 outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-full bg-primary px-5 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+          {/* Desktop Search */}
+          <div className="hidden flex-1 lg:block lg:max-w-xl">
+             <Form
+              action="/deals"
+              method="GET"
+              className="group flex w-full items-center overflow-hidden rounded-full border border-gray-200 bg-gray-50 transition-colors focus-within:border-primary focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20"
             >
-              Search
-            </button>
-          </Form>
+              <div className="pl-4 text-gray-400 group-focus-within:text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                name="q"
+                placeholder="Search curated products..."
+                className="w-full bg-transparent px-3 py-2 text-sm font-medium text-gray-900 outline-none placeholder:font-normal placeholder:text-gray-400"
+              />
+              <button
+                type="submit"
+                className="bg-primary px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              >
+                Search
+              </button>
+            </Form>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              to="/portal/login"
-              className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:border-primary hover:text-primary"
+          {/* Desktop Nav & Admin Links */}
+          <div className="hidden shrink-0 items-center gap-6 lg:flex">
+            <nav className="flex items-center gap-5 text-sm font-semibold text-gray-600">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.path}
+                  className={location.pathname === link.path ? "text-primary" : "transition-colors hover:text-gray-950"}
+                >
+                  {link.name}
+                </Link>
+              ))}
+            </nav>
+            <div className="h-4 w-px bg-gray-200"></div>
+            <div className="flex items-center gap-3 text-sm">
+              <Link to="/portal/login" className="font-medium text-gray-500 transition-colors hover:text-gray-900">
+                Agent Login
+              </Link>
+              <Link
+                to="/admin/login"
+                className="rounded-full bg-gray-100 px-3 py-1.5 font-bold text-gray-700 transition-colors hover:bg-gray-200"
+              >
+                Admin
+              </Link>
+            </div>
+          </div>
+
+          {/* Mobile Right: Search / Hamburger Toggle */}
+          <div className="flex flex-1 items-center justify-end gap-2 lg:hidden">
+            {/* Mobile Search Input (compact) */}
+            <Form
+              action="/deals"
+              method="GET"
+              className="flex max-w-[180px] flex-1 items-center rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 focus-within:border-primary focus-within:bg-white"
             >
-              Agent portal
-            </Link>
-            <Link
-              to="/admin/login"
-              className="rounded-full bg-gray-950 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black"
+              <input
+                type="text"
+                name="q"
+                placeholder="Search..."
+                className="w-full min-w-0 bg-transparent text-sm text-gray-900 outline-none placeholder:text-gray-400"
+              />
+              <button type="submit" className="text-gray-400" aria-label="Search">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </button>
+            </Form>
+
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="rounded-lg p-1.5 text-gray-600 hover:bg-gray-100"
+              aria-label="Toggle menu"
             >
-              Admin
-            </Link>
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                {isMobileMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                )}
+              </svg>
+            </button>
           </div>
         </div>
+      </div>
 
-        <nav className="flex flex-wrap items-center gap-4 border-t border-gray-100 pt-4 text-sm font-semibold text-gray-600">
-          {navLinks.map((link) => {
-            const isActive = location.pathname === link.path;
-
-            return (
+      {/* Mobile Menu Dropdown */}
+      {isMobileMenuOpen && (
+        <div className="absolute left-0 top-full w-full border-b border-gray-100 bg-white px-4 py-4 shadow-lg lg:hidden">
+          <nav className="flex flex-col gap-4 text-[15px] font-bold text-gray-700">
+            {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
-                className={
-                  isActive
-                    ? "text-primary"
-                    : "transition-colors hover:text-gray-900"
-                }
+                className={location.pathname === link.path ? "text-primary" : "hover:text-gray-950"}
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 {link.name}
               </Link>
-            );
-          })}
-        </nav>
-      </div>
+            ))}
+            <div className="my-1 h-px w-full bg-gray-100"></div>
+            <Link to="/portal/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
+              Agent Portal
+            </Link>
+            <Link to="/admin/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
+              Admin Access
+            </Link>
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

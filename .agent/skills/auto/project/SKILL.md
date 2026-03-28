@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 51 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 53 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **232 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **239 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -198,6 +198,9 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
+- 📐 **Git Commit: feat: implement product image gallery and A+ content renderi — confirmed 3x** — Captured via Git commit.
+Message: feat: implement product image gallery and A+ content rendering wit
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 16x**
@@ -226,19 +229,6 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
 - 📐 **convention in scratchpad_6oao5spx.md** — - - **Tabs**: USA, UK, DE, IT, CA, FR, ES
 + - **Tabs**: USA (Active), UK, DE, IT, CA, FR, ES (All ot
-- 📐 **convention in .gitignore** — + # Auto-generated agent rules (personalized per developer)
-+ .brainsync/agent-rules.md
-+ 
-- 📐 **convention in .gitignore** — File updated (external): .gitignore
-
-Content summary (8 lines):
-
-AGENT.md
-CLAUDE.md
-.agent-mem/
-
-# A
-- 📐 **Version your API from day 1 (/api/v1/)** — Version your API from day 1 (/api/v1/)
-- 📐 **Use consistent response format across all 
+- 
 
 ... [Truncated — see individual observations for full content]

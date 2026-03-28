@@ -29,6 +29,7 @@ export default function PortalLayout() {
 
   const navItems = [
     { to: "/portal", label: "Dashboard", end: true },
+    { to: "/portal/tracking", label: "Tracking IDs" },
     { to: "/portal/products", label: "Products" },
     { to: "/portal/links", label: "Links" },
   ];

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { loginSchema, setupSchema } from '../schemas';
+import { agentRegistrationSchema, loginSchema, setupSchema } from '../schemas';
 import { createJwt, hashPassword, verifyPassword } from '../services/auth';
 
 const auth = new Hono<AppEnv>();
@@ -137,6 +137,78 @@ auth.post('/setup', zValidator('json', setupSchema), async (c) => {
       message: 'Admin account created successfully',
       token,
       user: { id: user!.id, username: user!.username, role: 'super_admin', agentId: user!.agent_id },
+    },
+    201
+  );
+});
+
+auth.post('/register-agent', zValidator('json', agentRegistrationSchema), async (c) => {
+  const body = c.req.valid('json');
+  const passwordHash = await hashPassword(body.password);
+
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO agents (name, slug, email, phone) VALUES (?, ?, ?, ?)'
+    )
+      .bind(body.agent_name, body.agent_slug, body.email || null, body.phone || null)
+      .run();
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'Agent slug already exists' });
+    }
+    throw error;
+  }
+
+  const agent = await c.env.DB.prepare('SELECT id, name, slug FROM agents WHERE slug = ?')
+    .bind(body.agent_slug)
+    .first<{ id: number; name: string; slug: string }>();
+
+  if (!agent) {
+    throw new HTTPException(500, { message: 'Agent creation failed unexpectedly' });
+  }
+
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO users (username, email, password_hash, role, agent_id)
+       VALUES (?, ?, ?, ?, ?)`
+    )
+      .bind(body.username, body.email || null, passwordHash, 'agent', agent.id)
+      .run();
+  } catch (error: unknown) {
+    await c.env.DB.prepare('DELETE FROM agents WHERE id = ?').bind(agent.id).run();
+
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'Username or email already exists' });
+    }
+    throw error;
+  }
+
+  const user = await c.env.DB.prepare(
+    'SELECT id, username, role, agent_id FROM users WHERE username = ?'
+  )
+    .bind(body.username)
+    .first<{ id: number; username: string; role: string; agent_id: number | null }>();
+
+  if (!user) {
+    throw new HTTPException(500, { message: 'User creation failed unexpectedly' });
+  }
+
+  const token = await createJwt(
+    { sub: user.id, username: user.username, role: 'agent', agentId: user.agent_id },
+    c.env.JWT_SECRET
+  );
+
+  return c.json(
+    {
+      message: 'Agent account created successfully',
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        role: 'agent',
+        agentId: user.agent_id,
+      },
+      agent,
     },
     201
   );

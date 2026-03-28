@@ -136,6 +136,7 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       features: productData.features,
       status: 'active',
       updateExistingFromInput: true,
+      requireRealProductData: true,
     });
 
     return c.json({ product, message: 'Product fetched and saved' }, 201);

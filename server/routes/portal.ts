@@ -2,9 +2,9 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { portalAsinSubmissionSchema } from '../schemas';
+import { portalAsinSubmissionSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
-import { ensureProductRecord } from '../services/product-ingestion';
+import { ensureProductRecord, extractAsinFromInput } from '../services/product-ingestion';
 
 const portal = new Hono<AppEnv>();
 
@@ -179,6 +179,90 @@ portal.get('/performance', async (c) => {
   });
 });
 
+portal.get('/tracking', async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' });
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+     FROM tracking_ids
+     WHERE agent_id = ?
+     ORDER BY marketplace ASC, is_default DESC, created_at ASC`
+  )
+    .bind(agentId)
+    .all<{
+      id: number;
+      tag: string;
+      label: string | null;
+      marketplace: string;
+      is_default: number;
+      is_active: number;
+      created_at: string;
+    }>();
+
+  return c.json({ trackingIds: results ?? [] });
+});
+
+portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' });
+  }
+
+  const body = c.req.valid('json');
+
+  const existing = await c.env.DB.prepare(
+    `SELECT id
+     FROM tracking_ids
+     WHERE agent_id = ? AND marketplace = ?
+     ORDER BY is_default DESC, created_at ASC
+     LIMIT 1`
+  )
+    .bind(agentId, body.marketplace)
+    .first<{ id: number }>();
+
+  await c.env.DB.prepare(
+    'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
+  )
+    .bind(agentId, body.marketplace)
+    .run();
+
+  if (existing) {
+    await c.env.DB.prepare(
+      `UPDATE tracking_ids
+       SET tag = ?, label = ?, is_default = 1, is_active = 1
+       WHERE id = ?`
+    )
+      .bind(body.tag, body.label || null, existing.id)
+      .run();
+  } else {
+    await c.env.DB.prepare(
+      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
+       VALUES (?, ?, ?, ?, 1, 1)`
+    )
+      .bind(agentId, body.tag, body.label || null, body.marketplace)
+      .run();
+  }
+
+  const trackingId = await c.env.DB.prepare(
+    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+     FROM tracking_ids
+     WHERE agent_id = ? AND marketplace = ?
+     ORDER BY is_default DESC, created_at ASC
+     LIMIT 1`
+  )
+    .bind(agentId, body.marketplace)
+    .first();
+
+  return c.json({ trackingId, message: 'Tracking ID saved successfully' }, existing ? 200 : 201);
+});
+
 portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
@@ -189,6 +273,13 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
   }
 
   const { asin, marketplace, custom_title } = c.req.valid('json');
+  const resolvedAsin = extractAsinFromInput(asin);
+
+  if (!resolvedAsin) {
+    throw new HTTPException(400, {
+      message: 'Provide a valid ASIN or Amazon product link.',
+    });
+  }
 
   const agent = await c.env.DB.prepare('SELECT id, slug FROM agents WHERE id = ? AND is_active = 1')
     .bind(agentId)
@@ -217,31 +308,38 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
   let product = await c.env.DB.prepare(
     'SELECT id, title, image_url, status FROM products WHERE asin = ? AND marketplace = ?'
   )
-    .bind(asin, marketplace)
+    .bind(resolvedAsin, marketplace)
     .first<{ id: number; title: string; image_url: string; status: string }>();
 
   if (!product) {
     const apiKey = c.env.AMAZON_API_KEY;
     if (!apiKey) {
       throw new HTTPException(503, {
-        message: 'AMAZON_API_KEY not configured. Product submission cannot auto-fetch yet.',
+        message: 'Amazon product API is not configured. Product link generation needs live product data.',
       });
     }
 
-    const ensuredProduct = await ensureProductRecord({
-      db: c.env.DB,
-      asin,
-      marketplace,
-      apiKey,
-      status: 'pending_review',
-    });
+    try {
+      const ensuredProduct = await ensureProductRecord({
+        db: c.env.DB,
+        asin: resolvedAsin,
+        marketplace,
+        apiKey,
+        status: 'active',
+        requireRealProductData: true,
+      });
 
-    product = {
-      id: ensuredProduct.id,
-      title: ensuredProduct.title,
-      image_url: ensuredProduct.image_url,
-      status: ensuredProduct.status || 'pending_review',
-    };
+      product = {
+        id: ensuredProduct.id,
+        title: ensuredProduct.title,
+        image_url: ensuredProduct.image_url,
+        status: ensuredProduct.status || 'active',
+      };
+    } catch {
+      throw new HTTPException(502, {
+        message: 'Could not fetch live product data for this ASIN. Try another ASIN or ask admin to review it.',
+      });
+    }
   }
 
   if (!product) {
@@ -251,13 +349,13 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
   if (product.status === 'rejected') {
     await c.env.DB.prepare(
       `UPDATE products
-       SET status = 'pending_review', updated_at = CURRENT_TIMESTAMP
+       SET status = 'active', updated_at = CURRENT_TIMESTAMP
        WHERE id = ?`
     )
       .bind(product.id)
       .run();
 
-    product.status = 'pending_review';
+    product.status = 'active';
   }
 
   await c.env.DB.prepare(
@@ -274,19 +372,17 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
     .run();
 
   const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.deletePageData(agent.slug, asin));
-  c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, asin));
+  c.executionCtx.waitUntil(cache.deletePageData(agent.slug, resolvedAsin));
+  c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, resolvedAsin));
 
   return c.json(
     {
-      message:
-        product.status === 'active'
-          ? 'Product submitted successfully'
-          : 'Product submitted and is waiting for admin approval',
-      link: `/${agent.slug}/${asin}`,
+      message: 'Product link is ready.',
+      link: `/${agent.slug}/${resolvedAsin}`,
+      redirectLink: `/go/${agent.slug}/${resolvedAsin}`,
       status: product.status,
       product: {
-        asin,
+        asin: resolvedAsin,
         marketplace,
         title: custom_title || product.title,
         imageUrl: product.image_url,

@@ -37,11 +37,13 @@ export default [
   ]),
 
   route("portal/login", "routes/portal/login.tsx"),
+  route("portal/register", "routes/portal/register.tsx"),
   route("portal", "routes/portal/layout.tsx", [
     index("routes/portal/dashboard.tsx"),
     route("asins/new", "routes/portal/asin-new.tsx"),
     route("products", "routes/portal/products.tsx"),
     route("links", "routes/portal/links.tsx"),
+    route("tracking", "routes/portal/tracking.tsx"),
     route("analytics", "routes/portal/analytics.tsx"),
   ]),
 ] satisfies RouteConfig;
