@@ -39,7 +39,8 @@ page.get('/:agentSlug/:asin', async (c) => {
   const row = await c.env.DB.prepare(
     `SELECT
        a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-       p.asin, p.title as product_title, p.image_url, p.id as product_id,
+       p.asin, p.title as product_title, p.image_url, p.description, p.features,
+       p.product_images, p.aplus_images, p.id as product_id,
        t.tag as tracking_tag, t.marketplace,
        ap.custom_title
      FROM agent_products ap
@@ -58,6 +59,10 @@ page.get('/:agentSlug/:asin', async (c) => {
       asin: string;
       product_title: string;
       image_url: string;
+      description: string | null;
+      features: string | null;
+      product_images: string | null;
+      aplus_images: string | null;
       product_id: number;
       tracking_tag: string;
       marketplace: string;
@@ -77,6 +82,10 @@ page.get('/:agentSlug/:asin', async (c) => {
       asin: row.asin,
       title: row.custom_title || row.product_title,
       imageUrl: row.image_url,
+      description: row.description,
+      features: parseJsonArray(row.features),
+      productImages: parseJsonArray(row.product_images),
+      aplusImages: parseJsonArray(row.aplus_images),
     },
     trackingTag: row.tracking_tag,
     amazonUrl: buildAmazonUrl(row.asin, row.tracking_tag, row.marketplace),
@@ -99,6 +108,21 @@ page.get('/:agentSlug/:asin', async (c) => {
 
   return c.json(pageData);
 });
+
+function parseJsonArray(raw: string | null): string[] {
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === 'string');
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
 
 async function recordViewAsync(
   c: { req: { header: (name: string) => string | undefined; raw: Request }; env: { DB: D1Database } },

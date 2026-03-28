@@ -122,6 +122,10 @@ export interface LandingPageData {
     asin: string;
     title: string;
     imageUrl: string;
+    description?: string | null;
+    features?: string[];
+    productImages?: string[];
+    aplusImages?: string[];
     customTitle?: string;
   };
   trackingTag: string;

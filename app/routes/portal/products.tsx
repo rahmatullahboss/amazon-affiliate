@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
 interface PortalProduct {
   id: number;
@@ -78,8 +79,8 @@ export default function PortalProductsPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Submission failed");
+        const data = await response.json();
+        throw new Error(extractApiErrorMessage(data, "Submission failed"));
       }
 
       const data = (await response.json()) as SubmissionResponse;

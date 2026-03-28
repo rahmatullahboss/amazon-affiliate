@@ -1,39 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-
-interface ValidationIssue {
-  message?: string;
-  path?: string[];
-}
-
-function extractErrorMessage(payload: unknown): string {
-  if (!payload || typeof payload !== "object") {
-    return "Registration failed";
-  }
-
-  const data = payload as {
-    error?: string | { issues?: ValidationIssue[] };
-    message?: string;
-  };
-
-  if (typeof data.error === "string" && data.error.trim()) {
-    return data.error;
-  }
-
-  if (data.error && typeof data.error === "object" && Array.isArray(data.error.issues)) {
-    const firstIssue = data.error.issues[0];
-    if (firstIssue?.message) {
-      const field = firstIssue.path?.[0];
-      return field ? `${field}: ${firstIssue.message}` : firstIssue.message;
-    }
-  }
-
-  if (typeof data.message === "string" && data.message.trim()) {
-    return data.message;
-  }
-
-  return "Registration failed";
-}
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
 export default function PortalRegisterPage() {
   const navigate = useNavigate();
@@ -66,7 +33,7 @@ export default function PortalRegisterPage() {
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(extractErrorMessage(data));
+        throw new Error(extractApiErrorMessage(data, "Registration failed"));
       }
 
       const data = (await response.json()) as {

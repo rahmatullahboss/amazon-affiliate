@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 443 notes | Score threshold: >40
+> 453 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -32,14 +32,14 @@
 
 ## Project Standards
 
+- Fixed null crash in Meta — prevents null/undefined runtime crashes — confirmed 4x
+- Strengthened types AnalyticsOverview — formalizes the data contract with expl...
 - Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
 - what-changed in tracking.ts — confirmed 3x
 - Fixed null crash in Link — formalizes the data contract with explicit types — confirmed 5x
 - Fixed null crash in HTTPException — improves module reusability — confirmed 4x
 - convention in index.ts
 - what-changed in home.tsx — confirmed 3x
-- Fixed null crash in ProductRecord — prevents null/undefined runtime crashes — confirmed 3x
-- Updated clicks database schema — parallelizes async operations for speed — confirmed 3x
 
 ## Known Fixes
 
@@ -54,7 +54,7 @@
 - Optimized impliedFormat — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized Frontend — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
 
 ## Learned Patterns
 

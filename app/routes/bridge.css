@@ -67,16 +67,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: var(--space-8) var(--space-4);
   position: relative;
   z-index: 1;
+  gap: var(--space-6);
 }
 
 /* ─── Product Card ────────────────────────────── */
 .product-card {
   width: 100%;
-  max-width: 440px;
+  max-width: 860px;
   background: var(--gradient-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-2xl);
@@ -161,6 +162,23 @@
   overflow: hidden;
 }
 
+.product-description {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--color-text-secondary);
+}
+
+.feature-list {
+  margin: var(--space-4) 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
 /* ─── Buy Button ──────────────────────────────── */
 .buy-button-container {
   padding: 0 var(--space-6) var(--space-6);
@@ -241,6 +259,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-wrap: wrap;
   gap: var(--space-6);
   padding: var(--space-4) var(--space-6) var(--space-6);
 }
@@ -275,6 +294,49 @@
   opacity: 0.7;
   padding: var(--space-4);
   border-top: 1px solid var(--color-border);
+}
+
+.bridge-section {
+  width: 100%;
+  max-width: 860px;
+  background: var(--gradient-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-2xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-xl);
+}
+
+.bridge-section-title {
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-4);
+}
+
+.gallery-card,
+.aplus-card {
+  background: linear-gradient(145deg, #fff, #f8f8f8);
+  border-radius: var(--radius-xl);
+  padding: var(--space-4);
+}
+
+.gallery-image,
+.aplus-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.aplus-stack {
+  display: grid;
+  gap: var(--space-4);
 }
 
 /* ─── Loading State ───────────────────────────── */
@@ -333,6 +395,12 @@
     margin: 0 var(--space-2);
   }
 
+  .bridge-section {
+    border-radius: var(--radius-xl);
+    margin: 0 var(--space-2);
+    padding: var(--space-4);
+  }
+
   .product-image-container {
     padding: var(--space-6);
   }
@@ -363,7 +431,7 @@
 
 @media (min-width: 768px) {
   .product-card {
-    max-width: 500px;
+    max-width: 860px;
   }
 
   .product-title {

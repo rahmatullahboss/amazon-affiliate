@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 3 gotchas, 18 conventions, 16 fixes."
+description: "Typescript for amazon-affiliate. 3 gotchas, 19 conventions, 17 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **146 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **148 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -24,6 +24,24 @@ Auto-compiled from **146 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Strengthened types Failed — evolves the | -       .replace(/\/\*[\s\S]*?\*\//g, '') +       .replace(/\/\*[\s\S]*?\*\//g, ''); -       .trim() |
 
 ## 🔧 Problem Playbooks
+
+### Fixed null crash in FROM — prevents null/undefined runtime crashes
+-        p.asin, p.title as product_title, p.image_url, p.id as product_id,
++        p.asin, p.title as product_title, p.image_url, p.description, p.features,
+-        t.tag as tracking_tag, t.marketplace,
++        p.product_images, p.aplus_images, p.id as product_id,
+-        ap.custom_title
++        t.tag as tracking_tag, t.marketplace,
+-      FROM agent_products ap
++        ap.custom_title
+-   
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: FROM
+3. identifier: JOIN
+4. identifier: WHERE
+5. identifier: AND
 
 ### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
 - import { portalAsinSubmissionSchema } from '../schemas';
@@ -373,26 +391,16 @@ Auto-compiled from **146 real patterns** in **amazon-affiliate**. This skill is 
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **Strengthened types AnalyticsOverview — formalizes the data contract with expl...** — -     customTitle?: string;
++     description?: string | null;
+-   };
++     features?: string[];
+-  
 - 📐 **what-changed in tracking.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/portal/+types/tracking.ts
 
 Content summary (
 - 📐 **Fixed null crash in HTTPException — improves module reusability — confirmed 4x** — - import { ensureProductRecord } from '../services/product-ingestion';
 + import { ensureProductRecor
-- 📐 **convention in index.ts** — -   asin: z.string().length(10, 'ASIN must be 10 characters'),
-+   asin: z.string().min(1, 'ASIN or 
-- 📐 **Fixed null crash in ProductRecord — prevents null/undefined runtime crashes — confirmed 3x** — - }
-+   productImages: string[];
-- 
-+   aplusImages: string[];
-- interface ProductRecord {
-+ }
--   i
-- 📐 **Updated clicks database schema — parallelizes async operations for speed — confirmed 3x** — -     // We pass `env` as env, and an empty execution context
-+     const waitPromises: Promise<any>
-- 📐 **Strengthened types Failed — evolves the database schema to support new requir...** — -     await (env.DB as any).exec(schema);
-+     const cleanSchema = schema
--   } catch (err) {
-+    
-- 📐 **Strengthened types Also — offloads heavy computation off
+- 📐 
 
 ... [Truncated — see individual observations for full content]

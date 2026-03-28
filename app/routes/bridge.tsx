@@ -5,7 +5,15 @@ import { recordView } from "../../server/services/analytics";
 // ─── Types ───────────────────────────────────────
 interface BridgeData {
   agent: { slug: string; name: string };
-  product: { asin: string; title: string; imageUrl: string };
+  product: {
+    asin: string;
+    title: string;
+    imageUrl: string;
+    description?: string | null;
+    features?: string[];
+    productImages?: string[];
+    aplusImages?: string[];
+  };
   redirectUrl: string;
   marketplace: string;
 }
@@ -51,7 +59,8 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const row = await env.DB.prepare(
     `SELECT
        a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-       p.asin, p.title as product_title, p.image_url, p.id as product_id,
+       p.asin, p.title as product_title, p.image_url, p.description, p.features,
+       p.product_images, p.aplus_images, p.id as product_id,
        t.tag as tracking_tag, t.marketplace,
        ap.custom_title
      FROM agent_products ap
@@ -59,7 +68,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
      WHERE a.slug = ? AND p.asin = ?
-       AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1
+       AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
      LIMIT 1`
   )
     .bind(agentSlug, asin)
@@ -70,6 +79,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       asin: string;
       product_title: string;
       image_url: string;
+      description: string | null;
+      features: string | null;
+      product_images: string | null;
+      aplus_images: string | null;
       product_id: number;
       tracking_tag: string;
       marketplace: string;
@@ -104,6 +117,10 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       asin: row.asin,
       title: row.custom_title || row.product_title,
       imageUrl: row.image_url,
+      description: row.description,
+      features: parseJsonArray(row.features),
+      productImages: parseJsonArray(row.product_images),
+      aplusImages: parseJsonArray(row.aplus_images),
     },
     redirectUrl: `/go/${row.agent_slug}/${row.asin}`,
     marketplace: row.marketplace,
@@ -112,9 +129,29 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   return data;
 }
 
+function parseJsonArray(raw: string | null): string[] {
+  if (!raw) return [];
+
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === "string");
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
 // ─── Component ───────────────────────────────────
 export default function BridgePage({ loaderData }: Route.ComponentProps) {
   const data = loaderData as BridgeData;
+  const galleryImages = data.product.productImages?.length
+    ? data.product.productImages
+    : [data.product.imageUrl];
+  const aplusImages = data.product.aplusImages ?? [];
+  const features = data.product.features ?? [];
 
   return (
     <div className="bridge-page">
@@ -146,6 +183,16 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
           {/* Product Info */}
           <div className="product-info">
             <h1 className="product-title">{data.product.title}</h1>
+            {data.product.description ? (
+              <p className="product-description">{data.product.description}</p>
+            ) : null}
+            {features.length > 0 ? (
+              <ul className="feature-list">
+                {features.map((feature) => (
+                  <li key={feature}>{feature}</li>
+                ))}
+              </ul>
+            ) : null}
           </div>
 
           {/* Buy Button */}
@@ -180,6 +227,42 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
         </article>
+
+        {galleryImages.length > 1 ? (
+          <section className="bridge-section">
+            <h2 className="bridge-section-title">Product images</h2>
+            <div className="image-grid">
+              {galleryImages.map((image, index) => (
+                <div key={`${image}-${index}`} className="gallery-card">
+                  <img
+                    src={image}
+                    alt={`${data.product.title} image ${index + 1}`}
+                    className="gallery-image"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {aplusImages.length > 0 ? (
+          <section className="bridge-section">
+            <h2 className="bridge-section-title">More product details</h2>
+            <div className="aplus-stack">
+              {aplusImages.map((image, index) => (
+                <div key={`${image}-${index}`} className="aplus-card">
+                  <img
+                    src={image}
+                    alt={`${data.product.title} detail ${index + 1}`}
+                    className="aplus-image"
+                    loading="lazy"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </main>
 
       {/* Affiliate Disclosure — REQUIRED by Amazon Associates TOS */}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
 interface TrackingIdRow {
   id: number;
@@ -68,8 +69,8 @@ export default function PortalTrackingPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Failed to save tracking ID");
+        const data = await response.json();
+        throw new Error(extractApiErrorMessage(data, "Failed to save tracking ID"));
       }
 
       setSuccess("Tracking ID saved successfully");
