@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 332 notes | Score threshold: >40
+> 339 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,23 +20,26 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
 - **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
+- **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
 
-## Active: `app/components/home`
+## Active: `server/services`
 
-- **Fixed null crash in ProductCard — confirmed 3x**
+- **what-changed in google-sheets.ts**
+- **Fixed null crash in SheetSyncConfig — prevents null/undefined runtime crashes**
+- **what-changed in sheet-sync.ts**
+- **what-changed in product-ingestion.ts**
 
 ## Project Standards
 
-- Fixed null crash in ProductCard — confirmed 3x
-- Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x
-- Strengthened types ProductRow — formalizes the data contract with explicit types
-- Fixed null crash in Mapping — confirmed 3x
-- Strengthened types Contact
-- Strengthened types Route — wraps unsafe operation in error boundary
-- Strengthened types Route — parallelizes async operations for speed
-- Strengthened types HeroBanner — parallelizes async operations for speed
+- what-changed in analytics.ts — confirmed 3x
+- Fixed null crash in SELECT — parallelizes async operations for speed — confirmed 5x
+- Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x
+- Fixed null crash in HTTPException — parallelizes async operations for speed — confirmed 3x
+- what-changed in products.ts — confirmed 3x
+- what-changed in login.ts — confirmed 3x
+- what-changed in layout.ts — confirmed 3x
+- what-changed in dashboard.ts — confirmed 3x
 
 ## Known Fixes
 
@@ -46,16 +49,16 @@
 
 ## Recent Decisions
 
-- decision in product-detail.tsx
-- decision in home.tsx
+- decision in index.ts
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized Type — offloads heavy computation off the main thread
+- Optimized Step — offloads heavy computation off the main thread
+- Optimized impliedFormat — offloads heavy computation off the main thread
 
 ## Learned Patterns
 
 - Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x (seen 2x)
 - Decision: Optimized Argument — offloads heavy computation off the main thread (seen 2x)
-- Decision: Optimized impliedFormat — offloads heavy computation off the main thread (seen 2x)
+- Always: Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x (seen 2x)
 - Agent generates new migration for every change (squash related changes)
 - Agent installs packages without checking if already installed
 

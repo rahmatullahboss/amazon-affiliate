@@ -1,8 +1,8 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
-    "observationCount": 177,
+    "lastGenerated": "2026-03-28T11:50:47.670Z",
+    "observationCount": 181,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
@@ -12,7 +12,7 @@
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.707Z",
+    "lastGenerated": "2026-03-28T11:50:47.670Z",
     "observationCount": 11,
     "skillCount": 0,
     "domain": "config",
@@ -26,19 +26,19 @@
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
-    "observationCount": 109,
+    "lastGenerated": "2026-03-28T11:50:47.670Z",
+    "observationCount": 111,
     "skillCount": 0,
     "domain": "typescript",
     "triggerGlobs": [
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for amazon-affiliate. 10 conventions, 8 fixes."
+    "description": "Typescript for amazon-affiliate. 10 conventions, 9 fixes."
   },
   "typescript-react": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.670Z",
     "observationCount": 27,
     "skillCount": 0,
     "domain": "typescript-react",
@@ -49,7 +49,7 @@
   },
   "css": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.671Z",
     "observationCount": 3,
     "skillCount": 0,
     "domain": "css",
@@ -61,7 +61,7 @@
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.671Z",
     "observationCount": 2,
     "skillCount": 0,
     "domain": "javascript",
@@ -73,7 +73,7 @@
   },
   "convention": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.671Z",
     "observationCount": 0,
     "skillCount": 3,
     "domain": "convention",
@@ -84,7 +84,7 @@
   },
   "decision": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.671Z",
     "observationCount": 0,
     "skillCount": 3,
     "domain": "decision",
@@ -95,7 +95,7 @@
   },
   "database": {
     "enabled": true,
-    "lastGenerated": "2026-03-28T11:30:47.708Z",
+    "lastGenerated": "2026-03-28T11:50:47.670Z",
     "observationCount": 2,
     "skillCount": 0,
     "domain": "database",

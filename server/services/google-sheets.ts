@@ -40,7 +40,8 @@ export async function readSheetRows(input: {
   );
 
   if (!response.ok) {
-    throw new Error(`Google Sheets read failed with status ${response.status}`);
+    const errorText = await response.text();
+    throw new Error(`Google Sheets read failed with status ${response.status}: ${errorText}`);
   }
 
   const payload = (await response.json()) as { values?: string[][] };
@@ -77,7 +78,8 @@ export async function writeSheetRows(input: {
   );
 
   if (!clearResponse.ok) {
-    throw new Error(`Google Sheets clear failed with status ${clearResponse.status}`);
+    const errorText = await clearResponse.text();
+    throw new Error(`Google Sheets clear failed with status ${clearResponse.status}: ${errorText}`);
   }
 
   const updateResponse = await fetch(
@@ -99,7 +101,8 @@ export async function writeSheetRows(input: {
   );
 
   if (!updateResponse.ok) {
-    throw new Error(`Google Sheets write failed with status ${updateResponse.status}`);
+    const errorText = await updateResponse.text();
+    throw new Error(`Google Sheets write failed with status ${updateResponse.status}: ${errorText}`);
   }
 }
 
@@ -142,7 +145,8 @@ async function resolveSheetTitle(input: {
   );
 
   if (!metadataResponse.ok) {
-    throw new Error(`Google Sheets metadata lookup failed with status ${metadataResponse.status}`);
+    const errorText = await metadataResponse.text();
+    throw new Error(`Google Sheets metadata lookup failed with status ${metadataResponse.status}: ${errorText}`);
   }
 
   const metadata = (await metadataResponse.json()) as SpreadsheetMetadata;
@@ -194,7 +198,8 @@ async function getAccessToken(
   });
 
   if (!tokenResponse.ok) {
-    throw new Error(`Google OAuth token request failed with status ${tokenResponse.status}`);
+    const errorText = await tokenResponse.text();
+    throw new Error(`Google OAuth token request failed with status ${tokenResponse.status}: ${errorText}`);
   }
 
   const payloadJson = (await tokenResponse.json()) as { access_token?: string };

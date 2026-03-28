@@ -366,17 +366,45 @@ export async function mirrorProductsToSheet(
 }
 
 function mapRows(values: string[][]): SheetRowRecord[] {
-  if (values.length < 2) {
+  if (values.length === 0) {
     return [];
   }
 
   const headers = values[0].map(normalizeHeader);
+  const hasAsinHeader = headers.includes("asin");
+
+  if (!hasAsinHeader) {
+    return mapHeaderlessAsinGrid(values);
+  }
+
+  if (values.length < 2) {
+    return [];
+  }
+
   return values.slice(1).map((row) =>
     headers.reduce<SheetRowRecord>((accumulator, header, index) => {
       accumulator[header] = row[index] ?? "";
       return accumulator;
     }, {})
   );
+}
+
+function mapHeaderlessAsinGrid(values: string[][]): SheetRowRecord[] {
+  const records: SheetRowRecord[] = [];
+
+  for (const row of values) {
+    for (const cell of row) {
+      const normalized = normalizeCell(cell).toUpperCase();
+
+      if (!isValidAsin(normalized)) {
+        continue;
+      }
+
+      records.push({ asin: normalized });
+    }
+  }
+
+  return dedupeSheetRecords(records);
 }
 
 function normalizeHeader(header: string): string {
@@ -389,6 +417,26 @@ function normalizeHeader(header: string): string {
 
 function normalizeCell(value?: string): string {
   return (value || "").trim();
+}
+
+function dedupeSheetRecords(records: SheetRowRecord[]): SheetRowRecord[] {
+  const seen = new Set<string>();
+  const deduped: SheetRowRecord[] = [];
+
+  for (const record of records) {
+    const asin = normalizeCell(record.asin).toUpperCase();
+    const marketplace = normalizeCell(record.marketplace).toUpperCase();
+    const key = `${asin}:${marketplace}`;
+
+    if (!asin || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    deduped.push(record);
+  }
+
+  return deduped;
 }
 
 async function startLog(

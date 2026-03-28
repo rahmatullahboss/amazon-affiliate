@@ -55,7 +55,7 @@ export function isSuspiciousRequest(userAgent: string | undefined): boolean {
 }
 
 /**
- * Check if this click is a duplicate (same IP + same product within 30 seconds).
+ * Check if this click is a duplicate (same IP + same product within 60 seconds).
  * Returns true if the click should be SKIPPED for analytics (but redirect still works).
  */
 export async function isDuplicateClick(
@@ -70,7 +70,7 @@ export async function isDuplicateClick(
     return true; // Duplicate — skip analytics insert
   }
 
-  // Mark this click — expires in 30 seconds
-  await kv.put(dedupKey, '1', { expirationTtl: 30 });
+  // Cloudflare KV requires a minimum TTL of 60 seconds.
+  await kv.put(dedupKey, '1', { expirationTtl: 60 });
   return false;
 }
