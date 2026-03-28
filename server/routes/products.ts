@@ -4,6 +4,8 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createProductSchema, fetchAsinSchema, bulkAsinImportSchema, updateProductSchema } from '../schemas';
 import { CacheService } from '../services/cache';
+import { ensureProductRecord, fetchAmazonProductData } from '../services/product-ingestion';
+import { writeAuditLog } from '../services/audit-log';
 
 const products = new Hono<AppEnv>();
 
@@ -13,12 +15,56 @@ const products = new Hono<AppEnv>();
 products.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.*,
-       (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id) as agent_count,
+       (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id AND is_active = 1) as agent_count,
        (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
      FROM products p ORDER BY p.created_at DESC`
   ).all();
 
   return c.json({ products: results });
+});
+
+/**
+ * GET /api/products/submissions — Review agent-submitted products
+ */
+products.get('/submissions', async (c) => {
+  const status = c.req.query('status');
+  const allowedStatuses = new Set(['pending_review', 'rejected', 'active']);
+
+  if (status && !allowedStatuses.has(status)) {
+    throw new HTTPException(400, { message: 'Invalid status filter' });
+  }
+
+  const whereClause = status
+    ? 'WHERE p.status = ? AND ap.submitted_by_user_id IS NOT NULL'
+    : "WHERE p.status != 'active' AND ap.submitted_by_user_id IS NOT NULL";
+  const bindings = status ? [status] : [];
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT
+       p.id,
+       p.asin,
+       p.title,
+       p.image_url,
+       p.marketplace,
+       p.category,
+       p.status,
+       p.created_at,
+       p.updated_at,
+       COUNT(DISTINCT ap.agent_id) as requesting_agents,
+       GROUP_CONCAT(DISTINCT a.name) as agent_names,
+       GROUP_CONCAT(DISTINCT u.username) as submitted_by
+     FROM products p
+     JOIN agent_products ap ON ap.product_id = p.id
+     LEFT JOIN agents a ON a.id = ap.agent_id
+     LEFT JOIN users u ON u.id = ap.submitted_by_user_id
+     ${whereClause}
+     GROUP BY p.id
+     ORDER BY p.updated_at DESC, p.created_at DESC`
+  )
+    .bind(...bindings)
+    .all();
+
+  return c.json({ submissions: results ?? [] });
 });
 
 /**
@@ -73,45 +119,24 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
   }
 
   try {
-    const response = await fetch(
-      `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${marketplace}`,
-      {
-        headers: {
-          'X-RapidAPI-Key': apiKey,
-          'X-RapidAPI-Host': 'real-time-amazon-data.p.rapidapi.com',
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`API returned ${response.status}`);
-    }
-
-    const result = (await response.json()) as {
-      data?: { product_title?: string; product_photo?: string; product_category?: string };
-    };
-
-    const productData = result.data;
-    if (!productData?.product_title) {
+    const productData = await fetchAmazonProductData(apiKey, asin, marketplace);
+    if (!productData) {
       throw new HTTPException(404, { message: 'Product not found on Amazon' });
     }
 
-    await c.env.DB.prepare(
-      `INSERT INTO products (asin, title, image_url, marketplace, category, fetched_at)
-       VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-    )
-      .bind(
-        asin,
-        productData.product_title,
-        productData.product_photo || `https://images-na.ssl-images-amazon.com/images/I/${asin}.jpg`,
-        marketplace,
-        productData.product_category || null
-      )
-      .run();
-
-    const product = await c.env.DB.prepare('SELECT * FROM products WHERE asin = ? AND marketplace = ?')
-      .bind(asin, marketplace)
-      .first();
+    const product = await ensureProductRecord({
+      db: c.env.DB,
+      asin,
+      marketplace,
+      apiKey,
+      title: productData.title,
+      imageUrl: productData.imageUrl,
+      category: productData.category,
+      description: productData.description,
+      features: productData.features,
+      status: 'active',
+      updateExistingFromInput: true,
+    });
 
     return c.json({ product, message: 'Product fetched and saved' }, 201);
   } catch (error) {
@@ -225,6 +250,15 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
     .bind(id).first<{ asin: string }>();
   if (!product) throw new HTTPException(404, { message: 'Product not found' });
 
+  const relatedAgents = await c.env.DB.prepare(
+    `SELECT a.slug
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     WHERE ap.product_id = ?`
+  )
+    .bind(id)
+    .all<{ slug: string }>();
+
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
 
@@ -232,6 +266,7 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
   if (body.image_url) { updates.push('image_url = ?'); values.push(body.image_url); }
   if (body.category !== undefined) { updates.push('category = ?'); values.push(body.category); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
+  if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
 
   if (updates.length === 0) {
     throw new HTTPException(400, { message: 'No fields to update' });
@@ -246,8 +281,33 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
 
   const cache = new CacheService(c.env.KV);
   c.executionCtx.waitUntil(cache.invalidateForProduct(product.asin));
+  c.executionCtx.waitUntil(
+    Promise.all(
+      (relatedAgents.results ?? []).flatMap((agent) => [
+        cache.deletePageData(agent.slug, product.asin),
+        cache.deleteRedirectUrl(agent.slug, product.asin),
+      ])
+    )
+  );
 
   const updated = await c.env.DB.prepare('SELECT * FROM products WHERE id = ?').bind(id).first();
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'product.updated',
+      entityType: 'product',
+      entityId: id,
+      details: {
+        titleUpdated: body.title !== undefined,
+        imageUpdated: body.image_url !== undefined,
+        categoryUpdated: body.category !== undefined,
+        isActive: body.is_active,
+        status: body.status,
+      },
+    })
+  );
+
   return c.json({ product: updated, message: 'Product updated' });
 });
 
@@ -258,8 +318,33 @@ products.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid product ID' });
 
+  const product = await c.env.DB.prepare('SELECT asin FROM products WHERE id = ?')
+    .bind(id)
+    .first<{ asin: string }>();
+  if (!product) throw new HTTPException(404, { message: 'Product not found' });
+
+  const relatedAgents = await c.env.DB.prepare(
+    `SELECT a.slug
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     WHERE ap.product_id = ?`
+  )
+    .bind(id)
+    .all<{ slug: string }>();
+
   await c.env.DB.prepare('UPDATE products SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .bind(id).run();
+
+  const cache = new CacheService(c.env.KV);
+  c.executionCtx.waitUntil(cache.invalidateForProduct(product.asin));
+  c.executionCtx.waitUntil(
+    Promise.all(
+      (relatedAgents.results ?? []).flatMap((agent) => [
+        cache.deletePageData(agent.slug, product.asin),
+        cache.deleteRedirectUrl(agent.slug, product.asin),
+      ])
+    )
+  );
 
   return c.json({ message: 'Product deactivated' });
 });
@@ -367,6 +452,7 @@ products.post('/enrich', async (c) => {
             rating = ?,
             description = ?,
             features = ?,
+            status = ?,
             fetched_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`
@@ -379,6 +465,7 @@ products.post('/enrich', async (c) => {
           data.product_star_rating ? parseFloat(data.product_star_rating) : 4.5,
           (data.product_description || '').substring(0, 2000),
           features,
+          'active',
           product.id
         ).run();
 

@@ -1,6 +1,13 @@
 import { Hono } from 'hono';
+import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { getAnalyticsOverview, getAgentAnalytics } from '../services/analytics';
+import { importAmazonReportSchema } from '../schemas';
+import {
+  getAnalyticsOverview,
+  getAgentAnalytics,
+  importAmazonReport,
+} from '../services/analytics';
+import { writeAuditLog } from '../services/audit-log';
 
 const analytics = new Hono<AppEnv>();
 
@@ -10,6 +17,70 @@ const analytics = new Hono<AppEnv>();
 analytics.get('/overview', async (c) => {
   const overview = await getAnalyticsOverview(c.env.DB);
   return c.json(overview);
+});
+
+/**
+ * GET /api/analytics/reports — Recently imported Amazon reports
+ */
+analytics.get('/reports', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT
+       ar.id,
+       ar.marketplace,
+       ar.report_type,
+       ar.period_start,
+       ar.period_end,
+       ar.source_file_name,
+       ar.imported_at,
+       u.username as imported_by_username,
+       COUNT(ac.id) as conversions_count
+     FROM amazon_reports ar
+     LEFT JOIN users u ON u.id = ar.imported_by_user_id
+     LEFT JOIN amazon_conversions ac ON ac.report_id = ar.id
+     GROUP BY ar.id
+     ORDER BY ar.imported_at DESC
+     LIMIT 20`
+  ).all();
+
+  return c.json({ reports: results ?? [] });
+});
+
+/**
+ * POST /api/analytics/reports/import — Import an Amazon report CSV/TSV
+ */
+analytics.post('/reports/import', zValidator('json', importAmazonReportSchema), async (c) => {
+  const payload = c.req.valid('json');
+  const result = await importAmazonReport(c.env.DB, {
+    marketplace: payload.marketplace,
+    sourceFileName: payload.source_file_name,
+    csvContent: payload.csv_content,
+    reportType: payload.report_type,
+    periodStart: payload.period_start,
+    periodEnd: payload.period_end,
+    importedByUserId: c.get('userId'),
+  });
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'amazon_report.imported',
+      entityType: 'amazon_report',
+      entityId: result.reportId,
+      details: {
+        marketplace: payload.marketplace,
+        sourceFileName: payload.source_file_name,
+        importedRows: result.importedRows,
+        skippedRows: result.skippedRows,
+      },
+    })
+  );
+
+  return c.json({
+    reportId: result.reportId,
+    importedRows: result.importedRows,
+    skippedRows: result.skippedRows,
+    message: 'Amazon report imported successfully',
+  }, 201);
 });
 
 /**

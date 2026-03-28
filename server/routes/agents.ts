@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createAgentSchema, updateAgentSchema } from '../schemas';
 import { CacheService } from '../services/cache';
+import { writeAuditLog } from '../services/audit-log';
 
 const agents = new Hono<AppEnv>();
 
@@ -38,6 +39,21 @@ agents.post('/', zValidator('json', createAgentSchema), async (c) => {
     const agent = await c.env.DB.prepare('SELECT * FROM agents WHERE slug = ?')
       .bind(data.slug)
       .first();
+
+    c.executionCtx.waitUntil(
+      writeAuditLog(c.env.DB, {
+        userId: c.get('userId'),
+        action: 'agent.created',
+        entityType: 'agent',
+        entityId: (agent as { id?: number } | null)?.id ?? data.slug,
+        details: {
+          name: data.name,
+          slug: data.slug,
+          email: data.email || null,
+          phone: data.phone || null,
+        },
+      })
+    );
 
     return c.json({ agent, message: 'Agent created successfully' }, 201);
   } catch (error: unknown) {
@@ -87,6 +103,22 @@ agents.put('/:id', zValidator('json', updateAgentSchema), async (c) => {
   c.executionCtx.waitUntil(cache.invalidateForAgent(agent.slug));
 
   const updated = await c.env.DB.prepare('SELECT * FROM agents WHERE id = ?').bind(id).first();
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'agent.updated',
+      entityType: 'agent',
+      entityId: id,
+      details: {
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        isActive: data.is_active,
+      },
+    })
+  );
+
   return c.json({ agent: updated, message: 'Agent updated' });
 });
 
@@ -106,6 +138,15 @@ agents.delete('/:id', async (c) => {
 
   const cache = new CacheService(c.env.KV);
   c.executionCtx.waitUntil(cache.invalidateForAgent(agent.slug));
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'agent.deactivated',
+      entityType: 'agent',
+      entityId: id,
+      details: { slug: agent.slug },
+    })
+  );
 
   return c.json({ message: 'Agent deactivated' });
 });

@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 41 conventions, 9 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 43 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **165 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **177 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -40,6 +40,30 @@ Auto-compiled from **165 real patterns** in **amazon-affiliate**. This skill is 
 | Never force push to main, master, or production br | Never force push to main, master, or production branches |
 
 ## 🔧 Problem Playbooks
+
+### Patched security issue BEGIN — ensures atomic multi-step database operations
+- "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
++ GOOGLE_SERVICE_ACCOUNT_EMAIL=zisan-affiliate@sanguine-era-484512-i2.iam.gserviceaccount.com
+-   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YH
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: BEGIN
+3. identifier: PRIVATE
+4. identifier: KEY
+5. identifier: Ggr
+
+### Patched security issue BEGIN — ensures atomic multi-step database operations
+- 
++ "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
++   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YHUbHzqIVXcXzsh7gouVN9EQMPxqto0/q+I5eKQXbKyFTiY1JoA0hP\nRS9PDcJolDYD0Y0Xfz/MytAYEv54Uek9QhuIF
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: BEGIN
+3. identifier: PRIVATE
+4. identifier: KEY
+5. identifier: Ggr
 
 ### problem-fix in step-04-generate-tests.md
 File updated (external): .qwen/skills/bmad-testarch-atdd/steps-c/step-04-generate-tests.md
@@ -174,6 +198,8 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
+- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
 - 📐 **Strengthened types Compatible — ensures atomic multi-step database operations** — - Q: Can I use this in a canister filter?A: Yes. Cut to fit any filter (canister, HOB, sump, waterfa
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x**
 - 📐 **Updated Wireless database schema — ensures atomic multi-step database operations — confirmed 5x**
@@ -211,18 +237,6 @@ CLAUDE.md
 - 📐 **Always add empty states ("No items yet" with call-to-action)** — Always add empty states ("No items yet" with call-to-action)
 - 📐 **Always add error states with retry button — not just blank screen** — Always add error states with retry button — not just blank screen
 - 📐 **Always add loading states for async operations (skeleton, spinner)** — Always add loading states for async operations (skeleton, spinner)
-- 📐 **Test edge cases: empty input, null, boundary values, error scenarios** — Test edge cases: empty input, null, boundary values, error scenarios
-- 📐 **Each test should be independent — no shared mutable state between tests** — Each test should be independent — no shared mutable state between tests
-- 📐 **Write tests for business logic — test behavior/output, not implementation details** — Write tests for business logic — test behavior/output, not implementation details
-- 📐 **Close resources (streams, connections, handles) when done** — Close resources (streams, connections, handles) when done
-- 📐 **Debounce user input handlers (search, resize, scroll)** — Debounce user input handlers (search, resize, scroll)
-- 📐 **Use pagination for lists over 100 items** — Use pagination for lists over 100 items
-- 📐 **Implement retry logic for transient failures with exponential backoff** — Implement retry logic for transient failures with exponential backoff
-- 📐 **Return proper HTTP status codes — not 500 for everything** — Return proper HTTP status codes — not 500 for everything
-- 📐 **Always wrap async/await in try/catch** — Always wrap async/await in try/catch
-- 📐 **Hash passwords with cost factor ≥12 (bcrypt) or memory ≥64MB (argon2)** — Hash passwords with cost factor ≥12 (bcrypt) or memory ≥64MB (argon2)
-- 📐 **Implement rate limiting on login endpoints to prevent brute force** — Implement rate limiting on login endpoints to prevent brute force
-- 📐 **Use constants for magic numbers and strings** — Use constants for magic numbers and strings
-- 📐 **Handle edge cases: empty arrays, empty strings, null, undefined, 0, N
+- 📐 **Test edge cases: empty
 
 ... [Truncated — see individual observations for full content]

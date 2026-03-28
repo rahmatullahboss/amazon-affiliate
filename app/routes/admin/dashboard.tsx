@@ -7,6 +7,9 @@ interface OverviewData {
   viewsToday: number;
   clicksThisWeek: number;
   viewsThisWeek: number;
+  totalOrderedItems: number;
+  totalRevenue: number;
+  totalCommission: number;
   topAgents: Array<{ name: string; slug: string; clicks: number }>;
   topProducts: Array<{ asin: string; title: string; clicks: number }>;
 }
@@ -39,6 +42,9 @@ export default function Dashboard() {
     { label: "Views Today", value: data?.viewsToday ?? 0, icon: "📈", color: "#3b82f6" },
     { label: "Clicks This Week", value: data?.clicksThisWeek ?? 0, icon: "🔥", color: "#f59e0b" },
     { label: "Views This Week", value: data?.viewsThisWeek ?? 0, icon: "📅", color: "#8b5cf6" },
+    { label: "Ordered Items", value: data?.totalOrderedItems ?? 0, icon: "📦", color: "#14b8a6" },
+    { label: "Revenue", value: `$${(data?.totalRevenue ?? 0).toFixed(2)}`, icon: "💰", color: "#38bdf8" },
+    { label: "Commission", value: `$${(data?.totalCommission ?? 0).toFixed(2)}`, icon: "🪙", color: "#a855f7" },
   ];
 
   return (
@@ -54,7 +60,7 @@ export default function Dashboard() {
               <span style={{ fontSize: "0.8rem", color: "#6b6b85", fontWeight: 500 }}>{stat.label}</span>
             </div>
             <div style={{ fontSize: "1.75rem", fontWeight: 700, color: stat.color }}>
-              {stat.value.toLocaleString()}
+              {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
             </div>
           </div>
         ))}

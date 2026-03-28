@@ -10,10 +10,11 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 export const meta: Route.MetaFunction = () => [
-  { title: "DealsRky — Your Trusted Shopping Companion" },
+  { title: "DealsRky | Curated Amazon Affiliate Storefront" },
   {
     name: "description",
-    content: "Find the best deals on top products. Shop securely through Amazon with verified links.",
+    content:
+      "Curated Amazon product pages, fast bridge links, and transparent affiliate disclosures built for direct Amazon checkout.",
   },
   { name: "viewport", content: "width=device-width, initial-scale=1" },
   { name: "theme-color", content: "#0a0a0f" },

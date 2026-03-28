@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createUserSchema, updateUserSchema } from '../schemas';
 import { hashPassword } from '../services/auth';
+import { writeAuditLog } from '../services/audit-log';
 
 const users = new Hono<AppEnv>();
 
@@ -60,6 +61,20 @@ users.post('/', zValidator('json', createUserSchema), async (c) => {
   )
     .bind(body.username)
     .first();
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'user.created',
+      entityType: 'user',
+      entityId: (user as { id?: number } | null)?.id ?? body.username,
+      details: {
+        username: body.username,
+        role: body.role,
+        agentId: body.agent_id ?? null,
+      },
+    })
+  );
 
   return c.json({ user, message: 'User created successfully' }, 201);
 });
@@ -146,6 +161,22 @@ users.put('/:id', zValidator('json', updateUserSchema), async (c) => {
   )
     .bind(id)
     .first();
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'user.updated',
+      entityType: 'user',
+      entityId: id,
+      details: {
+        emailUpdated: body.email !== undefined,
+        role: body.role,
+        agentId: body.agent_id,
+        isActive: body.is_active,
+        passwordUpdated: body.password !== undefined,
+      },
+    })
+  );
 
   return c.json({ user, message: 'User updated successfully' });
 });

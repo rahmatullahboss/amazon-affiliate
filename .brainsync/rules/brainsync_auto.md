@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 242 notes | Score threshold: >40
+> 332 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,44 +20,42 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
 - **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
+- **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
 
-## Active: `.`
+## Active: `app/components/home`
 
-- **Strengthened types Overhaul — offloads heavy computation off the main thread**
-- **gotcha in flow-c-ascii.md**
-- **Optimized Amazon — offloads heavy computation off the main thread**
-- **Optimized Standalone — offloads heavy computation off the main thread**
-- **convention in .gitignore**
+- **Fixed null crash in ProductCard — confirmed 3x**
 
 ## Project Standards
 
-- Strengthened types Overhaul — offloads heavy computation off the main thread
-- convention in .gitignore
-- convention in .gitignore
-- Strengthened types Navigate
-- convention in scratchpad_6oao5spx.md
-- what-changed in manifest.yaml — confirmed 3x
-- Strengthened types Compatible — ensures atomic multi-step database operations
+- Fixed null crash in ProductCard — confirmed 3x
+- Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x
+- Strengthened types ProductRow — formalizes the data contract with explicit types
 - Fixed null crash in Mapping — confirmed 3x
+- Strengthened types Contact
+- Strengthened types Route — wraps unsafe operation in error boundary
+- Strengthened types Route — parallelizes async operations for speed
+- Strengthened types HeroBanner — parallelizes async operations for speed
 
 ## Known Fixes
 
 - ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
+- ❌ -     throw new HTTPException(400, { message: 'Missing agent or ASIN' }); → ✅ Fixed null crash in SELECT — parallelizes async operations for speed
+- ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
 
 ## Recent Decisions
 
-- Optimized Amazon — offloads heavy computation off the main thread
-- Optimized Standalone — offloads heavy computation off the main thread
+- decision in product-detail.tsx
+- decision in home.tsx
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized Argument — offloads heavy computation off the main thread
+- Optimized Type — offloads heavy computation off the main thread
 
 ## Learned Patterns
 
 - Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x (seen 2x)
 - Decision: Optimized Argument — offloads heavy computation off the main thread (seen 2x)
-- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x (seen 3x)
+- Decision: Optimized impliedFormat — offloads heavy computation off the main thread (seen 2x)
 - Agent generates new migration for every change (squash related changes)
 - Agent installs packages without checking if already installed
 

@@ -47,7 +47,7 @@ page.get('/:agentSlug/:asin', async (c) => {
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
      WHERE a.slug = ? AND p.asin = ?
-       AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1
+       AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
      LIMIT 1`
   )
     .bind(agentSlug, asin)

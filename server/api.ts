@@ -17,6 +17,8 @@ import publicRoutes from './routes/public';
 import portal from './routes/portal';
 import { requireRole } from './middleware/auth';
 import users from './routes/users';
+import sheets from './routes/sheets';
+import auditLogs from './routes/audit-logs';
 
 const app = new Hono<AppEnv>();
 
@@ -69,6 +71,8 @@ admin.route('/products', products);
 admin.route('/tracking', tracking);
 admin.route('/mappings', mappings);
 admin.route('/analytics', analytics);
+admin.route('/sheets', sheets);
+admin.route('/audit-logs', auditLogs);
 
 app.route('/api', admin);
 

@@ -1,306 +1,394 @@
 > **BrainSync Context Pumper** 🧠
-> Dynamically loaded for active file: `implementation_plan.md` (Domain: **Generic Logic**)
+> Dynamically loaded for active file: `app/components/home/ProductCard.tsx` (Domain: **Frontend (React/UI)**)
 
-### 🔴 Generic Logic Gotchas
-- **gotcha in flow-c-ascii.md**: File updated (external): .qwen/skills/wds-4-ux-design/data/page-creation-flows/flow-c-ascii.md
-
-Content summary (93 lines):
-# Flow C: ASCII Layout
-
-**Activates when:** User chooses to create an ASCII layout
-
----
-
-## Introduction
-
-<output>**Let's create a simple ASCII layout together.**
-
-⚠️ **Note:** ASCII is a last resort - sketches are much better for capturing design intent!
-
-We'll create a basic box-and-text layout to show structure.</output>
-
----
-
-## Gather Sections
-
-<ask>**What are the main sections from top to bottom?**
-
-Example:
-- Header
-- Hero
-- Features (3 columns)
-- CTA
-- Footer
-
-List sections:</ask>
-
-<acti
-
-### 📐 Generic Logic Conventions & Fixes
-- **[what-changed] 🟢 Edited implementation_plan.md (37 changes, 811min)**: Active editing session on implementation_plan.md.
-37 content changes over 811 minutes.
-- **[decision] Optimized Amazon — offloads heavy computation off the main thread**: - # Amazon Affiliate Bridge Page System — Enterprise Architecture
-+ # Amazon Affiliate Platform — Final Implementation Plan
-- ## 1. Executive Summary
-+ ## 1. Product Definition
-- A **Cloudflare-native bridge page system** that enables multiple agents to share unique landing page URLs. When a buyer clicks the link, they see a clean product page (image + title) with a **"Buy on Amazon"** button that dynamically injects the correct agent-specific tracking ID — fully compliant with Amazon Associates policies.
-+ This project is no longer a copy of the old `DealsRky` WordPress site and no longer depends on Google Sheets.
-- ### Core Flow
-+ The final product is a **fully in-house Amazon affiliate platform** with:
-- ```
-+ 
-- Agent shares link → Buyer clicks → Bridge Page loads (image + title + CTA)
-+ - a custom public affiliate frontend
--                                     → Buyer clicks "Buy on Amazon"
-+ - an admin panel for business operations
--                                     → Redirect to Amazon with agent's tracking ID
-+ - an agent portal for ASIN submission and link generation
-- ```
-+ - a bridge landing page + redirect engine
-- 
-+ - app-side traffic tracking
-- ### URL Pattern
-+ - Amazon report-based sales attribution
-- ```
-+ 
-- https://yourdomain.com/{agent-slug}/{ASIN}
-+ ### Core Business Goal
-- ```
-+ 
-- 
-+ Enable 30-40 agents to promote Amazon products through a custom site while keeping:
-- ---
-+ 
-- 
-+ - agent-specific landing links
-- ## 2. User Review Required
-+ - fast and compliant buyer flow
-- 
-+ - client-owned affiliate attribution
-- > [!IMPORTANT]
-+ - agent-level performance visibility
-- > **Amazon Creators API Eligibility**: The new Amazon Creators API (replacing PAAPI 5.0, which is being retired May 2026) requires **10 qualifying sales in the last 30 days** to access. If your client doesn't meet this threshold, we'll use a **dual-strategy** approach: manual product data entry via admin panel + optional third-party API fallback (ASIN Data API / RapidAPI). 
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [# Amazon Affiliate Platform — Final Implementation Plan]
-- **[decision] Optimized Standalone — offloads heavy computation off the main thread**: - ## 16. E-commerce UI Overhaul (dealsrky.com Replica)
-+ ## 16. Standalone Application & Compliance Pages
-- Instead of using AI-generated designs, we will natively replicate the exact design, layout, and color scheme of the reference site (`https://dealsrky.com/`) using **React Router (v7)** and **Tailwind CSS**, while ensuring strict Amazon TOS compliance.
-+ As confirmed, this system will be a **100% standalone web application**, completely separate from your main e-commerce site (DealsRKY). Because this system will be the destination where users land before heading to Amazon, Amazon's Operating Agreement dictates that it must look legitimate and contain necessary legal information.
-- ### Approach
-+ We will include the following static routes out-of-the-box to ensure compliance:
-- We will manually engineer the frontend to match the reference site pixel-by-pixel, using our existing `app/` structure.
-+ 
-- 
-+ 1. **`/privacy-policy`**: Standard Privacy Policy outlining data collection (analytics, IP hashing).
-- 1. **Establish the DealsRKY Design System in Tailwind:**
-+ 2. **`/affiliate-disclosure`**: Detailed page explaining the Amazon Associates relationship.
--    - **Primary Color:** Teal (`#0B8080` / custom teal).
-+ 3. **`/terms`**: Standard Terms of Service.
--    - **Secondary Colors:** Yellow accents, warm white backgrounds (`#f3f4f6`).
-+ 4. **`/contact`**: Simple contact information page for legitimacy.
--    - **Typography:** Clean sans-serif (Inter / Roboto).
-+ 
--    
-+ These pages will be linked cleanly in the footer of the Bridge Landing Page.
-- 2. **Implement Core Layout Components:**
-+ 
--    - **Header:** Top strip (contact info), Main Search bar (Teal), Logo (Left), "All Departments" vertical dropdown trigger, Main Navigation bar.
-+ ---
--    - **Footer:** Exact replica of the dealsrky footer, including the necessary **Amazon Affiliate Disclosure**.
-+ 
-- 
-+ ## 17. The "Instant Load" Caching Mechanism (KV)
-- 3. **Replicate the Home/Storefront Page:**
-+ 
--    
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [# Amazon Affiliate Bridge Page System — Enterprise Architecture]
-- **[convention] Strengthened types Overhaul — offloads heavy computation off the main thread**: - ## 16. Cost Analysis (Monthly)
-+ ## 16. E-commerce UI Overhaul (StitchMCP) Plan
-- | Service | Free Tier | Estimated Usage | Cost |
-+ To match the client's original e-commerce storefront requirement (as seen in `screencapture-dealsrky.png`), we are going to completely overhaul the frontend using **StitchMCP**, while ensuring 100% compliance with Amazon's TOS.
-- |---------|-----------|-----------------|------|
-+ 
-- | Cloudflare Workers | 100K req/day | ~500K req/day | $5/month |
-+ ### Approach 
-- | Cloudflare D1 | 5M reads/day | ~1M reads/day | Free |
-+ Stitch will be used to generate robust React code for the new UI, adopting the Teal/Cyan design system from the demo.
-- | Cloudflare KV | 100K reads/day | ~200K reads/day | $0.50/month |
-+ 
-- | Cloudflare Pages | Unlimited | — | Free |
-+ 1. **Create Stitch Project & Apply Design System:**
-- | 3rd Party Product API | — | ~1000 lookups/month | ~$30/month |
-+    - Base Color: Teal/Cyan (`#00A7A7` or similar). Space Grotesk / Inter typography.
-- | **Total** | | | **~$35.50/month** |
-+ 2. **Generate Desktop Screens (`deviceType: DESKTOP`):**
-- 
-+    - **Storefront Home:** Header, Navigation bar, Deals Slider, Category Grids, Branding section.
-- > [!NOTE]
-+    - **All Deals Page:** Left-pane category filters, grid of compliant product cards without static prices/stars.
-- > Cloudflare's free tier is extremely generous. For most use cases with <100K daily clicks, the infrastructure cost will be **$0-5/month** total.
-+    - **Product Detail (Bridge) Page:** Detailed view with the "View Deal" Amazon CTA.
-- 
-+ 3. **Generate Mobile Screens (`deviceType: MOBILE`):**
-- ---
-+    - Rerun similar generation prompts enforcing a strict mobile stacked layout, hamburger menus, and horizontal scrolling cards.
-- 
-+ 4. **Implement React Components:**
-- ## Open Questions
-+    - Extract the generated semantic HTML/Tailwind structures into our React Router `app/routes/` and `app/components/`.
-- 
-+ 5. **QA & Validation:**
-- > [!IMPORTANT]
-+    
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [# Amazon Affiliate Bridge Page System — Enterprise Architecture]
-- **[decision] Optimized impliedFormat — offloads heavy computation off the main thread**: - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es2015.d.ts","./node_modules/typescript/lib/lib.es2016.d.ts","./node_modules/typescript/lib/lib.es2017.d.ts","./node_modules/typescript/lib/lib.es2018.d.ts","./node_modules/typescript/lib/lib.es2019.d.ts","./node_modules/typescript/lib/lib.es2020.d.ts","./node_modules/typescript/lib/lib.es2021.d.ts","./node_modules/typescript/lib/lib.es2022.d.ts","./node_modules/typescript/lib/lib.dom.d.ts","./node_modules/typescript/lib/lib.dom.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.core.d.ts","./node_modules/typescript/lib/lib.es2015.collection.d.ts","./node_modules/typescript/lib/lib.es2015.generator.d.ts","./node_modules/typescript/lib/lib.es2015.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.promise.d.ts","./node_modules/typescript/lib/lib.es2015.proxy.d.ts","./node_modules/typescript/lib/lib.es2015.reflect.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.wellknown.d.ts","./node_modules/typescript/lib/lib.es2016.array.include.d.ts","./node_modules/typescript/lib/lib.es2016.intl.d.ts","./node_modules/typescript/lib/lib.es2017.arraybuffer.d.ts","./node_modules/typescript/lib/lib.es2017.date.d.ts","./node_modules/typescript/lib/lib.es2017.object.d.ts","./node_modules/typescript/lib/lib.es2017.sharedmemory.d.ts","./node_modules/typescript/lib/lib.es2017.string.d.ts","./node_modules/typescript/lib/lib.es2017.intl.d.ts","./node_modules/typescript/lib/lib.es2017.typedarrays.d.ts","./node_modules/typescript/lib/lib.es2018.asyncgenerator.d.ts","./node_modules/typescript/lib/lib.es2018.asynciterable.d.ts","./node_modules/typescript/lib/lib.es2018.intl.d.ts","./node_modules/typescript/lib/lib.es2018.promise.d.ts","./node_modules/typescript/lib/lib.es2018.regexp.d.ts","./node_modules/typescript/lib/lib.es2019.array.d.ts","./node_modules/typescript/lib/lib.es2019.object.d.ts","./node_modules/typescript/lib/li
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [fileNames, fileIdsList, fileInfos, root, options]
-- **[what-changed] what-changed in tsconfig.node.tsbuildinfo**: File updated (external): tsconfig.node.tsbuildinfo
-
-Content summary (1 lines):
-{"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es2015.d.ts","./node_modules/typescript/lib/lib.es2016.d.ts","./node_modules/typescript/lib/lib.es2017.d.ts","./node_modules/typescript/lib/lib.es2018.d.ts","./node_modules/typescript/lib/lib.es2019.d.ts","./node_modules/typescript/lib/lib.es2020.d.ts","./node_modules/typescript/lib/lib.es2021.d.ts","./node_modules/typescript/lib/lib.es2022.d.ts","./node_modules/typescript/lib/lib.es2015.core.d.ts","./n
-- **[decision] Optimized Argument — offloads heavy computation off the main thread**: - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es2015.d.ts","./node_modules/typescript/lib/lib.es2016.d.ts","./node_modules/typescript/lib/lib.es2017.d.ts","./node_modules/typescript/lib/lib.es2018.d.ts","./node_modules/typescript/lib/lib.es2019.d.ts","./node_modules/typescript/lib/lib.es2020.d.ts","./node_modules/typescript/lib/lib.es2021.d.ts","./node_modules/typescript/lib/lib.es2022.d.ts","./node_modules/typescript/lib/lib.dom.d.ts","./node_modules/typescript/lib/lib.dom.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.core.d.ts","./node_modules/typescript/lib/lib.es2015.collection.d.ts","./node_modules/typescript/lib/lib.es2015.generator.d.ts","./node_modules/typescript/lib/lib.es2015.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.promise.d.ts","./node_modules/typescript/lib/lib.es2015.proxy.d.ts","./node_modules/typescript/lib/lib.es2015.reflect.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.wellknown.d.ts","./node_modules/typescript/lib/lib.es2016.array.include.d.ts","./node_modules/typescript/lib/lib.es2016.intl.d.ts","./node_modules/typescript/lib/lib.es2017.arraybuffer.d.ts","./node_modules/typescript/lib/lib.es2017.date.d.ts","./node_modules/typescript/lib/lib.es2017.object.d.ts","./node_modules/typescript/lib/lib.es2017.sharedmemory.d.ts","./node_modules/typescript/lib/lib.es2017.string.d.ts","./node_modules/typescript/lib/lib.es2017.intl.d.ts","./node_modules/typescript/lib/lib.es2017.typedarrays.d.ts","./node_modules/typescript/lib/lib.es2018.asyncgenerator.d.ts","./node_modules/typescript/lib/lib.es2018.asynciterable.d.ts","./node_modules/typescript/lib/lib.es2018.intl.d.ts","./node_modules/typescript/lib/lib.es2018.promise.d.ts","./node_modules/typescript/lib/lib.es2018.regexp.d.ts","./node_modules/typescript/lib/lib.es2019.array.d.ts","./node_modules/typescript/lib/lib.es2019.object.d.ts","./node_modules/typescript/lib/li
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [fileNames, fileIdsList, fileInfos, root, options]
-- **[decision] Optimized Argument — hardens HTTP security headers**: - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es2015.d.ts","./node_modules/typescript/lib/lib.es2016.d.ts","./node_modules/typescript/lib/lib.es2017.d.ts","./node_modules/typescript/lib/lib.es2018.d.ts","./node_modules/typescript/lib/lib.es2019.d.ts","./node_modules/typescript/lib/lib.es2020.d.ts","./node_modules/typescript/lib/lib.es2021.d.ts","./node_modules/typescript/lib/lib.es2022.d.ts","./node_modules/typescript/lib/lib.dom.d.ts","./node_modules/typescript/lib/lib.dom.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.core.d.ts","./node_modules/typescript/lib/lib.es2015.collection.d.ts","./node_modules/typescript/lib/lib.es2015.generator.d.ts","./node_modules/typescript/lib/lib.es2015.iterable.d.ts","./node_modules/typescript/lib/lib.es2015.promise.d.ts","./node_modules/typescript/lib/lib.es2015.proxy.d.ts","./node_modules/typescript/lib/lib.es2015.reflect.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.d.ts","./node_modules/typescript/lib/lib.es2015.symbol.wellknown.d.ts","./node_modules/typescript/lib/lib.es2016.array.include.d.ts","./node_modules/typescript/lib/lib.es2016.intl.d.ts","./node_modules/typescript/lib/lib.es2017.arraybuffer.d.ts","./node_modules/typescript/lib/lib.es2017.date.d.ts","./node_modules/typescript/lib/lib.es2017.object.d.ts","./node_modules/typescript/lib/lib.es2017.sharedmemory.d.ts","./node_modules/typescript/lib/lib.es2017.string.d.ts","./node_modules/typescript/lib/lib.es2017.intl.d.ts","./node_modules/typescript/lib/lib.es2017.typedarrays.d.ts","./node_modules/typescript/lib/lib.es2018.asyncgenerator.d.ts","./node_modules/typescript/lib/lib.es2018.asynciterable.d.ts","./node_modules/typescript/lib/lib.es2018.intl.d.ts","./node_modules/typescript/lib/lib.es2018.promise.d.ts","./node_modules/typescript/lib/lib.es2018.regexp.d.ts","./node_modules/typescript/lib/lib.es2019.array.d.ts","./node_modules/typescript/lib/lib.es2019.object.d.ts","./node_modules/typescript/lib/li
-… [diff truncated]
-
-📌 IDE AST Context: Modified symbols likely include [fileNames, fileIdsList, fileInfos, root, options]
-- **[what-changed] Updated API endpoint package**: -     "hono": "^4.7.11",
-+     "@hono/zod-validator": "^0.5.0",
--     "@hono/zod-validator": "^0.5.0",
-+     "@tailwindcss/vite": "^4.2.2",
--     "isbot": "^5.1.31",
-+     "hono": "^4.7.11",
--     "react": "^19.1.1",
-+     "isbot": "^5.1.31",
--     "react-dom": "^19.1.1",
-+     "react": "^19.1.1",
--     "react-router": "^7.9.2",
-+     "react-dom": "^19.1.1",
--     "zod": "^3.24.4"
-+     "react-router": "^7.9.2",
--   },
-+     "tailwindcss": "^4.2.2",
--   "devDependencies": {
-+     "zod": "^3.24.4"
--     "@cloudflare/vite-plugin": "^1.13.5",
-+   },
--     "@react-router/dev": "^7.9.2",
-+   "devDependencies": {
--     "@types/node": "^22",
-+     "@cloudflare/vite-plugin": "^1.13.5",
--     "@types/react": "^19.1.13",
-+     "@react-router/dev": "^7.9.2",
--     "@types/react-dom": "^19.1.9",
-+     "@types/node": "^22",
--     "typescript": "^5.9.2",
-+     "@types/react": "^19.1.13",
--     "vite": "^7.1.7",
-+     "@types/react-dom": "^19.1.9",
--     "vite-tsconfig-paths": "^5.1.4",
-+     "typescript": "^5.9.2",
--     "wrangler": "^4.40.0"
-+     "vite": "^7.1.7",
--   }
-+     "vite-tsconfig-paths": "^5.1.4",
+### 📐 Frontend (React/UI) Conventions & Fixes
+- **[convention] Fixed null crash in ProductCard — confirmed 3x**: -   category: string;
++   category: string | null;
+-   price: string;
++   price?: string;
 - }
-+     "wrangler": "^4.40.0"
-+   }
++   marketplace?: string | null;
+- 
 + }
+- export function ProductCard({ item }: { item: ProductItem }) {
 + 
+-   const url = item.asin ? `/deals/${item.asin}` : `/deals`;
++ export function ProductCard({ item }: { item: ProductItem }) {
+- 
++   const url = item.asin ? `/deals/${item.asin}` : `/deals`;
+-   return (
++ 
+-     <Link 
++   return (
+-       to={url} 
++     <Link 
+-       className="group block bg-white rounded transition hover:shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] p-4 border border-gray-100/50"
++       to={url} 
+-     >
++       className="group block rounded-[1.75rem] border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-[0_20px_60px_-30px_rgba(11,128,128,0.35)]"
+-       {/* Product Image */}
++     >
+-       <div className="relative w-full aspect-square mb-4 flex items-center justify-center bg-transparent">
++       <div className="mb-4 flex items-center justify-between gap-3">
+-         <img 
++         <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
+-           src={item.image_url} 
++           {item.marketplace || "US"}
+-           alt={item.title} 
++         </span>
+-           className="max-h-full max-w-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
++         <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+-           loading="lazy"
++           Amazon
+-         />
++         </span>
+-       <div className="flex flex-col text-left">
++       <div className="relative mb-5 flex aspect-square w-full items-center justify-center rounded-[1.4rem] bg-[#f5f8f8] p-5">
+-         {/* Category */}
++         <img 
+-         <span className="text-[11px] text-gray-500 uppercase tracking-wide mb-1 block">
++           src={item.image_url} 
+-           {item.category || "General"}
++           alt={item.title} 
+-         </
+… [diff truncated]
 
-📌 IDE AST Context: Modified symbols likely include [name, private, type, scripts, dependencies]
-- **[what-changed] what-changed in tsconfig.cloudflare.tsbuildinfo**: File updated (external): tsconfig.cloudflare.tsbuildinfo
+📌 IDE AST Context: Modified symbols likely include [ProductItem, ProductCard]
+- **[problem-fix] problem-fix in products.tsx**: File updated (external): app/routes/portal/products.tsx
 
-Content summary (1 lines):
-{"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es2015.d.ts","./node_modules/typescript/lib/lib.es2016.d.ts","./node_modules/typescript/lib/lib.es2017.d.ts","./node_modules/typescript/lib/lib.es2018.d.ts","./node_modules/typescript/lib/lib.es2019.d.ts","./node_modules/typescript/lib/lib.es2020.d.ts","./node_modules/typescript/lib/lib.es2021.d.ts","./node_modules/typescript/lib/lib.es2022.d.ts","./node_modules/typescript/lib/lib.dom.d.ts","./node_modu
-- **[how-it-works] how-it-works in step-08d-mermaid-target-groups.md**: File updated (external): .qwen/skills/wds-2-trigger-mapping/steps-c/step-08d-mermaid-target-groups.md
+Content summary (199 lines):
+import { useEffect, useState } from "react";
 
-Content summary (141 lines):
----
-name: 'step-08d-mermaid-target-groups'
-description: 'Format target group nodes with emojis, priority levels, and profile traits'
+interface PortalProduct {
+  id: number;
+  custom_title: string | null;
+  product_id: number;
+  asin: string;
+  marketplace: string;
+  title: string;
+  image_url: string;
+  status: string;
+  tracking_tag: string;
+}
 
-# File References
-nextStepFile: './step-08e-mermaid-driving-forces.md'
-activityWorkflowFile: '../workflow.md'
----
+export default function PortalProductsPage() {
+  const [products, setProducts] = useState<PortalProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [asin, setAsin] = useState(""
+- **[what-changed] Replaced auth Reviews**: -     { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
++     { to: "/admin/product-submissions", label: "Reviews", icon: "🛂" },
+-     { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
++     { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
+-     { to: "/admin/analytics", label: "Analytics", icon: "📈" },
++     { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
+-     { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
++     { to: "/admin/analytics", label: "Analytics", icon: "📈" },
+-   ];
++     { to: "/admin/reports", label: "Reports", icon: "🧾" },
+- 
++     { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
+-   return (
++   ];
+-     <div style={styles.layout}>
++ 
+-       <aside style={styles.sidebar}>
++   return (
+-         <div style={styles.sidebarHeader}>
++     <div style={styles.layout}>
+-           <span style={styles.sidebarLogo}>D</span>
++       <aside style={styles.sidebar}>
+-           <span style={styles.sidebarTitle}>DealsRky</span>
++         <div style={styles.sidebarHeader}>
+-         </div>
++           <span style={styles.sidebarLogo}>D</span>
+- 
++           <span style={styles.sidebarTitle}>DealsRky</span>
+-         <nav style={styles.nav}>
++         </div>
+-           {navItems.map((item) => (
++ 
+-             <NavLink
++         <nav style={styles.nav}>
+-               key={item.to}
++           {navItems.map((item) => (
+-               to={item.to}
++             <NavLink
+-               end={item.end}
++               key={item.to}
+-               style={({ isActive }) => ({
++               to={item.to}
+-                 ...styles.navLink,
++               end={item.end}
+-                 background: isActive ? "rgba(255, 153, 0, 0.1)" : "transparent",
++               style={({ isActive }) => ({
+-                 color: isActive ? "#ff9900" : "#a0a0b8",
++                 ...styles.navLink,
+-                 borderLeft: isActive ? "3px solid #ff9900" : "3px solid transparent",
++                 ba
+… [diff truncated]
 
-# Step 27: Format Target Group Nodes
+📌 IDE AST Context: Modified symbols likely include [AdminLayout, styles]
+- **[what-changed] what-changed in deals.tsx**: -       SELECT * FROM products WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?
++       SELECT * FROM products WHERE is_active = 1 AND status = 'active' ORDER BY created_at DESC LIMIT ? OFFSET ?
+-       SELECT COUNT(*) as total FROM products WHERE is_active = 1
++       SELECT COUNT(*) as total FROM products WHERE is_active = 1 AND status = 'active'
 
-## STEP GOAL:
+📌 IDE AST Context: Modified symbols likely include [meta, loader, DealsPage]
+- **[what-changed] what-changed in home.tsx**: -       WHERE is_active = 1
++       WHERE is_active = 1 AND status = 'active'
 
-Create persona nodes with emojis, ALL CAPS names, priority levels (PRIMARY/SECONDARY/TERTIARY TARGET), and 3-4 key profile traits.
+📌 IDE AST Context: Modified symbols likely include [ProductRow, HomeLoaderData, meta, loader, editorialHighlights]
+- **[what-changed] Replaced auth Audit**: -   ];
++     { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
+- 
++   ];
+-   return (
++ 
+-     <div style={styles.layout}>
++   return (
+-       <aside style={styles.sidebar}>
++     <div style={styles.layout}>
+-         <div style={styles.sidebarHeader}>
++       <aside style={styles.sidebar}>
+-           <span style={styles.sidebarLogo}>D</span>
++         <div style={styles.sidebarHeader}>
+-           <span style={styles.sidebarTitle}>DealsRky</span>
++           <span style={styles.sidebarLogo}>D</span>
+-         </div>
++           <span style={styles.sidebarTitle}>DealsRky</span>
+- 
++         </div>
+-         <nav style={styles.nav}>
++ 
+-           {navItems.map((item) => (
++         <nav style={styles.nav}>
+-             <NavLink
++           {navItems.map((item) => (
+-               key={item.to}
++             <NavLink
+-               to={item.to}
++               key={item.to}
+-               end={item.end}
++               to={item.to}
+-               style={({ isActive }) => ({
++               end={item.end}
+-                 ...styles.navLink,
++               style={({ isActive }) => ({
+-                 background: isActive ? "rgba(255, 153, 0, 0.1)" : "transparent",
++                 ...styles.navLink,
+-                 color: isActive ? "#ff9900" : "#a0a0b8",
++                 background: isActive ? "rgba(255, 153, 0, 0.1)" : "transparent",
+-                 borderLeft: isActive ? "3px solid #ff9900" : "3px solid transparent",
++                 color: isActive ? "#ff9900" : "#a0a0b8",
+-               })}
++                 borderLeft: isActive ? "3px solid #ff9900" : "3px solid transparent",
+-             >
++               })}
+-               <span>{item.icon}</span>
++             >
+-               <span>{item.label}</span>
++               <span>{item.icon}</span>
+-             </NavLink>
++               <span>{item.label}</span>
+-           ))}
++             </NavLink>
+-         </nav>
++           ))}
+- 
++         </nav>
+-         <div style={style
+… [diff truncated]
 
-## MANDATORY EXECUTION RULES (READ FIRST):
+📌 IDE AST Context: Modified symbols likely include [AdminLayout, styles]
+- **[convention] Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x**: -   topAgents: Array<{ name: string; slug: string; clicks: number }>;
++   totalOrderedItems: number;
+-   topProducts: Array<{ asin: string; title: string; clicks: number }>;
++   totalRevenue: number;
+- }
++   totalCommission: number;
+- 
++   topAgents: Array<{ name: string; slug: string; clicks: number }>;
+- export default function Dashboard() {
++   topProducts: Array<{ asin: string; title: string; clicks: number }>;
+-   const [data, setData] = useState<OverviewData | null>(null);
++ }
+-   const [loading, setLoading] = useState(true);
++ 
+- 
++ export default function Dashboard() {
+-   useEffect(() => { fetchData(); }, []);
++   const [data, setData] = useState<OverviewData | null>(null);
+- 
++   const [loading, setLoading] = useState(true);
+-   const fetchData = async () => {
++ 
+-     try {
++   useEffect(() => { fetchData(); }, []);
+-       const token = localStorage.getItem("auth_token");
++ 
+-       const res = await fetch("/api/analytics/overview", {
++   const fetchData = async () => {
+-         headers: { Authorization: `Bearer ${token}` },
++     try {
+-       });
++       const token = localStorage.getItem("auth_token");
+-       if (res.ok) setData(await res.json());
++       const res = await fetch("/api/analytics/overview", {
+-     } catch (err) { console.error("Failed to fetch dashboard data:", err); }
++         headers: { Authorization: `Bearer ${token}` },
+-     finally { setLoading(false); }
++       });
+-   };
++       if (res.ok) setData(await res.json());
+- 
++     } catch (err) { console.error("Failed to fetch dashboard data:", err); }
+-   if (loading) {
++     finally { setLoading(false); }
+-     return <div style={{ color: "#a0a0b8", padding: "2rem" }}>Loading dashboard...</div>;
++   };
+-   }
++ 
+- 
++   if (loading) {
+-   const stats = [
++     return <div style={{ color: "#a0a0b8", padding: "2rem" }}>Loading dashboard...</div>;
+-     { label: "Total Clicks", value: data?.totalClicks ?? 0, icon: "🖱️", color: "#ff9900" },
++   }
+-     { label: "Total Views", value:
+… [diff truncated]
 
-### Universal Rules:
+📌 IDE AST Context: Modified symbols likely include [OverviewData, Dashboard]
+- **[what-changed] Updated API endpoint DealsRky — improves module reusability**: -   { title: "DealsRky — Your Trusted Shopping Companion" },
++   { title: "DealsRky | Curated Amazon Affiliate Storefront" },
+-     content: "Find the best deals on top products. Shop securely through Amazon with verified links.",
++     content:
+-   },
++       "Curated Amazon product pages, fast bridge links, and transparent affiliate disclosures built for direct Amazon checkout.",
+-   { name: "viewport", content: "width=device-width, initial-scale=1" },
++   },
+-   { name: "theme-color", content: "#0a0a0f" },
++   { name: "viewport", content: "width=device-width, initial-scale=1" },
+- ];
++   { name: "theme-color", content: "#0a0a0f" },
+- 
++ ];
+- export function Layout({ children }: { children: React.ReactNode }) {
++ 
+-   return (
++ export function Layout({ children }: { children: React.ReactNode }) {
+-     <html lang="en">
++   return (
+-       <head>
++     <html lang="en">
+-         <meta charSet="utf-8" />
++       <head>
+-         <meta name="viewport" content="width=device-width, initial-scale=1" />
++         <meta charSet="utf-8" />
+-         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
++         <meta name="viewport" content="width=device-width, initial-scale=1" />
+-         <Meta />
++         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+-         <Links />
++         <Meta />
+-       </head>
++         <Links />
+-       <body>
++       </head>
+-         {children}
++       <body>
+-         <ScrollRestoration />
++         {children}
+-         <Scripts />
++         <ScrollRestoration />
+-       </body>
++         <Scripts />
+-     </html>
++       </body>
+-   );
++     </html>
+- }
++   );
+- 
++ }
+- export default function App() {
++ 
+-   return <Outlet />;
++ export default function App() {
+- }
++   return <Outlet />;
+- 
++ }
+- export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
++ 
+-   let message = "Oops!";
++ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+-   let details = "An unexpected error occurred.";
 
+… [diff truncated]
 
-- **[how-it-works] how-it-works in STORYBOARD-INTEGRATION.md**: File updated (external): .qwen/skills/wds-4-ux-design/data/modular-architecture/STORYBOARD-INTEGRATION.md
+📌 IDE AST Context: Modified symbols likely include [meta, Layout, App, ErrorBoundary]
+- **[convention] Strengthened types ProductRow — formalizes the data contract with explicit types**: - export function meta({}: Route.MetaArgs) {
++ interface ProductRow {
+-   return [
++   id: number;
+-     { title: "DealsRky — Your Trusted Shopping Companion" },
++   asin: string;
+-   ];
++   title: string;
+- }
++   image_url: string;
+- 
++   category: string | null;
+- export async function loader({ context }: Route.LoaderArgs) {
++   marketplace: string | null;
+-   const env = context.cloudflare.env;
++   created_at: string;
+-   
++ }
+-   // Minimal query for featured items
++ 
+-   const products = await env.DB.prepare(`
++ interface HomeLoaderData {
+-     SELECT * FROM products WHERE is_active = 1 ORDER BY created_at DESC LIMIT 12
++   products: ProductRow[];
+-   `).all();
++ }
+-   return { products: products.results || [] };
++ export function meta({}: Route.MetaArgs) {
+- }
++   return [
+- 
++     { title: "DealsRky | Curated Amazon Finds" },
+- export default function Home({ loaderData }: Route.ComponentProps) {
++     {
+-   const data = loaderData as { products: any[] };
++       name: "description",
+- 
++       content:
+-   // Split products for different sections visually
++         "Browse curated Amazon product picks, review pages, and quick-buy landing pages designed for fast, transparent shopping.",
+-   const trending = data.products.slice(0, 6);
++     },
+-   const appliances = data.products.slice(6, 12);
++   ];
+-   
++ }
+-   return (
++ export async function loader({ context }: Route.LoaderArgs) {
+-     <div className="bg-white min-h-screen">
++   const env = context.cloudflare.env;
+-       
++ 
+-       {/* 1. Hero Section (Categories + Banner) */}
++   const { results } = await env.DB.prepare(
+-       <section className="bg-white py-4 md:py-8">
++     `
+-          <div className="container mx-auto px-4 !max-w-[1280px]">
++       SELECT id, asin, title, image_url, category, marketplace, created_at
+-            <div className="flex flex-col md:flex-row gap-6">
++       FROM products
+-              {/* Left Column: Vertical Categories Menu (Hidden on Mobile, Visible on Desktop) */}
+… [diff truncated]
 
-Content summary (715 lines):
-# Storyboard Integration Guide
-
-**Using Visual Storyboards to Document Complex Component Functionality**
-
----
-
-## Problem Statement
-
-Complex interactive components (calendars, booking systems, multi-step workflows) have **state transitions** and **interaction flows** that are difficult to describe in text alone.
-
-**Storyboards** provide visual, sequential documentation of:
-
-- State transitions (e.g., Empty → Booked → Active → Completed)
-- User interactions and system responses
-- Time-based chang
-- **[what-changed] what-changed in step-06a-extract-features.md**: File updated (external): .qwen/skills/wds-2-trigger-mapping/steps-c/step-06a-extract-features.md
-
-Content summary (132 lines):
----
-name: 'step-06a-extract-features'
-description: 'Extract features from project documentation for impact analysis'
-
-# File References
-nextStepFile: './step-06b-confirm-assessment.md'
-activityWorkflowFile: '../workflow.md'
----
-
-# Step 12: Extract Features
-
-## STEP GOAL:
-
-Silently read the project brief and extract all strategically relevant features, presenting them for user review and confirmation before impact assessment.
-
-## MANDATORY EXECUTION RULES (READ FIRST):
-
-### Universal Rules:
-
-- 🛑
-- **[what-changed] what-changed in CREATION-GUIDE.md**: File updated (external): .qwen/skills/wds-5-agentic-development/data/guides/CREATION-GUIDE.md
-
-Content summary (1149 lines):
-# Interactive Prototype Creation Guide
-
-**For**: Freya WDS Designer Agent  
-**Purpose**: Step-by-step guide to creating production-quality interactive prototypes  
-**Based on**: Dog Week proven patterns
-
----
-
-## 🎯 When to Create Interactive Prototypes
-
-Create interactive prototypes when:
-
-✅ **Complex interactions** - Multi-step forms, drag-and-drop, animations  
-✅ **User testing needed** - Need real usability feedback  
-✅ **Developer handoff** - Developers need working reference  
-✅ **Stakehold
+📌 IDE AST Context: Modified symbols likely include [ProductRow, HomeLoaderData, meta, loader, editorialHighlights]

@@ -3,6 +3,8 @@ import { z } from 'zod';
 // Supported marketplaces
 export const MARKETPLACES = ['US', 'CA', 'UK', 'DE', 'IT', 'FR', 'ES'] as const;
 export type Marketplace = (typeof MARKETPLACES)[number];
+export const PRODUCT_STATUSES = ['active', 'pending_review', 'rejected'] as const;
+export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
 // ─── Agent Schemas ─────────────────────────────────────
 export const createAgentSchema = z.object({
@@ -48,6 +50,7 @@ export const updateProductSchema = z.object({
   image_url: z.string().url('Valid image URL required').optional(),
   category: z.string().max(100).optional().nullable(),
   is_active: z.boolean().optional(),
+  status: z.enum(PRODUCT_STATUSES).optional(),
 });
 
 // ─── Tracking ID Schemas ───────────────────────────────
@@ -107,4 +110,20 @@ export const updateUserSchema = z.object({
   role: z.enum(['super_admin', 'admin', 'agent']).optional(),
   agent_id: z.number().int().positive().optional().nullable(),
   is_active: z.boolean().optional(),
+});
+
+export const importAmazonReportSchema = z.object({
+  marketplace: z.enum(MARKETPLACES),
+  source_file_name: z.string().min(1).max(255),
+  csv_content: z.string().min(1, 'Report content is required'),
+  report_type: z.string().min(1).max(100).default('tracking_summary'),
+  period_start: z.string().optional().nullable(),
+  period_end: z.string().optional().nullable(),
+});
+
+export const updateSheetSyncConfigSchema = z.object({
+  sheet_url: z.string().url().optional().nullable(),
+  sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  default_marketplace: z.enum(MARKETPLACES).default('US'),
+  is_active: z.boolean().default(false),
 });

@@ -28,15 +28,20 @@ export default [
     route("users", "routes/admin/users.tsx"),
     route("agents", "routes/admin/agents.tsx"),
     route("products", "routes/admin/products.tsx"),
+    route("product-submissions", "routes/admin/product-submissions.tsx"),
     route("tracking", "routes/admin/tracking.tsx"),
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
+    route("reports", "routes/admin/reports.tsx"),
+    route("audit-logs", "routes/admin/audit-logs.tsx"),
   ]),
 
   route("portal/login", "routes/portal/login.tsx"),
   route("portal", "routes/portal/layout.tsx", [
     index("routes/portal/dashboard.tsx"),
+    route("asins/new", "routes/portal/asin-new.tsx"),
     route("products", "routes/portal/products.tsx"),
     route("links", "routes/portal/links.tsx"),
+    route("analytics", "routes/portal/analytics.tsx"),
   ]),
 ] satisfies RouteConfig;

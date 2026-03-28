@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 2 conventions, 4 fixes."
+description: "Typescript for amazon-affiliate. 10 conventions, 8 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,9 +11,104 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **41 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **109 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## 🔧 Problem Playbooks
+
+### Fixed null crash in Hono — parallelizes async operations for speed
+- 
++ import { writeAuditLog } from '../services/audit-log';
+- const products = new Hono<AppEnv>();
++ 
+- 
++ const products = new Hono<AppEnv>();
+- /**
++ 
+-  * GET /api/products — List all products
++ /**
+-  */
++  * GET /api/products — List all products
+- products.get('/', async (c) => {
++  */
+-   const { results } = await c.env.DB.prepare(
++ products.get('/', async (c) => {
+-     `SELECT p.*,
++   co
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Hono
+3. identifier: AppEnv
+4. identifier: GET
+5. identifier: List
+
+### Fixed null crash in Hono — prevents null/undefined runtime crashes
+- 
++ import { writeAuditLog } from '../services/audit-log';
+- const agents = new Hono<AppEnv>();
++ 
+- 
++ const agents = new Hono<AppEnv>();
+- /**
++ 
+-  * GET /api/agents — List all agents with stats
++ /**
+-  */
++  * GET /api/agents — List all agents with stats
+- agents.get('/', async (c) => {
++  */
+-   const { results } = await c.env.DB.prepare(
++ agents.get('/', async (c) => {
+-     `SELECT a.*,
+
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Hono
+3. identifier: AppEnv
+4. identifier: GET
+5. identifier: List
+
+### Fixed null crash in Hono — parallelizes async operations for speed
+- 
++ import { ensureProductRecord, fetchAmazonProductData } from '../services/product-ingestion';
+- const products = new Hono<AppEnv>();
++ 
+- 
++ const products = new Hono<AppEnv>();
+- /**
++ 
+-  * GET /api/products — List all products
++ /**
+-  */
++  * GET /api/products — List all products
+- products.get('/', async (c) => {
++  */
+-   const { results } = await c.env.DB.prepare(
++ products.get('/', as
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Hono
+3. identifier: AppEnv
+4. identifier: GET
+5. identifier: List
+
+### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
+-     c.set('userRole', payload.role as string);
++     c.set('userRole', payload.role as 'super_admin' | 'admin' | 'agent');
+-   } catch (error) {
++     c.set('agentId', (payload.agentId as number | null | undefined) ?? null);
+-     if (error instanceof HTTPException) throw error;
++     c.set('username', payload.username as string);
+-     throw new HTTPException(401, { message: 'Invalid token' });
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: HTTPException
+3. identifier: Invalid
+4. identifier: Array
+5. identifier: Context
 
 ### Added error handling products
 -   const body = await c.req.json<{ limit?: number; offset?: number }>().catch(() => ({}));
@@ -86,6 +181,31 @@ Auto-compiled from **41 real patterns** in **amazon-affiliate**. This skill is a
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **what-changed in analytics.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/portal/+types/analytics.ts
+
+Content summary 
+- 📐 **Fixed null crash in SELECT — parallelizes async operations for speed — confirmed 5x** — -   const updates: string[] = [];
++   const relatedAgents = await c.env.DB.prepare(
+-   const values
+- 📐 **Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x** — -   "/portal/login": {
++   "/admin/audit-logs": {
+-   "/portal": {
++   "/portal/login": {
+-   "/port
+- 📐 **Fixed null crash in HTTPException — parallelizes async operations for speed — confirmed 3x** — - portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
++ p
+- 📐 **what-changed in products.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/products.ts
+
+Content summary (6
+- 📐 **what-changed in login.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/login.ts
+
+Content summary (62 l
+- 📐 **what-changed in layout.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/layout.ts
+
+Content summary (62 
+- 📐 **what-changed in dashboard.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/admin/+types/dashboard.ts
+
+Content summary (
 - 📐 **Updated API endpoint Annotations — reduces initial bundle size with code spli... — confirmed 5x** — -   id: "routes/about";
 +   id: "routes/public-layout";
 -   module: typeof import("../about.js");
@@ -93,5 +213,10 @@ Auto-compiled from **41 real patterns** in **amazon-affiliate**. This skill is a
 - 📐 **Fixed null crash in Hono — prevents null/undefined runtime crashes — confirmed 3x** — - import { CacheService } from '../services/cache';
 + import { recordClick, hashIp } from '../servic
 
+## 🤔 Decisions & Trade-offs
+
+- **decision in index.ts** — -   default_marketplace: z.enum(MARKETPLACES).default('US'),
++   sheet_tab_name: z.string().min(1).m
+
 ---
-*Auto-generated by BrainSync 🧠 | 41 patterns | 2026-03-28*
+*Auto-generated by BrainSync 🧠 | 109 patterns | 2026-03-28*

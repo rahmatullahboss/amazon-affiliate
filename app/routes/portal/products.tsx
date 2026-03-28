@@ -125,6 +125,20 @@ export default function PortalProductsPage() {
                 <p style={styles.copy}>
                   {product.asin} · {product.marketplace} · {product.tracking_tag}
                 </p>
+                <p
+                  style={{
+                    ...styles.copy,
+                    color:
+                      product.status === "active"
+                        ? "#4ade80"
+                        : product.status === "rejected"
+                          ? "#f87171"
+                          : "#fbbf24",
+                    marginBottom: 0,
+                  }}
+                >
+                  Status: {product.status.replace("_", " ")}
+                </p>
               </div>
             </div>
           ))}

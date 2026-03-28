@@ -3,50 +3,76 @@ import type { Route } from "./+types/disclosure";
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "Affiliate Disclosure | DealsRky" },
-    { name: "description", content: "Amazon Affiliate Disclosure for DealsRky" },
+    {
+      name: "description",
+      content:
+        "Learn how DealsRky uses affiliate links and how Amazon commissions work on this site.",
+    },
   ];
 }
 
 export default function AffiliateDisclosure() {
   return (
-    <div className="bg-gray-50 min-h-screen py-16">
-      <div className="container mx-auto px-4 max-w-4xl">
-        <div className="bg-white border border-gray-200 shadow-sm rounded-lg p-8 md:p-12">
-          <h1 className="text-3xl md:text-4xl font-extrabold mb-8 text-gray-800 border-b border-gray-100 pb-4">Affiliate Disclosure</h1>
-          
-          <div className="prose prose-blue max-w-none text-gray-600 text-sm leading-relaxed">
-            <div className="p-5 bg-blue-50 border-l-4 border-primary rounded-r mb-8">
-              <p className="text-gray-700 italic font-medium m-0">
-                "DealsRky is a participant in the Amazon Services LLC Associates Program, an affiliate advertising program designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com."
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_24%,#f4f6f6_100%)] py-16">
+      <div className="mx-auto max-w-4xl px-4">
+        <div className="rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm md:p-12">
+          <div className="border-b border-gray-100 pb-8">
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
+              Transparency
+            </p>
+            <h1 className="mt-3 text-3xl font-black text-gray-950 md:text-4xl">
+              Affiliate Disclosure
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-gray-600 md:text-base">
+              DealsRky links to products sold on Amazon. Some links on this site are
+              affiliate links, which means DealsRky may earn a commission from qualifying
+              purchases.
+            </p>
+          </div>
+
+          <div className="mt-8 space-y-8 text-sm leading-7 text-gray-600 md:text-base">
+            <section className="rounded-[1.5rem] border border-primary/15 bg-primary/5 p-6">
+              <p className="font-medium text-gray-800">
+                DealsRky is a participant in the Amazon Services LLC Associates Program,
+                an affiliate advertising program designed to provide a means for sites to
+                earn advertising fees by advertising and linking to Amazon properties.
               </p>
-            </div>
+            </section>
 
-            <h2 className="text-xl font-bold mt-8 mb-4 text-gray-800">Transparency is our priority</h2>
-            <p className="mb-4">
-              We believe in honest and transparent relationships with our users. When you read our content, 
-              product reviews, or deal highlights, you will notice links leading to products on Amazon.
-              These are affiliate links.
-            </p>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">What this means for you</h2>
+              <p className="mt-3">
+                If you click an affiliate link on DealsRky and complete an eligible
+                purchase on Amazon, DealsRky may receive a commission. This does not add
+                extra cost to your purchase.
+              </p>
+            </section>
 
-            <h2 className="text-xl font-bold mt-8 mb-4 text-gray-800">What does this mean for you?</h2>
-            <p className="mb-4">
-              If you click on one of these affiliate links and make a purchase on Amazon within a certain timeframe, 
-              we may earn a small commission from that purchase. 
-              <strong className="text-gray-800"> This comes at absolutely no additional cost to you.</strong> The price you pay on Amazon is exactly 
-              the same whether you use our affiliate link or go directly to Amazon without it.
-            </p>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">How product links work</h2>
+              <p className="mt-3">
+                DealsRky publishes product pages and route pages that send visitors to
+                Amazon for final pricing, checkout, shipping, and returns. Orders are not
+                processed on DealsRky.
+              </p>
+            </section>
 
-            <h2 className="text-xl font-bold mt-8 mb-4 text-gray-800">Why do we use affiliate links?</h2>
-            <p className="mb-4">
-              Running and maintaining DealsRky—including our research, content creation, and technical infrastructure—requires resources. 
-              The small commissions we earn help support the site and allow us to continue hunting for the best deals for you.
-            </p>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">Editorial independence</h2>
+              <p className="mt-3">
+                We may earn commissions, but we still aim to keep product selection,
+                landing pages, and category coverage useful and consistent for users.
+              </p>
+            </section>
 
-            <h2 className="text-xl font-bold mt-8 mb-4 text-gray-800">Our Promise</h2>
-            <p className="mb-4">
-              While we stand to benefit financially from qualifying purchases, our priority is always to highlight products 
-              and deals we believe are genuinely valuable. Our recommendations are not blindly dictated by potential commissions. We select deals based on their merit and value to our audience.
-            </p>
+            <section>
+              <h2 className="text-xl font-bold text-gray-900">Pricing and availability</h2>
+              <p className="mt-3">
+                Product pricing, stock, promotions, and shipping information are shown on
+                Amazon and may change without notice. Always verify the latest details on
+                Amazon before buying.
+              </p>
+            </section>
           </div>
         </div>
       </div>

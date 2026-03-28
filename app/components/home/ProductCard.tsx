@@ -6,10 +6,11 @@ interface ProductItem {
   asin?: string;
   title: string;
   image_url: string;
-  category: string;
-  price: string;
+  category: string | null;
+  price?: string;
   original_price?: string;
   rating?: number;
+  marketplace?: string | null;
 }
 
 export function ProductCard({ item }: { item: ProductItem }) {
@@ -18,33 +19,38 @@ export function ProductCard({ item }: { item: ProductItem }) {
   return (
     <Link 
       to={url} 
-      className="group block bg-white rounded transition hover:shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] p-4 border border-gray-100/50"
+      className="group block rounded-[1.75rem] border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-[0_20px_60px_-30px_rgba(11,128,128,0.35)]"
     >
-      {/* Product Image */}
-      <div className="relative w-full aspect-square mb-4 flex items-center justify-center bg-transparent">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
+          {item.marketplace || "US"}
+        </span>
+        <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-semibold text-primary">
+          Amazon
+        </span>
+      </div>
+
+      <div className="relative mb-5 flex aspect-square w-full items-center justify-center rounded-[1.4rem] bg-[#f5f8f8] p-5">
         <img 
           src={item.image_url} 
           alt={item.title} 
-          className="max-h-full max-w-full object-contain mix-blend-multiply group-hover:scale-105 transition-transform duration-300"
+          className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
         />
       </div>
 
       <div className="flex flex-col text-left">
-        {/* Category */}
-        <span className="text-[11px] text-gray-500 uppercase tracking-wide mb-1 block">
+        <span className="mb-2 block text-[11px] uppercase tracking-[0.22em] text-gray-500">
           {item.category || "General"}
         </span>
 
-        {/* Title */}
-        <h3 className="text-[14px] text-gray-800 font-medium leading-tight mb-2 line-clamp-2 group-hover:text-primary transition-colors">
+        <h3 className="line-clamp-3 text-base font-semibold leading-6 text-gray-900 transition-colors group-hover:text-primary">
           {item.title}
         </h3>
 
-        {/* Amazon TOS Compliant: Link to check price instead of showing static price */}
-        <div className="flex items-center gap-1 mt-auto pt-1">
+        <div className="mt-5 flex items-center gap-1 pt-1">
           <span className="text-sm font-semibold text-primary group-hover:underline">
-            View Deal →
+            Open product page →
           </span>
         </div>
       </div>

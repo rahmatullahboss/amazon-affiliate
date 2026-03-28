@@ -7,6 +7,8 @@ export type Bindings = {
   JWT_SECRET: string;
   AMAZON_API_KEY?: string;
   IP_SALT?: string;
+  GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
 };
 
 // Hono app types
@@ -39,6 +41,7 @@ export interface ProductRow {
   image_url: string;
   marketplace: string;
   category: string | null;
+  status?: 'active' | 'pending_review' | 'rejected';
   is_active: number;
   fetched_at: string | null;
   created_at: string;
@@ -133,8 +136,26 @@ export interface AnalyticsOverview {
   viewsToday: number;
   clicksThisWeek: number;
   viewsThisWeek: number;
+  totalOrderedItems: number;
+  totalRevenue: number;
+  totalCommission: number;
   topAgents: Array<{ name: string; slug: string; clicks: number }>;
   topProducts: Array<{ asin: string; title: string; clicks: number }>;
+  topAgentsByCommission: Array<{
+    name: string;
+    slug: string;
+    orderedItems: number;
+    revenueAmount: number;
+    commissionAmount: number;
+  }>;
+  recentReports: Array<{
+    id: number;
+    marketplace: string;
+    sourceFileName: string;
+    importedAt: string;
+    importedByUsername: string | null;
+    conversionsCount: number;
+  }>;
 }
 
 // Amazon URL builder — 7 marketplaces supported

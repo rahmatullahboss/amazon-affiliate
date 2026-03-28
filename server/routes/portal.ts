@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { portalAsinSubmissionSchema } from '../schemas';
 import { CacheService } from '../services/cache';
+import { ensureProductRecord } from '../services/product-ingestion';
 
 const portal = new Hono<AppEnv>();
 
@@ -85,7 +86,7 @@ portal.get('/links', async (c) => {
      JOIN agents a ON a.id = ap.agent_id
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
-     ${whereClause}
+     ${whereClause}${whereClause ? ' AND' : ' WHERE'} p.status = 'active' AND p.is_active = 1
      ORDER BY ap.created_at DESC`
   )
     .bind(...bindings)
@@ -113,6 +114,69 @@ portal.get('/links', async (c) => {
   }));
 
   return c.json({ links });
+});
+
+portal.get('/performance', async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can view performance' });
+  }
+
+  const [clicks, views, topProducts, salesTotals, recentClicks] = await Promise.all([
+    c.env.DB.prepare('SELECT COUNT(*) as count FROM clicks WHERE agent_id = ?')
+      .bind(agentId)
+      .first<{ count: number }>(),
+    c.env.DB.prepare('SELECT COUNT(*) as count FROM page_views WHERE agent_id = ?')
+      .bind(agentId)
+      .first<{ count: number }>(),
+    c.env.DB.prepare(
+      `SELECT p.asin, p.title, COUNT(c.id) as clicks
+       FROM clicks c
+       JOIN products p ON p.id = c.product_id
+       WHERE c.agent_id = ?
+       GROUP BY p.id
+       ORDER BY clicks DESC
+       LIMIT 8`
+    )
+      .bind(agentId)
+      .all<{ asin: string; title: string; clicks: number }>(),
+    c.env.DB.prepare(
+      `SELECT
+         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+         COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount,
+         COALESCE(SUM(ac.commission_amount), 0) as commission_amount
+       FROM amazon_conversions ac
+       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+       WHERE t.agent_id = ?`
+    )
+      .bind(agentId)
+      .first<{ ordered_items: number; revenue_amount: number; commission_amount: number }>(),
+    c.env.DB.prepare(
+      `SELECT tracking_tag, country, clicked_at
+       FROM clicks
+       WHERE agent_id = ?
+       ORDER BY clicked_at DESC
+       LIMIT 20`
+    )
+      .bind(agentId)
+      .all<{ tracking_tag: string; country: string | null; clicked_at: string }>(),
+  ]);
+
+  const totalClicks = clicks?.count ?? 0;
+  const totalViews = views?.count ?? 0;
+
+  return c.json({
+    totalClicks,
+    totalViews,
+    ctr: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) : '0.00',
+    orderedItems: salesTotals?.ordered_items ?? 0,
+    revenueAmount: salesTotals?.revenue_amount ?? 0,
+    commissionAmount: salesTotals?.commission_amount ?? 0,
+    topProducts: topProducts.results ?? [],
+    recentClicks: recentClicks.results ?? [],
+  });
 });
 
 portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
@@ -164,55 +228,36 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
       });
     }
 
-    const response = await fetch(
-      `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${marketplace}`,
-      {
-        headers: {
-          'X-RapidAPI-Key': apiKey,
-          'X-RapidAPI-Host': 'real-time-amazon-data.p.rapidapi.com',
-        },
-      }
-    );
+    const ensuredProduct = await ensureProductRecord({
+      db: c.env.DB,
+      asin,
+      marketplace,
+      apiKey,
+      status: 'pending_review',
+    });
 
-    if (!response.ok) {
-      throw new HTTPException(502, { message: 'Failed to fetch product from Amazon data provider' });
-    }
-
-    const result = (await response.json()) as {
-      data?: {
-        product_title?: string;
-        product_photo?: string;
-        product_category?: string;
-      };
+    product = {
+      id: ensuredProduct.id,
+      title: ensuredProduct.title,
+      image_url: ensuredProduct.image_url,
+      status: ensuredProduct.status || 'pending_review',
     };
-
-    if (!result.data?.product_title) {
-      throw new HTTPException(404, { message: 'ASIN not found in product data provider' });
-    }
-
-    await c.env.DB.prepare(
-      `INSERT INTO products (asin, title, image_url, marketplace, category, status, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`
-    )
-      .bind(
-        asin,
-        result.data.product_title,
-        result.data.product_photo || `https://images-na.ssl-images-amazon.com/images/I/${asin}._AC_SL1500_.jpg`,
-        marketplace,
-        result.data.product_category || null,
-        'active'
-      )
-      .run();
-
-    product = await c.env.DB.prepare(
-      'SELECT id, title, image_url, status FROM products WHERE asin = ? AND marketplace = ?'
-    )
-      .bind(asin, marketplace)
-      .first<{ id: number; title: string; image_url: string; status: string }>();
   }
 
   if (!product) {
     throw new HTTPException(500, { message: 'Product creation failed unexpectedly' });
+  }
+
+  if (product.status === 'rejected') {
+    await c.env.DB.prepare(
+      `UPDATE products
+       SET status = 'pending_review', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+      .bind(product.id)
+      .run();
+
+    product.status = 'pending_review';
   }
 
   await c.env.DB.prepare(
@@ -234,8 +279,12 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
 
   return c.json(
     {
-      message: 'Product submitted successfully',
+      message:
+        product.status === 'active'
+          ? 'Product submitted successfully'
+          : 'Product submitted and is waiting for admin approval',
       link: `/${agent.slug}/${asin}`,
+      status: product.status,
       product: {
         asin,
         marketplace,
