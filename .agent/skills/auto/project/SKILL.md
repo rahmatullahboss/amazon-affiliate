@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 46 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 51 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **193 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **232 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -198,6 +198,11 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 16x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 7x**
+- 📐 **Updated page_views database schema — evolves the database schema to support n... — confirmed 4x**
 - 📐 **Added JWT tokens authentication — confirmed 3x** — - - `[/]` **Setup & Boilerplate**
 + - `[x]` **Setup & Boilerplate**
 -   - `[ ]` Setup JWT mock utili
@@ -234,10 +239,6 @@ CLAUDE.md
 
 # A
 - 📐 **Version your API from day 1 (/api/v1/)** — Version your API from day 1 (/api/v1/)
-- 📐 **Use consistent response format across all endpoints** — Use consistent response format across all endpoints
-- 📐 **Implement soft delete for important data — don't hard delete without confirmation** — Implement soft delete for important data — don't hard delete without confirmation
-- 📐 **Handle timezone correctly — store UTC, display in user's timezone** — Handle timezone correctly — store UTC, display in user's timezone
-- 📐 **Make layouts responsive from the start — mobile-first approach** — Make layouts responsive from the start — mobile-first approach
-- 📐 **Disable submit button during form submissi
+- 📐 **Use consistent response format across all 
 
 ... [Truncated — see individual observations for full content]

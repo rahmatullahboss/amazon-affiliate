@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 368 notes | Score threshold: >40
+> 416 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -27,24 +27,16 @@
 - **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
 - **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
 
-## Active: `.`
-
-- **Optimized package — offloads heavy computation off the main thread**
-- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
-- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
-- **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x**
-- **Strengthened types Overhaul — offloads heavy computation off the main thread**
-
 ## Project Standards
 
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
-- Strengthened types Overhaul — offloads heavy computation off the main thread
-- convention in .gitignore
-- convention in .gitignore
+- what-changed in home.tsx — confirmed 3x
+- Fixed null crash in ProductRecord — prevents null/undefined runtime crashes — confirmed 3x
 - Updated clicks database schema — parallelizes async operations for speed — confirmed 3x
 - Strengthened types Failed — evolves the database schema to support new requir...
+- Strengthened types Also — offloads heavy computation off the main thread
+- Added JWT tokens authentication — confirmed 3x
+- Optimized Step — offloads heavy computation off the main thread — confirmed 4x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
 
 ## Known Fixes
 
@@ -54,10 +46,10 @@
 
 ## Recent Decisions
 
-- Optimized package — offloads heavy computation off the main thread
+- Optimized Product — offloads heavy computation off the main thread
 - Optimized vitest.config — offloads heavy computation off the main thread
-- Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized DealsRKY — offloads heavy computation off the main thread
+- Optimized Step — offloads heavy computation off the main thread
 
 ## Learned Patterns
 

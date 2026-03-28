@@ -4,6 +4,8 @@ interface AmazonProductData {
   category: string | null;
   description: string | null;
   features: string[];
+  productImages: string[];
+  aplusImages: string[];
 }
 
 interface ProductRecord {
@@ -14,6 +16,8 @@ interface ProductRecord {
   marketplace: string;
   category: string | null;
   status?: string;
+  product_images?: string | null;
+  aplus_images?: string | null;
 }
 
 interface EnsureProductInput {
@@ -26,6 +30,8 @@ interface EnsureProductInput {
   category?: string | null;
   description?: string | null;
   features?: string[] | null;
+  productImages?: string[] | null;
+  aplusImages?: string[] | null;
   status?: string;
   updateExistingFromInput?: boolean;
 }
@@ -76,9 +82,11 @@ export async function fetchAmazonProductData(
     data?: {
       product_title?: string;
       product_photo?: string;
+      product_photos?: string[];
       product_category?: string;
       product_description?: string;
       about_product?: string[];
+      aplus_images?: string[];
     };
   };
 
@@ -92,6 +100,8 @@ export async function fetchAmazonProductData(
     category: result.data.product_category || null,
     description: result.data.product_description?.substring(0, 2000) || null,
     features: result.data.about_product?.slice(0, 6) || [],
+    productImages: result.data.product_photos?.slice(0, 8) || [],
+    aplusImages: result.data.aplus_images?.slice(0, 6) || [],
   };
 }
 
@@ -102,7 +112,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
   let product = await input.db
     .prepare(
-      `SELECT id, asin, title, image_url, marketplace, category, status
+      `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
        FROM products
        WHERE asin = ? AND marketplace = ?`
     )
@@ -114,6 +124,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
   const explicitCategory = input.category?.trim() || null;
   const explicitDescription = input.description?.trim() || null;
   const explicitFeatures = input.features?.length ? JSON.stringify(input.features) : null;
+  const explicitProductImages = input.productImages?.length ? JSON.stringify(input.productImages) : null;
+  const explicitAplusImages = input.aplusImages?.length ? JSON.stringify(input.aplusImages) : null;
 
   if (!product) {
     const fetched =
@@ -126,6 +138,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
     const category = explicitCategory ?? fetched?.category ?? null;
     const description = explicitDescription ?? fetched?.description ?? null;
     const features = explicitFeatures ?? (fetched?.features.length ? JSON.stringify(fetched.features) : null);
+    const productImages = explicitProductImages ?? (fetched?.productImages?.length ? JSON.stringify(fetched.productImages) : null);
+    const aplusImages = explicitAplusImages ?? (fetched?.aplusImages?.length ? JSON.stringify(fetched.aplusImages) : null);
 
     await input.db
       .prepare(
@@ -137,9 +151,11 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
            category,
            description,
            features,
+           product_images,
+           aplus_images,
            status,
            fetched_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         asin,
@@ -149,6 +165,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
         category,
         description,
         features,
+        productImages,
+        aplusImages,
         status,
         fetched ? new Date().toISOString() : null
       )
@@ -156,7 +174,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
     product = await input.db
       .prepare(
-        `SELECT id, asin, title, image_url, marketplace, category, status
+        `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
          FROM products
          WHERE asin = ? AND marketplace = ?`
       )
@@ -186,6 +204,14 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       updates.push("features = ?");
       values.push(explicitFeatures);
     }
+    if (input.productImages !== undefined) {
+      updates.push("product_images = ?");
+      values.push(explicitProductImages);
+    }
+    if (input.aplusImages !== undefined) {
+      updates.push("aplus_images = ?");
+      values.push(explicitAplusImages);
+    }
     if (input.status) {
       updates.push("status = ?");
       values.push(status);
@@ -200,7 +226,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
       product = await input.db
         .prepare(
-          `SELECT id, asin, title, image_url, marketplace, category, status
+          `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
            FROM products
            WHERE id = ?`
         )

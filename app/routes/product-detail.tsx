@@ -1,5 +1,6 @@
 import type { Route } from "./+types/product-detail";
 import { Link } from "react-router";
+import { useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
 import { AMAZON_DOMAINS } from "../../server/utils/types";
 
@@ -13,6 +14,8 @@ interface ProductRow {
   marketplace: string | null;
   features: string | null;
   review_content: string | null;
+  product_images: string | null;
+  aplus_images: string | null;
 }
 
 interface RelatedProductRow {
@@ -54,7 +57,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const product = await env.DB.prepare(
     `
-      SELECT id, asin, title, description, image_url, category, marketplace, features, review_content
+      SELECT id, asin, title, description, image_url, category, marketplace, features, review_content, product_images, aplus_images
       FROM products
       WHERE asin = ? AND is_active = 1 AND status = 'active'
     `
@@ -100,25 +103,70 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   } satisfies ProductDetailData;
 }
 
-function parseFeatures(raw: string | null): string[] {
+function parseJsonArray(raw: string | null): string[] {
   if (!raw) return [];
-
   try {
     const parsed = JSON.parse(raw) as unknown;
-
     if (Array.isArray(parsed)) {
       return parsed.filter((item): item is string => typeof item === "string");
     }
   } catch {
     return [];
   }
-
   return [];
+}
+
+// ─── Image Gallery Component ────────────────────
+function ImageGallery({ mainImage, galleryImages, title }: { mainImage: string; galleryImages: string[]; title: string }) {
+  const allImages = galleryImages.length > 0 ? galleryImages : [mainImage];
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const currentImage = allImages[selectedIndex] || mainImage;
+
+  return (
+    <div>
+      {/* Main Image */}
+      <div className="rounded-[1.75rem] bg-[#f5f8f8] p-6">
+        <img
+          src={currentImage}
+          alt={title}
+          className="mx-auto max-h-[520px] w-full object-contain transition-all duration-300"
+          loading="eager"
+        />
+      </div>
+
+      {/* Thumbnail Strip */}
+      {allImages.length > 1 ? (
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+          {allImages.map((img, i) => (
+            <button
+              key={`thumb-${i}`}
+              onClick={() => setSelectedIndex(i)}
+              className={`flex-shrink-0 rounded-xl border-2 p-1.5 transition-all duration-200 ${
+                i === selectedIndex
+                  ? "border-primary ring-2 ring-primary/20"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+              aria-label={`View image ${i + 1}`}
+            >
+              <img
+                src={img}
+                alt={`${title} - ${i + 1}`}
+                className="h-16 w-16 rounded-lg object-contain"
+                loading="lazy"
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
   const { product, relatedProducts, amazonUrl } = loaderData as ProductDetailData;
-  const features = parseFeatures(product.features);
+  const features = parseJsonArray(product.features);
+  const galleryImages = parseJsonArray(product.product_images);
+  const aplusImages = parseJsonArray(product.aplus_images);
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
@@ -143,14 +191,11 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
       <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="rounded-[1.75rem] bg-[#f5f8f8] p-6">
-              <img
-                src={product.image_url}
-                alt={product.title}
-                className="mx-auto max-h-[520px] w-full object-contain"
-                loading="eager"
-              />
-            </div>
+            <ImageGallery
+              mainImage={product.image_url}
+              galleryImages={galleryImages}
+              title={product.title}
+            />
           </section>
 
           <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
@@ -235,6 +280,35 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
               {features.map((feature) => (
                 <div key={feature} className="rounded-2xl bg-gray-50 p-4 text-sm leading-6 text-gray-700">
                   {feature}
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {/* A+ Content — Premium Visual Details */}
+        {aplusImages.length > 0 ? (
+          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-6">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                From the manufacturer
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-gray-950">
+                Product details
+              </h2>
+            </div>
+            <div className="flex flex-col gap-4">
+              {aplusImages.map((img, i) => (
+                <div
+                  key={`aplus-${i}`}
+                  className="overflow-hidden rounded-2xl border border-gray-100"
+                >
+                  <img
+                    src={img}
+                    alt={`${product.title} — detail ${i + 1}`}
+                    className="w-full object-contain"
+                    loading="lazy"
+                  />
                 </div>
               ))}
             </div>

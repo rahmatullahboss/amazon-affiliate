@@ -36,7 +36,7 @@ export async function loader({ context }: Route.LoaderArgs) {
       FROM products
       WHERE is_active = 1 AND status = 'active'
       ORDER BY created_at DESC
-      LIMIT 12
+      LIMIT 36
     `
   ).all<ProductRow>();
 
@@ -47,16 +47,16 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 const editorialHighlights = [
   {
-    title: "Fast bridge pages",
-    description: "Clean product pages that send buyers to Amazon without extra friction.",
+    title: "Curated Expert Picks",
+    description: "Every product we feature is hand-selected and vetted for quality to give you the smartest deals.",
   },
   {
-    title: "Transparent affiliate flow",
-    description: "Affiliate disclosures, direct Amazon checkout, and no fake pricing.",
+    title: "Transparent Shopping",
+    description: "Clear specifications, direct links without hidden fees, and pure transparency for all products.",
   },
   {
-    title: "Fresh catalog intake",
-    description: "Products can be added from the in-house portal and published quickly.",
+    title: "Secure Trusted Checkout",
+    description: "When you find a deal you love, your purchase is finalized securely directly on Amazon.",
   },
 ];
 
@@ -73,15 +73,14 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-16 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="max-w-2xl">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.35em] text-primary">
-              Amazon affiliate storefront
+              Handpicked Deals & Reviews
             </p>
             <h1 className="max-w-xl text-4xl font-black leading-tight text-gray-950 md:text-6xl">
-              Curated product pages built for faster Amazon buying.
+              Discover top products at the best prices today.
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 md:text-lg">
-              DealsRky is a lightweight affiliate site for curated Amazon finds.
-              We publish clean product pages, keep disclosures visible, and send
-              buyers straight to Amazon for checkout.
+              DealsRky is your premium destination for curated tech, gadgets, and home goods.
+              We do the heavy lifting of researching the best Amazon deals so you can shop with absolute confidence.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -104,12 +103,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-primary/80">
-                  Coverage
+                  Global Availability
                 </p>
-                <h2 className="mt-2 text-2xl font-bold">Marketplace-ready setup</h2>
+                <h2 className="mt-2 text-2xl font-bold">Top Markets Supported</h2>
               </div>
               <div className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/80">
-                Live catalog
+                Live updates
               </div>
             </div>
 
@@ -129,9 +128,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
               <p className="text-sm leading-6 text-white/85">
-                Buyers land on a product page, review the item context, then use a
-                direct CTA to continue on Amazon. No cart clone, no fake checkout,
-                no static pricing.
+                Simply browse our top recommendations, read clear reviews, and check out directly and safely on Amazon without any middleman markup.
               </p>
             </div>
           </div>
@@ -146,7 +143,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
             >
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                Core system
+                Our Promise
               </p>
               <h2 className="mt-4 text-2xl font-bold text-gray-900">
                 {item.title}
@@ -185,10 +182,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         ) : (
           <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
-            <h3 className="text-lg font-bold text-gray-900">No products published yet</h3>
+            <h3 className="text-lg font-bold text-gray-900">Check back soon for new deals</h3>
             <p className="mt-2 text-sm text-gray-600">
-              Once admins or agents add ASINs through the system, published items will
-              appear here automatically.
+              Our team is currently updating the catalog with the latest top-rated items. 
+              Please check back shortly!
             </p>
           </div>
         )}
@@ -205,9 +202,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </h2>
             <div className="mt-8 grid gap-5">
               {[
-                "A product enters the catalog through the admin panel or agent portal.",
-                "DealsRky creates a clean product page and optional agent-specific landing link.",
-                "Every buyer click is sent through a tracked Amazon redirect route.",
+                "We search thousands of listings to identify the best, highly-rated tech and gadgets.",
+                "You browse clean, organized reviews without intrusive ads or confusing interfaces.",
+                "Click 'View Deal' to seamlessly finalize your purchase safely and directly on Amazon.",
               ].map((step, index) => (
                 <div key={step} className="flex gap-4 rounded-2xl bg-gray-50 p-4">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary font-bold text-white">

@@ -64,9 +64,6 @@ export function Footer() {
             <Link to="/contact" className="hover:text-white">
               Contact Support
             </Link>
-            <Link to="/portal/login" className="hover:text-white">
-              Agent Portal
-            </Link>
           </div>
         </div>
       </div>
