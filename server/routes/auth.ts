@@ -3,61 +3,9 @@ import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { loginSchema, setupSchema } from '../schemas';
+import { createJwt, hashPassword, verifyPassword } from '../services/auth';
 
 const auth = new Hono<AppEnv>();
-
-// ─── Password Hashing with PBKDF2 (Web Crypto) ───────────
-// SHA-256 is NOT suitable for passwords — too fast, brute-forceable.
-// PBKDF2 with 100K iterations is the correct approach for Workers runtime.
-
-const PBKDF2_ITERATIONS = 100_000;
-const SALT_LENGTH = 16; // 128-bit salt
-
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-
-  const hashArray = Array.from(new Uint8Array(derivedBits));
-  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-  // Store as "salt:hash" — both the salt and hash are needed for verification
-  return `${saltHex}:${hashHex}`;
-}
-
-async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  const [saltHex, expectedHash] = storedHash.split(':');
-  if (!saltHex || !expectedHash) return false;
-
-  const encoder = new TextEncoder();
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
-
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
-  );
-
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-
-  const hashHex = Array.from(new Uint8Array(derivedBits))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
-
-  return hashHex === expectedHash;
-}
 
 // ─── Rate Limiting ───────────────────────────────────────
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -91,16 +39,36 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
 
   const { username, password } = c.req.valid('json');
 
-  const user = await c.env.DB.prepare('SELECT * FROM admin_users WHERE username = ?')
+  const user = await c.env.DB.prepare(
+    `SELECT id, username, password_hash, role, agent_id, is_active
+     FROM users
+     WHERE username = ?`
+  )
     .bind(username)
-    .first<{ id: number; username: string; password_hash: string; role: string }>();
+    .first<{ id: number; username: string; password_hash: string; role: string; agent_id: number | null; is_active: number }>();
 
-  if (!user) {
+  const legacyAdmin = !user
+    ? await c.env.DB.prepare('SELECT id, username, password_hash, role FROM admin_users WHERE username = ?')
+        .bind(username)
+        .first<{ id: number; username: string; password_hash: string; role: string }>()
+    : null;
+
+  if (!user && !legacyAdmin) {
     c.executionCtx.waitUntil(recordFailedLogin(c.env.KV, ip));
     throw new HTTPException(401, { message: 'Invalid credentials' });
   }
 
-  const isValid = await verifyPassword(password, user.password_hash);
+  if (user && !user.is_active) {
+    throw new HTTPException(403, { message: 'User account is inactive' });
+  }
+
+  const account = user ?? {
+    ...legacyAdmin!,
+    agent_id: null,
+    is_active: 1,
+  };
+
+  const isValid = await verifyPassword(password, account.password_hash);
 
   if (!isValid) {
     c.executionCtx.waitUntil(recordFailedLogin(c.env.KV, ip));
@@ -111,13 +79,23 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
   c.executionCtx.waitUntil(clearLoginAttempts(c.env.KV, ip));
 
   const token = await createJwt(
-    { sub: user.id, username: user.username, role: user.role },
+    {
+      sub: account.id,
+      username: account.username,
+      role: account.role,
+      agentId: account.agent_id,
+    },
     c.env.JWT_SECRET
   );
 
   return c.json({
     token,
-    user: { id: user.id, username: user.username, role: user.role },
+    user: {
+      id: account.id,
+      username: account.username,
+      role: account.role,
+      agentId: account.agent_id,
+    },
   });
 });
 
@@ -132,19 +110,25 @@ auth.post('/setup', zValidator('json', setupSchema), async (c) => {
     throw new HTTPException(403, { message: 'Setup already completed. Use login instead.' });
   }
 
-  const { username, password } = c.req.valid('json');
+  const { username, email, password } = c.req.valid('json');
   const passwordHash = await hashPassword(password);
 
   await c.env.DB.prepare('INSERT INTO admin_users (username, password_hash, role) VALUES (?, ?, ?)')
     .bind(username, passwordHash, 'admin')
     .run();
 
-  const user = await c.env.DB.prepare('SELECT * FROM admin_users WHERE username = ?')
+  await c.env.DB.prepare(
+    'INSERT INTO users (username, email, password_hash, role) VALUES (?, ?, ?, ?)'
+  )
+    .bind(username, email || null, passwordHash, 'super_admin')
+    .run();
+
+  const user = await c.env.DB.prepare('SELECT id, username, role, agent_id FROM users WHERE username = ?')
     .bind(username)
-    .first<{ id: number; username: string; role: string }>();
+    .first<{ id: number; username: string; role: string; agent_id: number | null }>();
 
   const token = await createJwt(
-    { sub: user!.id, username: user!.username, role: user!.role },
+    { sub: user!.id, username: user!.username, role: 'super_admin', agentId: user!.agent_id },
     c.env.JWT_SECRET
   );
 
@@ -152,36 +136,10 @@ auth.post('/setup', zValidator('json', setupSchema), async (c) => {
     {
       message: 'Admin account created successfully',
       token,
-      user: { id: user!.id, username: user!.username, role: user!.role },
+      user: { id: user!.id, username: user!.username, role: 'super_admin', agentId: user!.agent_id },
     },
     201
   );
 });
-
-// ─── JWT Creation (24-hour expiry) ───────────────────────
-async function createJwt(
-  payload: Record<string, unknown>,
-  secret: string
-): Promise<string> {
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  const now = Math.floor(Date.now() / 1000);
-  const fullPayload = { ...payload, iat: now, exp: now + 86400 }; // 24 hours
-  const payloadB64 = btoa(JSON.stringify(fullPayload))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw', encoder.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-  );
-
-  const sigBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(`${header}.${payloadB64}`));
-  const signature = btoa(String.fromCharCode(...new Uint8Array(sigBuffer)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  return `${header}.${payloadB64}.${signature}`;
-}
 
 export default auth;

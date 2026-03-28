@@ -1,13 +1,12 @@
 import type { Route } from "./+types/bridge";
 import "./bridge.css";
-import { buildAmazonUrl } from "../../server/utils/types";
-import { recordView, hashIp } from "../../server/services/analytics";
+import { recordView } from "../../server/services/analytics";
 
 // ─── Types ───────────────────────────────────────
 interface BridgeData {
   agent: { slug: string; name: string };
   product: { asin: string; title: string; imageUrl: string };
-  amazonUrl: string;
+  redirectUrl: string;
   marketplace: string;
 }
 
@@ -106,7 +105,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       title: row.custom_title || row.product_title,
       imageUrl: row.image_url,
     },
-    amazonUrl: buildAmazonUrl(row.asin, row.tracking_tag, row.marketplace),
+    redirectUrl: `/go/${row.agent_slug}/${row.asin}`,
     marketplace: row.marketplace,
   };
 
@@ -152,10 +151,9 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
           {/* Buy Button */}
           <div className="buy-button-container">
             <a
-              href={data.amazonUrl}
+              href={data.redirectUrl}
               className="buy-button"
               rel="noopener noreferrer nofollow sponsored"
-              target="_blank"
               id="buy-on-amazon-btn"
             >
               <span className="buy-button-icon">🛒</span>

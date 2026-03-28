@@ -83,5 +83,28 @@ export const loginSchema = z.object({
 
 export const setupSchema = z.object({
   username: z.string().min(3).max(50),
+  email: z.string().email().optional().nullable(),
   password: z.string().min(8),
+});
+
+export const portalAsinSubmissionSchema = z.object({
+  asin: z.string().length(10, 'ASIN must be 10 characters'),
+  marketplace: z.enum(MARKETPLACES).default('US'),
+  custom_title: z.string().max(500).optional().nullable(),
+});
+
+export const createUserSchema = z.object({
+  username: z.string().min(3).max(50),
+  email: z.string().email().optional().nullable(),
+  password: z.string().min(8),
+  role: z.enum(['super_admin', 'admin', 'agent']).default('agent'),
+  agent_id: z.number().int().positive().optional().nullable(),
+});
+
+export const updateUserSchema = z.object({
+  email: z.string().email().optional().nullable(),
+  password: z.string().min(8).optional(),
+  role: z.enum(['super_admin', 'admin', 'agent']).optional(),
+  agent_id: z.number().int().positive().optional().nullable(),
+  is_active: z.boolean().optional(),
 });

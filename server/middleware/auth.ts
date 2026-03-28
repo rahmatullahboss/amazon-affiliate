@@ -23,7 +23,9 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next): Promise<vo
     }
 
     c.set('userId', payload.sub as number);
-    c.set('userRole', payload.role as string);
+    c.set('userRole', payload.role as 'super_admin' | 'admin' | 'agent');
+    c.set('agentId', (payload.agentId as number | null | undefined) ?? null);
+    c.set('username', payload.username as string);
   } catch (error) {
     if (error instanceof HTTPException) throw error;
     throw new HTTPException(401, { message: 'Invalid token' });
@@ -31,6 +33,16 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next): Promise<vo
 
   await next();
 };
+
+export const requireRole =
+  (...roles: Array<'super_admin' | 'admin' | 'agent'>) =>
+  async (c: Context<AppEnv>, next: Next): Promise<void> => {
+    const role = c.get('userRole');
+    if (!role || !roles.includes(role)) {
+      throw new HTTPException(403, { message: 'Insufficient permissions' });
+    }
+    await next();
+  };
 
 async function verifyJwt(
   token: string,

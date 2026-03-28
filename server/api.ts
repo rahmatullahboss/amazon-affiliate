@@ -14,6 +14,9 @@ import tracking from './routes/tracking';
 import mappings from './routes/mappings';
 import analytics from './routes/analytics';
 import publicRoutes from './routes/public';
+import portal from './routes/portal';
+import { requireRole } from './middleware/auth';
+import users from './routes/users';
 
 const app = new Hono<AppEnv>();
 
@@ -61,12 +64,20 @@ const admin = new Hono<AppEnv>();
 admin.use('*', authMiddleware);
 
 admin.route('/agents', agents);
+admin.route('/users', users);
 admin.route('/products', products);
 admin.route('/tracking', tracking);
 admin.route('/mappings', mappings);
 admin.route('/analytics', analytics);
 
 app.route('/api', admin);
+
+const portalApi = new Hono<AppEnv>();
+portalApi.use('*', authMiddleware);
+portalApi.use('*', requireRole('agent', 'admin', 'super_admin'));
+portalApi.route('/', portal);
+
+app.route('/api/portal', portalApi);
 
 // ─── Global Error Handler ─────────────────────────────────
 app.onError(async (err, c) => {

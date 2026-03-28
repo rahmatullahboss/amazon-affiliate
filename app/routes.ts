@@ -25,10 +25,18 @@ export default [
   route("admin/login", "routes/admin/login.tsx"),
   route("admin", "routes/admin/layout.tsx", [
     index("routes/admin/dashboard.tsx"),
+    route("users", "routes/admin/users.tsx"),
     route("agents", "routes/admin/agents.tsx"),
     route("products", "routes/admin/products.tsx"),
     route("tracking", "routes/admin/tracking.tsx"),
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
+  ]),
+
+  route("portal/login", "routes/portal/login.tsx"),
+  route("portal", "routes/portal/layout.tsx", [
+    index("routes/portal/dashboard.tsx"),
+    route("products", "routes/portal/products.tsx"),
+    route("links", "routes/portal/links.tsx"),
   ]),
 ] satisfies RouteConfig;

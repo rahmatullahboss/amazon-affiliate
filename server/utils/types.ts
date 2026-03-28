@@ -14,7 +14,9 @@ export type AppEnv = {
   Bindings: Bindings;
   Variables: {
     userId?: number;
-    userRole?: string;
+    userRole?: 'super_admin' | 'admin' | 'agent';
+    agentId?: number | null;
+    username?: string;
   };
 };
 
@@ -93,6 +95,18 @@ export interface AdminUserRow {
   password_hash: string;
   role: string;
   created_at: string;
+}
+
+export interface UserRow {
+  id: number;
+  username: string;
+  email: string | null;
+  password_hash: string;
+  role: 'super_admin' | 'admin' | 'agent';
+  agent_id: number | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
 }
 
 // API response types

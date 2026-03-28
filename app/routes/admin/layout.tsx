@@ -25,6 +25,7 @@ export default function AdminLayout() {
 
   const navItems = [
     { to: "/admin", label: "Dashboard", icon: "📊", end: true },
+    { to: "/admin/users", label: "Users", icon: "🧑‍💼" },
     { to: "/admin/agents", label: "Agents", icon: "👥" },
     { to: "/admin/products", label: "Products", icon: "📦" },
     { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
