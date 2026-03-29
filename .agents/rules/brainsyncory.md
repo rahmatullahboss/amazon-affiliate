@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 453 notes | Score threshold: >40
+> 708 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,41 +20,46 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in UPDATE — prevents null/undefined runtime crashes** — -       await ensureProductRecord({
-+       try {
--         db: input.
-- **⚠️ GOTCHA: Fixed null crash in AppEnv — offloads heavy computation off the main thread** — - import type { AppEnv } from '../server/utils/types';
-+ import { env 
-- **⚠️ GOTCHA: Strengthened types Failed — evolves the database schema to support new requir...** — -       .replace(/\/\*[\s\S]*?\*\//g, '')
-+       .replace(/\/\*[\s\S]
-- **gotcha in flow-c-ascii.md** — File updated (external): .qwen/skills/wds-4-ux-design/data/page-creati
-- **⚠️ GOTCHA: Fixed null crash in TrackingId** — -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.tra
+- **⚠️ GOTCHA: Fixed null crash in Route — adds runtime type validation before use** — - import { extractApiErrorMessage } from "../../utils/api-errors";
++ i
+- **⚠️ GOTCHA: Fixed null crash in Route — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
++ import ty
+- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { copyTextToClipboard } from "../../utils/clipboard";
++ impor
+- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { extractApiErrorMessage } from "../../utils/api-errors";
++ i
+- **⚠️ GOTCHA: Fixed null crash in AdminUser — parallelizes async operations for speed** — - 
++ import { getAuthToken } from "../../utils/auth-session";
+- interf
+- **⚠️ GOTCHA: Fixed null crash in PortalMeResponse — parallelizes async operations for speed** — - 
++ import { getAuthToken } from "../../utils/auth-session";
+- interf
 
 ## Project Standards
 
-- Fixed null crash in Meta — prevents null/undefined runtime crashes — confirmed 4x
-- Strengthened types AnalyticsOverview — formalizes the data contract with expl...
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
-- what-changed in tracking.ts — confirmed 3x
-- Fixed null crash in Link — formalizes the data contract with explicit types — confirmed 5x
-- Fixed null crash in HTTPException — improves module reusability — confirmed 4x
-- convention in index.ts
-- what-changed in home.tsx — confirmed 3x
+- Fixed null crash in Date — prevents null/undefined runtime crashes — confirmed 3x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x
+- Fixed null crash in Array — prevents null/undefined runtime crashes — confirmed 3x
+- Updated schema MARKETPLACES — confirmed 3x
+- what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x
+- what-changed in config.json — confirmed 3x
+- what-changed in mappings.ts — confirmed 3x
+- what-changed in privacy.ts — confirmed 3x
 
 ## Known Fixes
 
-- ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
-- ❌ -     throw new HTTPException(400, { message: 'Missing agent or ASIN' }); → ✅ Fixed null crash in SELECT — parallelizes async operations for speed
-- ❌ -   } catch (error) { → ✅ Fixed null crash in Product — parallelizes async operations for speed
+- ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
-- ❌ +     throw new HTTPException(403, { message: 'Only linked agent accounts can view performance' }); → ✅ Fixed null crash in HTTPException — prevents null/undefined runtime crashes
+- ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
+- ❌ -     } catch (err) { console.error("Failed to fetch dashboard data:", err); } → ✅ Fixed null crash in Array — prevents null/undefined runtime crashes
+- ❌ +     throw new HTTPException(400, { message: 'Invalid status filter' }); → ✅ Fixed null crash in HTTPException — improves module reusability
 
 ## Recent Decisions
 
 - Optimized impliedFormat — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized Cache — extracts logic into a dedicated service for separation of c...
 
 ## Learned Patterns
 

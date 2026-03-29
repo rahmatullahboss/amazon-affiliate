@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface AuditLog {
   id: number;
@@ -21,7 +22,7 @@ export default function AuditLogsPage() {
 
   async function fetchLogs() {
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = getAuthToken();
       const response = await fetch("/api/audit-logs", {
         headers: { Authorization: `Bearer ${token}` },
       });

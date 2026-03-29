@@ -5,6 +5,7 @@ import { buildAmazonUrl } from '../utils/types';
 import { recordClick, hashIp } from '../services/analytics';
 import { checkRedirectRateLimit, incrementRateLimitCounters } from '../middleware/rate-limit';
 import { isSuspiciousRequest, isDuplicateClick } from '../middleware/bot-guard';
+import { safeKvGetJson, safeKvPut } from '../services/kv-safe';
 
 const redirect = new Hono<AppEnv>();
 
@@ -56,7 +57,7 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   let ctx: RedirectContext | null = null;
 
   // 1. Try KV cache first (sub-millisecond)
-  const cached = await c.env.KV.get(cacheKey, 'json') as RedirectContext | null;
+  const cached = await safeKvGetJson<RedirectContext>(c.env.KV, cacheKey);
   if (cached) {
     ctx = cached;
   }
@@ -88,7 +89,7 @@ redirect.get('/:agentSlug/:asin', async (c) => {
 
     // 3. Warm cache for next hit (cache the FULL context, not just URL)
     c.executionCtx.waitUntil(
-      c.env.KV.put(cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
+      safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
     );
   }
 

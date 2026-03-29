@@ -22,6 +22,7 @@ import {
 } from '../services/password-reset';
 import { getPublicAppOrigin } from '../utils/url';
 import { verifyGoogleCredential } from '../services/google-auth';
+import { safeKvDelete, safeKvGetText, safeKvPut } from '../services/kv-safe';
 
 const auth = new Hono<AppEnv>();
 
@@ -31,7 +32,7 @@ const LOCKOUT_DURATION = 900; // 15 minutes in seconds
 
 async function checkRateLimit(kv: KVNamespace, ip: string): Promise<void> {
   const key = `rate:login:${ip}`;
-  const attempts = parseInt((await kv.get(key)) || '0');
+  const attempts = parseInt((await safeKvGetText(kv, key)) || '0');
 
   if (attempts >= MAX_LOGIN_ATTEMPTS) {
     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' });
@@ -40,12 +41,12 @@ async function checkRateLimit(kv: KVNamespace, ip: string): Promise<void> {
 
 async function recordFailedLogin(kv: KVNamespace, ip: string): Promise<void> {
   const key = `rate:login:${ip}`;
-  const attempts = parseInt((await kv.get(key)) || '0');
-  await kv.put(key, String(attempts + 1), { expirationTtl: LOCKOUT_DURATION });
+  const attempts = parseInt((await safeKvGetText(kv, key)) || '0');
+  await safeKvPut(kv, key, String(attempts + 1), { expirationTtl: LOCKOUT_DURATION });
 }
 
 async function clearLoginAttempts(kv: KVNamespace, ip: string): Promise<void> {
-  await kv.delete(`rate:login:${ip}`);
+  await safeKvDelete(kv, `rate:login:${ip}`);
 }
 
 /**
@@ -281,7 +282,7 @@ auth.post('/forgot-password', zValidator('json', forgotPasswordSchema), async (c
     const resetUrl = `${origin}/portal/reset-password?token=${encodeURIComponent(token)}`;
 
     try {
-      await storePasswordResetToken(c.env.KV, token, user.id);
+      await storePasswordResetToken(c.env.DB, c.env.KV, token, user.id);
       await sendPasswordResetEmail({
         env: c.env,
         to: user.email,
@@ -304,7 +305,7 @@ auth.post('/forgot-password', zValidator('json', forgotPasswordSchema), async (c
 
 auth.post('/reset-password', zValidator('json', resetPasswordSchema), async (c) => {
   const { token, password } = c.req.valid('json');
-  const userId = await consumePasswordResetToken(c.env.KV, token);
+  const userId = await consumePasswordResetToken(c.env.DB, c.env.KV, token);
 
   if (!userId) {
     throw new HTTPException(400, { message: 'This reset link is invalid or expired.' });
@@ -384,7 +385,7 @@ auth.post('/google', zValidator('json', googleAuthSchema), async (c) => {
   }
 
   const signupToken = generatePasswordResetToken();
-  await storeGoogleSignupToken(c.env.KV, signupToken, {
+  await storeGoogleSignupToken(c.env.DB, c.env.KV, signupToken, {
     email: profile.email,
     name: profile.name,
     googleSub: profile.sub,
@@ -402,7 +403,7 @@ auth.post('/google', zValidator('json', googleAuthSchema), async (c) => {
 
 auth.post('/google/complete-signup', zValidator('json', googleCompleteSignupSchema), async (c) => {
   const body = c.req.valid('json');
-  const pending = await consumeGoogleSignupToken(c.env.KV, body.token);
+  const pending = await consumeGoogleSignupToken(c.env.DB, c.env.KV, body.token);
 
   if (!pending) {
     throw new HTTPException(400, { message: 'This signup session is invalid or expired.' });

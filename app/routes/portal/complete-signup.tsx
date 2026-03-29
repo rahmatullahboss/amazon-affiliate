@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { persistAuthSession } from "../../utils/auth-session";
 
 export default function PortalCompleteSignupPage() {
   const navigate = useNavigate();
@@ -61,8 +62,7 @@ export default function PortalCompleteSignupPage() {
         throw new Error("Failed to complete signup");
       }
 
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      persistAuthSession(data.token, data.user);
       navigate("/portal/tracking");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to complete signup");

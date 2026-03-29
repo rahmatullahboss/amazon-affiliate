@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import type { Route } from "./+types/products";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "RKY Tag House" },
+    { name: "application-name", content: "RKY Tag House" },
+    { name: "apple-mobile-web-app-title", content: "RKY Tag House" },
+  ];
+}
 
 interface PortalProduct {
   id: number;
@@ -50,7 +60,7 @@ export default function PortalProductsPage() {
   const [lastPayload, setLastPayload] = useState<ProductSubmissionPayload | null>(null);
 
   const loadProducts = async () => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
     const response = await fetch("/api/portal/products", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -77,7 +87,7 @@ export default function PortalProductsPage() {
     setLastPayload(payload);
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = getAuthToken();
       const response = await fetch("/api/portal/products/submit", {
         method: "POST",
         headers: {

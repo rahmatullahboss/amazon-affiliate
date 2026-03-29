@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
+import type { Route } from "./+types/links";
 import { copyTextToClipboard } from "../../utils/clipboard";
+import { getAuthToken } from "../../utils/auth-session";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "RKY Tag House" },
+    { name: "application-name", content: "RKY Tag House" },
+    { name: "apple-mobile-web-app-title", content: "RKY Tag House" },
+  ];
+}
 
 interface PortalLink {
   agentSlug: string;
@@ -20,7 +30,7 @@ export default function PortalLinksPage() {
   const [copiedKey, setCopiedKey] = useState("");
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
     fetch("/api/portal/links", {
       headers: { Authorization: `Bearer ${token}` },
     })

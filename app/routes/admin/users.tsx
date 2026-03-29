@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface AdminUser {
   id: number;
@@ -17,7 +18,7 @@ interface Agent {
   slug: string;
 }
 
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AdminUser[]>([]);

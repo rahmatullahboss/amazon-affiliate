@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface OverviewData {
   totalClicks: number;
@@ -74,7 +75,7 @@ export default function AnalyticsPage() {
   }, []);
 
   async function loadAnalytics(showRefreshState = false) {
-    const token = localStorage.getItem("auth_token");
+      const token = getAuthToken();
     if (!token) {
       setError("Authentication required.");
       setLoading(false);
@@ -122,7 +123,7 @@ export default function AnalyticsPage() {
 
   async function handleImport(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
 
     if (!token) {
       setError("Authentication required.");

@@ -1,5 +1,15 @@
 import { useEffect, useState } from "react";
+import type { Route } from "./+types/tracking";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { getAuthToken } from "../../utils/auth-session";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "RKY Tag House" },
+    { name: "application-name", content: "RKY Tag House" },
+    { name: "apple-mobile-web-app-title", content: "RKY Tag House" },
+  ];
+}
 
 interface TrackingIdRow {
   id: number;
@@ -32,7 +42,7 @@ export default function PortalTrackingPage() {
   });
 
   async function loadTracking() {
-    const token = localStorage.getItem("auth_token");
+    const token = getAuthToken();
     const response = await fetch("/api/portal/tracking", {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -60,7 +70,7 @@ export default function PortalTrackingPage() {
     setSuccess("");
 
     try {
-      const token = localStorage.getItem("auth_token");
+      const token = getAuthToken();
       const response = await fetch("/api/portal/tracking", {
         method: "POST",
         headers: {
@@ -88,6 +98,14 @@ export default function PortalTrackingPage() {
       setSaving(false);
     }
   };
+
+  const getReplacementCandidates = (trackingId: TrackingIdRow) =>
+    trackingIds.filter(
+      (candidate) =>
+        candidate.id !== trackingId.id &&
+        candidate.marketplace === trackingId.marketplace &&
+        candidate.is_active === 1
+    );
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-[minmax(320px,420px)_1fr] gap-4">
@@ -192,45 +210,47 @@ export default function PortalTrackingPage() {
                 >
                   Edit
                 </button>
-                <button
-                  type="button"
-                  className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold cursor-pointer hover:bg-red-500/20 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
-                  disabled={deletingId === trackingId.id || replacingId === trackingId.id || trackingId.usage_count > 0}
-                  onClick={async () => {
-                    if (!window.confirm("Delete this tag?")) return;
+                {trackingId.usage_count === 0 ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold cursor-pointer hover:bg-red-500/20 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
+                    disabled={deletingId === trackingId.id || replacingId === trackingId.id}
+                    onClick={async () => {
+                      if (!window.confirm("Delete this tag?")) return;
 
-                    setDeletingId(trackingId.id);
-                    setError("");
-                    setSuccess("");
+                      setDeletingId(trackingId.id);
+                      setError("");
+                      setSuccess("");
 
-                    try {
-                      const token = localStorage.getItem("auth_token");
-                      const response = await fetch(`/api/portal/tracking/${trackingId.id}`, {
-                        method: "DELETE",
-                        headers: { Authorization: `Bearer ${token}` },
-                      });
+                      try {
+                        const token = getAuthToken();
+                        const response = await fetch(`/api/portal/tracking/${trackingId.id}`, {
+                          method: "DELETE",
+                          headers: { Authorization: `Bearer ${token}` },
+                        });
 
-                      if (!response.ok) {
-                        const data = await response.json();
-                        throw new Error(extractApiErrorMessage(data, "Failed to delete tag"));
+                        if (!response.ok) {
+                          const data = await response.json();
+                          throw new Error(extractApiErrorMessage(data, "Failed to delete tag"));
+                        }
+
+                        if (editingId === trackingId.id) {
+                          setEditingId(null);
+                          setForm({ tag: "", label: "", marketplace: "US" });
+                        }
+
+                        setSuccess("Tag deleted successfully");
+                        await loadTracking();
+                      } catch (requestError) {
+                        setError(requestError instanceof Error ? requestError.message : "Failed to delete tag");
+                      } finally {
+                        setDeletingId(null);
                       }
-
-                      if (editingId === trackingId.id) {
-                        setEditingId(null);
-                        setForm({ tag: "", label: "", marketplace: "US" });
-                      }
-
-                      setSuccess("Tag deleted successfully");
-                      await loadTracking();
-                    } catch (requestError) {
-                      setError(requestError instanceof Error ? requestError.message : "Failed to delete tag");
-                    } finally {
-                      setDeletingId(null);
-                    }
-                  }}
-                >
-                  {trackingId.usage_count > 0 ? "In Use" : deletingId === trackingId.id ? "Deleting..." : "Delete"}
-                </button>
+                    }}
+                  >
+                    {deletingId === trackingId.id ? "Deleting..." : "Delete"}
+                  </button>
+                ) : null}
                 {trackingId.usage_count > 0 ? (
                   <>
                     <button
@@ -238,20 +258,10 @@ export default function PortalTrackingPage() {
                       className="px-3 py-1.5 bg-sky-500/10 border border-sky-500/30 rounded-full text-sky-300 text-xs font-semibold cursor-pointer hover:bg-sky-500/20 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                       disabled={
                         replacingId === trackingId.id ||
-                        trackingIds.filter(
-                          (candidate) =>
-                            candidate.id !== trackingId.id &&
-                            candidate.marketplace === trackingId.marketplace &&
-                            candidate.is_active === 1
-                        ).length === 0
+                        getReplacementCandidates(trackingId).length === 0
                       }
                       onClick={() => {
-                        const candidates = trackingIds.filter(
-                          (candidate) =>
-                            candidate.id !== trackingId.id &&
-                            candidate.marketplace === trackingId.marketplace &&
-                            candidate.is_active === 1
-                        );
+                        const candidates = getReplacementCandidates(trackingId);
                         if (candidates.length === 0) return;
                         setReplaceTargetId(trackingId.id);
                         setReplacementId(candidates[0].id);
@@ -273,7 +283,7 @@ export default function PortalTrackingPage() {
                         setSuccess("");
 
                         try {
-                          const token = localStorage.getItem("auth_token");
+                          const token = getAuthToken();
                           const response = await fetch(`/api/portal/tracking/${trackingId.id}?cascade=1`, {
                             method: "DELETE",
                             headers: { Authorization: `Bearer ${token}` },
@@ -305,6 +315,11 @@ export default function PortalTrackingPage() {
                 <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/25 rounded-full text-amber-500 text-xs font-bold">
                   {trackingId.is_default ? "Default" : "Saved"}
                 </span>
+                {trackingId.usage_count > 0 ? (
+                  <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-slate-300 text-xs font-semibold">
+                    In Use
+                  </span>
+                ) : null}
               </div>
             </div>
               {replaceTargetId === trackingId.id ? (
@@ -318,14 +333,7 @@ export default function PortalTrackingPage() {
                       value={replacementId}
                       onChange={(event) => setReplacementId(Number(event.target.value))}
                     >
-                      {trackingIds
-                        .filter(
-                          (candidate) =>
-                            candidate.id !== trackingId.id &&
-                            candidate.marketplace === trackingId.marketplace &&
-                            candidate.is_active === 1
-                        )
-                        .map((candidate) => (
+                      {getReplacementCandidates(trackingId).map((candidate) => (
                           <option className="bg-gray-800" key={candidate.id} value={candidate.id}>
                             {candidate.tag} {candidate.label ? `· ${candidate.label}` : ""}
                           </option>
@@ -341,7 +349,7 @@ export default function PortalTrackingPage() {
                         setSuccess("");
 
                         try {
-                          const token = localStorage.getItem("auth_token");
+                          const token = getAuthToken();
                           const response = await fetch(`/api/portal/tracking/${trackingId.id}/replace-delete`, {
                             method: "POST",
                             headers: {
@@ -393,7 +401,17 @@ export default function PortalTrackingPage() {
                       Cancel
                     </button>
                   </div>
+                  {getReplacementCandidates(trackingId).length === 0 ? (
+                    <p className="m-0 mt-3 text-xs text-slate-400">
+                      No other active {trackingId.marketplace} tag is available yet. Save another tag first if you want to replace this one.
+                    </p>
+                  ) : null}
                 </div>
+              ) : null}
+              {trackingId.usage_count > 0 && replaceTargetId !== trackingId.id ? (
+                <p className="m-0 mt-3 text-xs text-slate-400">
+                  This tag is linked to live product links. Use <span className="font-semibold text-sky-300">Replace &amp; Delete</span> to move those links to another {trackingId.marketplace} tag, or use <span className="font-semibold text-red-300">Delete with Links</span> to remove both the tag and its linked products.
+                </p>
               ) : null}
             </div>
           ))}

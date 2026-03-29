@@ -1,5 +1,15 @@
 import { Outlet, NavLink, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
+import type { Route } from "./+types/layout";
+import { clearAuthSession, restoreAuthSession } from "../../utils/auth-session";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "RKY Tag House" },
+    { name: "application-name", content: "RKY Tag House" },
+    { name: "apple-mobile-web-app-title", content: "RKY Tag House" },
+  ];
+}
 
 interface AuthUser {
   id: number;
@@ -14,16 +24,14 @@ export default function PortalLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    const rawUser = localStorage.getItem("auth_user");
+    document.title = "RKY Tag House";
 
-    if (!token || !rawUser) {
+    const restoredUser = restoreAuthSession();
+    if (!restoredUser) {
       navigate("/portal/login");
       return;
     }
-
-    const parsed = JSON.parse(rawUser) as AuthUser;
-    setUser(parsed);
+    setUser(restoredUser);
   }, [navigate]);
 
   if (!user) return null;
@@ -90,8 +98,7 @@ export default function PortalLayout() {
         <button
           className="border border-red-500/30 rounded-xl bg-red-500/10 text-red-300 py-3 px-4 font-semibold cursor-pointer hover:bg-red-500/20 transition-colors mt-8"
           onClick={() => {
-            localStorage.removeItem("auth_token");
-            localStorage.removeItem("auth_user");
+            clearAuthSession();
             navigate("/portal/login");
           }}
         >

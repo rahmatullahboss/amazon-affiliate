@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import type { Route } from "./+types/register";
 import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { persistAuthSession } from "../../utils/auth-session";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string };
@@ -51,8 +52,7 @@ export default function PortalRegisterPage({ loaderData }: Route.ComponentProps)
         user: { id: number; username: string; role: string; agentId: number | null };
       };
 
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      persistAuthSession(data.token, data.user);
       navigate("/portal/tracking");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Registration failed");
@@ -98,8 +98,7 @@ export default function PortalRegisterPage({ loaderData }: Route.ComponentProps)
         }
 
         if (data.token && data.user) {
-          localStorage.setItem("auth_token", data.token);
-          localStorage.setItem("auth_user", JSON.stringify(data.user));
+          persistAuthSession(data.token, data.user);
           navigate("/portal");
           return;
         }

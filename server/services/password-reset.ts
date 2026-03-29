@@ -1,7 +1,12 @@
 import type { Bindings } from '../utils/types';
+import { safeKvDelete, safeKvGetText, safeKvPut } from './kv-safe';
 
 const RESET_TOKEN_TTL_SECONDS = 60 * 60;
 const GOOGLE_SIGNUP_TTL_SECONDS = 15 * 60;
+
+function toSqliteDateTime(timestampMs: number): string {
+  return new Date(timestampMs).toISOString().slice(0, 19).replace("T", " ");
+}
 
 function base64UrlEncode(bytes: Uint8Array): string {
   let binary = '';
@@ -17,26 +22,63 @@ export function generatePasswordResetToken(): string {
 }
 
 export async function storePasswordResetToken(
+  db: D1Database,
   kv: KVNamespace,
   token: string,
   userId: number
 ): Promise<void> {
-  await kv.put(`password-reset:${token}`, JSON.stringify({ userId }), {
+  const payload = JSON.stringify({ userId });
+  const expiresAt = toSqliteDateTime(Date.now() + RESET_TOKEN_TTL_SECONDS * 1000);
+  const storedInKv = await safeKvPut(kv, `password-reset:${token}`, payload, {
     expirationTtl: RESET_TOKEN_TTL_SECONDS,
   });
+
+  if (!storedInKv) {
+    await db.prepare(
+      `INSERT OR REPLACE INTO temp_tokens (token, purpose, payload, expires_at, created_at)
+       VALUES (?, 'password_reset', ?, ?, CURRENT_TIMESTAMP)`
+    )
+      .bind(token, payload, expiresAt)
+      .run();
+  }
 }
 
 export async function consumePasswordResetToken(
+  db: D1Database,
   kv: KVNamespace,
   token: string
 ): Promise<number | null> {
-  const raw = await kv.get(`password-reset:${token}`);
-  if (!raw) return null;
+  const kvKey = `password-reset:${token}`;
+  const raw = await safeKvGetText(kv, kvKey);
 
-  await kv.delete(`password-reset:${token}`);
+  if (raw) {
+    await safeKvDelete(kv, kvKey);
+
+    try {
+      const parsed = JSON.parse(raw) as { userId?: number };
+      return typeof parsed.userId === 'number' ? parsed.userId : null;
+    } catch {
+      return null;
+    }
+  }
+
+  const fallback = await db.prepare(
+    `SELECT payload
+     FROM temp_tokens
+     WHERE token = ? AND purpose = 'password_reset' AND expires_at > CURRENT_TIMESTAMP
+     LIMIT 1`
+  )
+    .bind(token)
+    .first<{ payload: string }>();
+
+  if (!fallback?.payload) return null;
+
+  await db.prepare(`DELETE FROM temp_tokens WHERE token = ? AND purpose = 'password_reset'`)
+    .bind(token)
+    .run();
 
   try {
-    const parsed = JSON.parse(raw) as { userId?: number };
+    const parsed = JSON.parse(fallback.payload) as { userId?: number };
     return typeof parsed.userId === 'number' ? parsed.userId : null;
   } catch {
     return null;
@@ -97,6 +139,7 @@ export async function sendPasswordResetEmail({
 }
 
 export async function storeGoogleSignupToken(
+  db: D1Database,
   kv: KVNamespace,
   token: string,
   payload: {
@@ -105,12 +148,24 @@ export async function storeGoogleSignupToken(
     googleSub: string;
   }
 ): Promise<void> {
-  await kv.put(`google-signup:${token}`, JSON.stringify(payload), {
+  const serialized = JSON.stringify(payload);
+  const expiresAt = toSqliteDateTime(Date.now() + GOOGLE_SIGNUP_TTL_SECONDS * 1000);
+  const storedInKv = await safeKvPut(kv, `google-signup:${token}`, serialized, {
     expirationTtl: GOOGLE_SIGNUP_TTL_SECONDS,
   });
+
+  if (!storedInKv) {
+    await db.prepare(
+      `INSERT OR REPLACE INTO temp_tokens (token, purpose, payload, expires_at, created_at)
+       VALUES (?, 'google_signup', ?, ?, CURRENT_TIMESTAMP)`
+    )
+      .bind(token, serialized, expiresAt)
+      .run();
+  }
 }
 
 export async function consumeGoogleSignupToken(
+  db: D1Database,
   kv: KVNamespace,
   token: string
 ): Promise<{
@@ -118,10 +173,28 @@ export async function consumeGoogleSignupToken(
   name: string | null;
   googleSub: string;
 } | null> {
-  const raw = await kv.get(`google-signup:${token}`);
-  if (!raw) return null;
+  const kvKey = `google-signup:${token}`;
+  let raw = await safeKvGetText(kv, kvKey);
 
-  await kv.delete(`google-signup:${token}`);
+  if (raw) {
+    await safeKvDelete(kv, kvKey);
+  } else {
+    const fallback = await db.prepare(
+      `SELECT payload
+       FROM temp_tokens
+       WHERE token = ? AND purpose = 'google_signup' AND expires_at > CURRENT_TIMESTAMP
+       LIMIT 1`
+    )
+      .bind(token)
+      .first<{ payload: string }>();
+
+    raw = fallback?.payload || null;
+    if (!raw) return null;
+
+    await db.prepare(`DELETE FROM temp_tokens WHERE token = ? AND purpose = 'google_signup'`)
+      .bind(token)
+      .run();
+  }
 
   try {
     const parsed = JSON.parse(raw) as {

@@ -153,6 +153,15 @@ portal.get('/performance', async (c) => {
     c.env.DB.prepare(
       `SELECT
          COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         ) as returned_items,
          COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount,
          COALESCE(SUM(ac.commission_amount), 0) as commission_amount
        FROM amazon_conversions ac
@@ -160,7 +169,12 @@ portal.get('/performance', async (c) => {
        WHERE t.agent_id = ?`
     )
       .bind(agentId)
-      .first<{ ordered_items: number; revenue_amount: number; commission_amount: number }>(),
+      .first<{
+        ordered_items: number;
+        returned_items: number;
+        revenue_amount: number;
+        commission_amount: number;
+      }>(),
     c.env.DB.prepare(
       `SELECT tracking_tag, country, clicked_at
        FROM clicks
@@ -180,6 +194,7 @@ portal.get('/performance', async (c) => {
     totalViews,
     ctr: totalViews > 0 ? ((totalClicks / totalViews) * 100).toFixed(2) : '0.00',
     orderedItems: salesTotals?.ordered_items ?? 0,
+    returnedItems: salesTotals?.returned_items ?? 0,
     revenueAmount: salesTotals?.revenue_amount ?? 0,
     commissionAmount: salesTotals?.commission_amount ?? 0,
     topProducts: topProducts.results ?? [],
@@ -278,7 +293,10 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
     return c.json({ trackingId, message: 'Tag saved successfully' }, existing ? 200 : 201);
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
-      throw new HTTPException(409, { message: 'This tag is already being used. Save the correct full tag for this agent.' });
+      throw new HTTPException(409, {
+        message:
+          'This tag is already assigned to another account. Use a different tag or ask admin to move it to this agent.',
+      });
     }
 
     throw error;
@@ -485,6 +503,7 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
         asin: resolvedAsin,
         marketplace,
         apiKey,
+        fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
         status: 'active',
         requireRealProductData: true,
       });

@@ -3,6 +3,7 @@ import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
 const PBKDF2_ITERATIONS = 100_000;
 const LEGACY_PBKDF2_ITERATIONS = 310_000;
 const SALT_LENGTH = 16;
+const JWT_EXPIRY_SECONDS = 60 * 60 * 24 * 30;
 
 function parseStoredHash(storedHash: string): {
   iterations: number;
@@ -60,7 +61,7 @@ export async function createJwt(payload: Record<string, unknown>, secret: string
     .replace(/=+$/, '');
 
   const now = Math.floor(Date.now() / 1000);
-  const fullPayload = { ...payload, iat: now, exp: now + 86400 };
+  const fullPayload = { ...payload, iat: now, exp: now + JWT_EXPIRY_SECONDS };
   const payloadB64 = btoa(JSON.stringify(fullPayload))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')

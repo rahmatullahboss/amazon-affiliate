@@ -7,6 +7,7 @@ import { CacheService } from '../services/cache';
 import {
   ensureProductRecord,
   fetchAmazonProductData,
+  fetchAmazonProductDataWithFallback,
   refreshProductRecord,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
@@ -185,7 +186,12 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
   }
 
   try {
-    const productData = await fetchAmazonProductData(apiKey, asin, marketplace);
+    const productData = await fetchAmazonProductDataWithFallback({
+      asin,
+      marketplace,
+      primaryApiKey: apiKey,
+      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    });
     if (!productData) {
       throw new HTTPException(404, { message: 'Product not found on Amazon' });
     }
@@ -195,6 +201,7 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       asin,
       marketplace,
       apiKey,
+      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
       title: productData.title,
       imageUrl: productData.imageUrl,
       category: productData.category,
@@ -334,6 +341,7 @@ products.post('/:id/refresh', async (c) => {
     const refreshed = await refreshProductRecord({
       db: c.env.DB,
       apiKey,
+      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
       asin: product.asin,
       marketplace: product.marketplace,
       status: product.status || 'active',
@@ -551,43 +559,18 @@ products.post('/enrich', async (c) => {
 
     const promises = batch.map(async (product) => {
       try {
-        const response = await fetch(
-          `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${product.asin}&country=${product.marketplace}`,
-          {
-            headers: {
-              'X-RapidAPI-Key': apiKey,
-              'X-RapidAPI-Host': 'real-time-amazon-data.p.rapidapi.com',
-            },
-          }
-        );
+        const productData = await fetchAmazonProductDataWithFallback({
+          asin: product.asin,
+          marketplace: product.marketplace,
+          primaryApiKey: apiKey,
+          fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+        });
 
-        if (!response.ok) {
+        if (!productData) {
           results.push({ asin: product.asin, status: 'error' });
           return;
         }
-
-        const json = await response.json() as {
-          status?: string;
-          data?: {
-            product_title?: string;
-            product_photo?: string;
-            product_category?: string;
-            product_price?: string;
-            product_original_price?: string;
-            product_star_rating?: string;
-            product_description?: string;
-            about_product?: string[];
-          };
-        };
-
-        const data = json.data;
-        if (!data?.product_title) {
-          results.push({ asin: product.asin, status: 'not_found' });
-          return;
-        }
-
-        // Build features JSON from about_product array
-        const features = data.about_product ? JSON.stringify(data.about_product.slice(0, 6)) : '[]';
+        const features = JSON.stringify(productData.features.slice(0, 6));
 
         await c.env.DB.prepare(
           `UPDATE products SET
@@ -604,19 +587,19 @@ products.post('/enrich', async (c) => {
             updated_at = CURRENT_TIMESTAMP
            WHERE id = ?`
         ).bind(
-          data.product_title.substring(0, 500),
-          data.product_photo || `https://images-na.ssl-images-amazon.com/images/I/${product.asin}._AC_SL1500_.jpg`,
-          data.product_category || null,
-          data.product_price || '',
-          data.product_original_price || '',
-          data.product_star_rating ? parseFloat(data.product_star_rating) : 4.5,
-          (data.product_description || '').substring(0, 2000),
+          productData.title.substring(0, 500),
+          productData.imageUrl || `https://images-na.ssl-images-amazon.com/images/I/${product.asin}._AC_SL1500_.jpg`,
+          productData.category || null,
+          '',
+          '',
+          4.5,
+          (productData.description || '').substring(0, 2000),
           features,
           'active',
           product.id
         ).run();
 
-        results.push({ asin: product.asin, status: 'enriched', title: data.product_title.substring(0, 80) });
+        results.push({ asin: product.asin, status: 'enriched', title: productData.title.substring(0, 80) });
       } catch (err) {
         console.error(`[Enrich] Failed for ${product.asin}:`, err);
         results.push({ asin: product.asin, status: 'error' });

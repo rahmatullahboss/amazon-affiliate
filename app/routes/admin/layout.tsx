@@ -1,5 +1,15 @@
 import { Outlet, NavLink, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
+import type { Route } from "./+types/layout";
+import { clearAuthSession, restoreAuthSession } from "../../utils/auth-session";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Dealsrky | RKY Tag Store" },
+    { name: "application-name", content: "Dealsrky | RKY Tag Store" },
+    { name: "apple-mobile-web-app-title", content: "Dealsrky | RKY Tag Store" },
+  ];
+}
 
 export default function AdminLayout() {
   const navigate = useNavigate();
@@ -7,18 +17,18 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("auth_token");
-    const userData = localStorage.getItem("auth_user");
-    if (!token || !userData) {
+    document.title = "Dealsrky | RKY Tag Store";
+
+    const restoredUser = restoreAuthSession();
+    if (!restoredUser) {
       navigate("/admin/login");
       return;
     }
-    setUser(JSON.parse(userData));
+    setUser(restoredUser);
   }, [navigate]);
 
   const handleLogout = () => {
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("auth_user");
+    clearAuthSession();
     navigate("/admin/login");
   };
 

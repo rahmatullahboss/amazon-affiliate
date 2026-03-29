@@ -65,6 +65,7 @@ sheets.post('/sync/import', async (c) => {
     db: c.env.DB,
     kv: c.env.KV,
     apiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
     config,
     credentials: {
       clientEmail: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,

@@ -35,4 +35,5 @@
   // Secrets (set via `wrangler secret put`):
   // - JWT_SECRET
   // - AMAZON_API_KEY (optional)
+  // - AMAZON_API_KEY_FALLBACK (optional)
 }

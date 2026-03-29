@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 3 gotchas, 19 conventions, 17 fixes."
+description: "Typescript for amazon-affiliate. 13 gotchas, 44 conventions, 37 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **148 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **258 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -19,388 +19,332 @@ Auto-compiled from **148 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvDelete, safeKvGetText, safeKvPut } from '../services/kv-safe'; - const auth = ne |
+| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvGetJson, safeKvPut } from '../services/kv-safe'; - const redirect = new Hono<App |
+| ⚠️ GOTCHA: Fixed null crash in HTTPException — pre | -   let resolvedAgentId = body.agent_id ?? null; +   if (body.role === 'agent' && !body.agent_id) {  |
+| ⚠️ GOTCHA: Fixed null crash in COALESCE — prevents | -          COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount, +          COALESCE( -          CO |
+| ⚠️ GOTCHA: Fixed null crash in SELECT — paralleliz | -  +   const origin = getPublicAppOrigin(c.req.url, c.env); -   const { results } = await c.env.DB.p |
+| ⚠️ GOTCHA: discovery in portal.ts | -     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' } |
+| ⚠️ GOTCHA: Fixed null crash in Promise — paralleli | -   const { results } = await c.env.DB.prepare( +   const [productsResult, summaryResult] = await Pr |
+| ⚠️ GOTCHA: Fixed null crash in Hono — parallelizes | - import { ensureProductRecord, fetchAmazonProductData } from '../services/product-ingestion'; + imp |
+| ⚠️ GOTCHA: Fixed null crash in Number — paralleliz | -   const { results } = await c.env.DB.prepare( +   const requestedPage = Number.parseInt(c.req.quer |
+| ⚠️ GOTCHA: Fixed null crash in SELECT — prevents n | -     `SELECT id, tag, label, marketplace, is_default, is_active, created_at +     `SELECT id, tag,  |
 | ⚠️ GOTCHA: Fixed null crash in UPDATE — prevents n | -       await ensureProductRecord({ +       try { -         db: input.db, +         await ensureProd |
 | ⚠️ GOTCHA: Fixed null crash in AppEnv — offloads h | - import type { AppEnv } from '../server/utils/types'; + import { env } from 'cloudflare:workers'; - |
 | ⚠️ GOTCHA: Strengthened types Failed — evolves the | -       .replace(/\/\*[\s\S]*?\*\//g, '') +       .replace(/\/\*[\s\S]*?\*\//g, ''); -       .trim() |
 
 ## 🔧 Problem Playbooks
 
-### Fixed null crash in FROM — prevents null/undefined runtime crashes
--        p.asin, p.title as product_title, p.image_url, p.id as product_id,
-+        p.asin, p.title as product_title, p.image_url, p.description, p.features,
--        t.tag as tracking_tag, t.marketplace,
-+        p.product_images, p.aplus_images, p.id as product_id,
--        ap.custom_title
-+        t.tag as tracking_tag, t.marketplace,
--      FROM agent_products ap
-+        ap.custom_title
--   
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: FROM
-3. identifier: JOIN
-4. identifier: WHERE
-5. identifier: AND
-
-### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
-- import { portalAsinSubmissionSchema } from '../schemas';
-+ import { portalAsinSubmissionSchema, portalTrackingSetupSchema } from '../schemas';
-- portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
-+ portal.get('/tracking', async (c) => {
--   const userId = c.get('userId');
+### Fixed null crash in Rate — prevents brute-force and DoS attacks
+- /**
++ import { safeKvGetText, safeKvPut } from "../services/kv-safe";
+-  * Rate Limiting Middleware for Redirect Engine
 + 
-- 
-+   if (role !== 'agent' || !agentId) {
--   if (role !== 'agent' || !agentI
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: HTTPException
-3. identifier: Only
-4. identifier: IDs
-5. identifier: SELECT
-
-### Fixed null crash in INSERT — improves module reusability
-- import { loginSchema, setupSchema } from '../schemas';
-+ import { agentRegistrationSchema, loginSchema, setupSchema } from '../schemas';
-- export default auth;
-+ auth.post('/register-agent', zValidator('json', agentRegistrationSchema), async (c) => {
-- 
-+   const body = c.req.valid('json');
-+   const passwordHash = await hashPassword(body.password);
-+ 
-+   try {
-+     await c.env.DB.prepare(
-+  
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: INSERT
-3. identifier: INTO
-4. identifier: VALUES
-5. identifier: Error
-
-### Fixed null crash in Product — parallelizes async operations for speed
--     });
-+       requireRealProductData: true,
-- 
-+     });
--     return c.json({ product, message: 'Product fetched and saved' }, 201);
-+ 
--   } catch (error) {
-+     return c.json({ product, message: 'Product fetched and saved' }, 201);
--     if (error instanceof HTTPException) throw error;
-+   } catch (error) {
--     console.error('[Products] ASIN fetch error:', error);
-+     if (error instanc
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Product
-3. identifier: HTTPException
-4. identifier: Products
-5. identifier: ASIN
-
-### Fixed null crash in ParsedSheetProductRow — prevents null/undefined runtime c...
-- }
-+   requireRealProductData?: boolean;
-- 
-+ }
-- interface ParsedSheetProductRow {
-+ 
--   asin: string;
-+ interface ParsedSheetProductRow {
--   marketplace: string;
-+   asin: string;
--   title: string | null;
-+   marketplace: string;
--   imageUrl: string | null;
-+   title: string | null;
--   category: string | null;
-+   imageUrl: string | null;
--   status: string;
-+   category: string | null;
-- 
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ParsedSheetProductRow
-3. identifier: Promise
-4. identifier: AmazonProductData
-5. identifier: RapidAPI
-
-### Fixed null crash in Promise — prevents null/undefined runtime crashes
-- 
-+ const AMAZON_ASIN_PATTERNS = [
-- export function normalizeAsin(rawAsin: string): string {
-+   /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i,
--   return rawAsin.trim().toUpperCase();
-+   /\/gp\/product\/([A-Z0-9]{10})(?:[/?]|$)/i,
-- }
-+   /[?&]asin=([A-Z0-9]{10})(?:[&#]|$)/i,
-- 
-+ ];
-- export function isValidAsin(asin: string): boolean {
-+ 
--   return VALID_ASIN_REGEX.test(normalizeAsin(asin));
-+ export f
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Promise
-3. identifier: AmazonProductData
-4. identifier: RapidAPI
-5. identifier: Key
-
-### Fixed null crash in Only — reduces initial bundle size with code splitting
--  * for all existing products in the REMOTE D1 database.
-+  * with exponential backoff retry on 429 rate limits.
--  * 
+-  * Uses Cloudflare KV with TTL-based auto-expiry.
++ /**
+-  *
++  * Rate Limiting Middleware for Redirect Engine
+-  * Limits:
++  * Uses Cloudflare KV with TTL-based auto-expiry.
+-  * - 60 redirects per IP per minute (prevents click flooding)
 +  *
--  */
+-  * - 10,000 redirects per 
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Rate
+3. identifier: Limiting
+4. identifier: Middleware
+5. identifier: Redirect
+
+### Fixed null crash in Guard
+- /**
++ import { safeKvGetText, safeKvPut } from "../services/kv-safe";
+-  * Bot Guard — Detects and blocks non-human traffic on redirect engine.
++ 
+-  *
++ /**
+-  * Why this matters:
++  * Bot Guard — Detects and blocks non-human traffic on redirect engine.
+-  * - Amazon monitors click patterns and flags suspicious bot traffic
++  *
+-  * - Bot clicks inflate analytics and waste KV/D1 resources
 +  * 
-- 
-+  * Only fetches products that don't already have product_images set.
-- const API_KEY = "9526f19141mshd939399dce12cbdp1d9e68jsn75e244cf35ad";
-+  */
-- const DELAY_MS = 1200; // ~50 requests/minute (RapidAPI free tier safe)
-+ 
-- 
-+ const API_KEY = "9526f19141ms
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Only
-3. identifier: Apply
-4. identifier: SQL
-5. identifier: ApiResponse
+2. identifier: Bot
+3. identifier: Guard
+4. identifier: Detects
+5. identifier: Why
 
-### Fixed null crash in Failed — wraps unsafe operation in error boundary
-- import fs from 'node:fs';
-+ import schema from '../migrations/0001_init.sql?raw';
-- import path from 'node:path';
-+ 
+### Fixed null crash in Array — prevents null/undefined runtime crashes
+-   const passwordHash = await hashPassword(body.password);
++   if (body.initial_tags?.length) {
 - 
-+ beforeAll(async () => {
-- beforeAll(async () => {
-+   if (!env.DB) return;
--   // Read the schema migration file
-+   
--   if (!env.DB) return;
-+   try {
--   
-+     await (env.DB as any).exec(schema);
--   let migrationPath = path.resolve(process.cwd(), 'migrations/0001_init.sq
++     const uniqueTagsByMarketplace = new Map(body.initial_tags.map((tag) => [tag.marketplace, tag]));
+-   try {
++     const tagsToCheck = Array.from(uniqueTagsByMarketplace.values());
+-     await c.env.DB.prepare(
++ 
+-       `INSERT INTO users (username, email, password_hash, role, agent_id)
++     
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Failed
-3. identifier: Read
-4. identifier: Also
-5. identifier: 0001_initsqlraw
-
-### Fixed null crash in SheetSyncConfig — prevents null/undefined runtime crashes
--   ensureProductRecord,
-+   parseSpreadsheetReference,
--   parseSheetProductRow,
-+   readSheetRows,
-- } from "./product-ingestion";
-+   writeSheetRows,
-- 
-+ } from "./google-sheets";
-- interface SheetSyncConfig {
-+ import { ensureProductRecord, isValidAsin } from "./product-ingestion";
--   id: number;
-+ 
--   sheet_url: string | null;
-+ interface SheetSyncConfig {
--   default_marketplace: string;
-
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: SheetSyncConfig
-3. identifier: SheetSyncLog
-4. identifier: GoogleCredentials
-5. identifier: SyncProductsFromSheetInput
-
-### Fixed null crash in Hono — parallelizes async operations for speed
-- 
-+ import { writeAuditLog } from '../services/audit-log';
-- const products = new Hono<AppEnv>();
-+ 
-- 
-+ const products = new Hono<AppEnv>();
-- /**
-+ 
--  * GET /api/products — List all products
-+ /**
--  */
-+  * GET /api/products — List all products
-- products.get('/', async (c) => {
-+  */
--   const { results } = await c.env.DB.prepare(
-+ products.get('/', async (c) => {
--     `SELECT p.*,
-+   co
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Hono
-3. identifier: AppEnv
-4. identifier: GET
-5. identifier: List
-
-### Fixed null crash in Hono — prevents null/undefined runtime crashes
-- 
-+ import { writeAuditLog } from '../services/audit-log';
-- const agents = new Hono<AppEnv>();
-+ 
-- 
-+ const agents = new Hono<AppEnv>();
-- /**
-+ 
--  * GET /api/agents — List all agents with stats
-+ /**
--  */
-+  * GET /api/agents — List all agents with stats
-- agents.get('/', async (c) => {
-+  */
--   const { results } = await c.env.DB.prepare(
-+ agents.get('/', async (c) => {
--     `SELECT a.*,
-
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Hono
-3. identifier: AppEnv
-4. identifier: GET
-5. identifier: List
-
-### Fixed null crash in Hono — parallelizes async operations for speed
-- 
-+ import { ensureProductRecord, fetchAmazonProductData } from '../services/product-ingestion';
-- const products = new Hono<AppEnv>();
-+ 
-- 
-+ const products = new Hono<AppEnv>();
-- /**
-+ 
--  * GET /api/products — List all products
-+ /**
--  */
-+  * GET /api/products — List all products
-- products.get('/', async (c) => {
-+  */
--   const { results } = await c.env.DB.prepare(
-+ products.get('/', as
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Hono
-3. identifier: AppEnv
-4. identifier: GET
-5. identifier: List
+2. identifier: Map
+3. identifier: Array
+4. identifier: SELECT
+5. identifier: FROM
 
 ### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
--     c.set('userRole', payload.role as string);
-+     c.set('userRole', payload.role as 'super_admin' | 'admin' | 'agent');
--   } catch (error) {
-+     c.set('agentId', (payload.agentId as number | null | undefined) ?? null);
--     if (error instanceof HTTPException) throw error;
-+     c.set('username', payload.username as string);
--     throw new HTTPException(401, { message: 'Invalid token' });
+-       throw new HTTPException(409, { message: 'This tag is already being used. Save the correct full tag for this agent.' });
++       throw new HTTPException(409, {
+-     }
++         message:
+- 
++           'This tag is already assigned to another account. Use a different tag or ask admin to move it to this agent.',
+-     throw error;
++       });
+-   }
++     }
+- });
++ 
+- 
++     throw error;
+- po
 
 **Actionable Steps:**
 1. Modified 1 files
 2. identifier: HTTPException
-3. identifier: Invalid
-4. identifier: Array
-5. identifier: Context
+3. identifier: This
+4. identifier: Use
+5. identifier: Number
 
-### Added error handling products
--   const body = await c.req.json<{ limit?: number; offset?: number }>().catch(() => ({}));
-+   const body = await c.req.json<{ limit?: number; offset?: number }>().catch(() => ({ limit: 20, offset: 0 }));
-
-📌 IDE AST Context: Modified symbols likely include [products, products.get('/') callback, products.post('/') callback, products.post('/fetch-asin') callback, products.post('/bulk-import') call
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### Fixed null crash in POST — parallelizes async operations for speed
-- export default products;
-+ /**
+### Fixed null crash in SELECT — prevents null/undefined runtime crashes
+-        (SELECT COUNT(*) FROM clicks WHERE agent_id = a.id) as total_clicks
++        (SELECT COUNT(*) FROM clicks WHERE agent_id = a.id) as total_clicks,
+-      FROM agents a ORDER BY a.created_at DESC`
++        (SELECT COUNT(*) FROM users WHERE agent_id = a.id AND is_active = 1) as user_count,
+-   ).all();
++        (SELECT MAX(clicked_at) FROM clicks WHERE agent_id = a.id) as last_click_at,
 - 
-+  * POST /api/products/enrich — Bulk-enrich products with real Amazon data
-+  *
-+  * Fetches real title, image, category, price from RapidAPI
-+  * for products that still have placeholder data.
-+  * Rate-limited: processes 5 at a time with 1s delay between batches.
-+  */
-+ products.post('/enrich', async (c) => {
-+   const apiKey = c.env.AMAZON_API_KEY;
-+   if (
++
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: POST
-3. identifier: Bulk
-4. identifier: Amazon
-5. identifier: Fetches
+2. identifier: SELECT
+3. identifier: COUNT
+4. identifier: FROM
+5. identifier: WHERE
 
-### Fixed null crash in POST — prevents null/undefined runtime crashes
--  * PUT /api/products/:id — Update a product
-+  * POST /api/products/bulk-import — Bulk import ASINs (paste or CSV)
--  */
-+  *
-- products.put('/:id', async (c) => {
-+  * Accepts an array of ASINs + marketplace.
--   const id = parseInt(c.req.param('id'));
-+  * Uses D1 batch() for atomic performance.
--   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid product ID' });
-+  * Skips dupl
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: POST
-3. identifier: Bulk
-4. identifier: ASINs
-5. identifier: CSV
-
-### Fixed null crash in Password — uses a proper password hashing algorithm
-- /**
-+ // ─── Password Hashing with PBKDF2 (Web Crypto) ───────────
--  * POST /api/auth/login - Admin login
-+ // SHA-256 is NOT suitable for passwords — too fast, brute-forceable.
--  */
-+ // PBKDF2 with 100K iterations is the correct approach for Workers runtime.
-- auth.post('/login', zValidator('json', loginSchema), async (c) => {
+### Fixed null crash in Number — uses a proper password hashing algorithm
+- 
++ const JWT_EXPIRY_SECONDS = 60 * 60 * 24 * 30;
+- function parseStoredHash(storedHash: string): {
 + 
--   const { username, password } = c.req.valid('json');
-+ cons
+-   iterations: number;
++ function parseStoredHash(storedHash: string): {
+-   saltHex: string;
++   iterations: number;
+-   expectedHash: string;
++   saltHex: string;
+- } | null {
++   expectedHash: string;
+-   if (storedHash.includes('$')) {
++ } | null {
+-     const [iterationsRaw, payload] = sto
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Password
-3. identifier: Hashing
-4. identifier: Web
-5. identifier: Crypto
+2. identifier: Number
+3. identifier: Promise
+4. identifier: Buffer
+5. identifier: Record
 
-## 📐 Conventions & Best Practices
+### Fixed null crash in HTTPException
+-   if (!trackingId) throw new HTTPException(404, { message: 'Tracking ID not found or not owned by agent' });
++   if (!trackingId) throw new HTTPException(404, { message: 'Tag not found or not owned by agent' });
 
-### Project Conventions
-- 📐 **Strengthened types AnalyticsOverview — formalizes the data contract with expl...** — -     customTitle?: string;
-+     description?: string | null;
--   };
-+     features?: string[];
+📌 IDE AST Context: Modified symbols likely include [mappings, mappings.get('/') callback, mappings.post('/') callback, mappings.post('/bulk') callback, mappings.delete('/:id') callback
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: HTTPException
+3. identifier: Tag
+4. identifier: Tracking
+
+### Fixed null crash in EnsureProductInput — prevents null/undefined runtime crashes
+-   product_images?: string | null;
++   description?: string | null;
+-   aplus_images?: string | null;
++   features?: string | null;
+- }
++   review_content?: string | null;
+- 
++   product_images?: string | null;
+- interface EnsureProductInput {
++   aplus_images?: string | null;
+-   db: D1Database;
++ }
+-   asin: string;
++ 
+-   marketplace: string;
++ interface EnsureProductInput {
+-   apiKey?: strin
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: EnsureProductInput
+3. identifier: ParsedSheetProductRow
+4. identifier: Amazon
+5. identifier: What
+
+### Fixed null crash in SheetSyncLogPagination — prevents null/undefined runtime ...
+- interface GoogleCredentials {
++ interface SheetSyncLogPagination {
+-   clientEmail: string;
++   page: number;
+-   privateKey: string;
++   pageSize: number;
+- }
++   totalItems: number;
+- 
++   totalPages: number;
+- interface SyncProductsFromSheetInput {
++ }
+-   db: D1Database;
++ 
+-   kv: KVNamespace;
++ interface SheetSyncLogPage {
+-   apiKey?: string;
++   logs: SheetSyncLog[];
+-   config: SheetSyn
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: SheetSyncLogPagination
+3. identifier: SheetSyncLogPage
+4. identifier: SheetSyncLog
+5. identifier: GoogleCredentials
+
+### Fixed null crash in SELECT — prevents null/undefined runtime crashes
+- 
++   const envAdminMatch =
+-   const user = await c.env.DB.prepare(
++     username === c.env.ADMIN_USERNAME && [REDACTED] c.env.ADMIN_PASSWORD;
+-     `SELECT id, username, password_hash, role, agent_id, is_active
++ 
+-      FROM users
++   const user = await c.env.DB.prepare(
+-      WHERE username = ?`
++     `SELECT id, username, password_hash, role, agent_id, is_active
+-   )
++      FROM users
 -  
-- 📐 **what-changed in tracking.ts — confirmed 3x** — File updated (external): .react-router/types/app/routes/portal/+types/tracking.ts
 
-Content summary (
-- 📐 **Fixed null crash in HTTPException — improves module reusability — confirmed 4x** — - import { ensureProductRecord } from '../services/product-ingestion';
-+ import { ensureProductRecor
-- 📐 
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: SELECT
+3. identifier: FROM
+4. identifier: WHERE
+5. identifier: HTTPException
+
+### Fixed null crash in Number — uses a proper password hashing algorithm
+- const PBKDF2_ITERATIONS = 100_000;
++ import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
+- const LEGACY_PBKDF2_ITERATIONS = 310_000;
++ 
+- const SALT_LENGTH = 16;
++ const PBKDF2_ITERATIONS = 100_000;
+- 
++ const LEGACY_PBKDF2_ITERATIONS = 310_000;
+- function parseStoredHash(storedHash: string): {
++ const SALT_LENGTH = 16;
+-   iterations: number;
++ 
+-   saltHex: string;
++ functi
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Number
+3. identifier: Promise
+4. identifier: Buffer
+5. identifier: Record
+
+### Fixed null crash in HTTPException — improves module reusability
+-     await storePasswordResetToken(c.env.KV, token, user.id);
++     try {
+-     await sendPasswordResetEmail({
++       await storePasswordResetToken(c.env.KV, token, user.id);
+-       env: c.env,
++       await sendPasswordResetEmail({
+-       to: user.email,
++         env: c.env,
+-       resetUrl,
++         to: user.email,
+-     });
++         resetUrl,
+-   }
++       });
+- 
++     } catch (error: u
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: HTTPException
+3. identifier: Error
+4. identifier: Password
+5. identifier: This
+
+### Fixed null crash in RESEND_API_KEY
+-   if (!env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL) {
++   if (!env.RESEND_API_KEY) {
+-       from: env.RESEND_FROM_EMAIL,
++       from: env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+
+📌 IDE AST Context: Modified symbols likely include [RESET_TOKEN_TTL_SECONDS, GOOGLE_SIGNUP_TTL_SECONDS, base64UrlEncode, generatePasswordResetToken, storePasswordResetToken]
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: RESEND_API_KEY
+3. identifier: RESEND_FROM_EMAIL
+
+### Fixed null crash in Hono — prevents brute-force and DoS attacks
+- import { agentRegistrationSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema, setupSchema } from '../schemas';
++ import {
+- import { createJwt, hashPassword, verifyPassword } from '../services/auth';
++   agentRegistrationSchema,
+- import { consumePasswordResetToken, generatePasswordResetToken, sendPasswordResetEmail, storePasswordResetToken } from '../services/password-reset';
++   fo
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Hono
+3. identifier: AppEnv
+4. identifier: Rate
+5. identifier: Limiting
+
+### Fixed null crash in Number — prevents null/undefined runtime crashes
+- portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
++ portal.delete('/tracking/:id', async (c) => {
+-   const userId = c.get('userId');
++   const id = Number.parseInt(c.req.param('id'), 10);
+-     throw new HTTPException(403, { message: 'Only linked agent accounts can submit ASINs' });
++     throw new HTTPException(403, { message: 'Only linked agent acc
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Number
+3. identifier: HTTPException
+4. identifier: Only
+5. identifier: Invalid
+
+### Fixed null crash in Hono — prevents brute-force and DoS attacks
+- import { agentRegistrationSchema, loginSchema, setupSchema } from '../schemas';
++ import { agentRegistrationSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema, setupSchema } from '../schemas';
+- 
++ import { consumePasswordReset
 
 ... [Truncated — see individual observations for full content]

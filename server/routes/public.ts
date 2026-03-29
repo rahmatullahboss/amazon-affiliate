@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../utils/types";
+import { safeKvGetJson, safeKvPut } from "../services/kv-safe";
 
 const router = new Hono<AppEnv>();
 
@@ -8,7 +9,7 @@ router.get("/categories", async (c) => {
   const cacheKey = "public:categories";
 
   // Try cache first (1 hour)
-  const cached = await c.env.KV.get(cacheKey, "json");
+  const cached = await safeKvGetJson<unknown[]>(c.env.KV, cacheKey);
   if (cached) {
     return c.json(cached);
   }
@@ -17,7 +18,7 @@ router.get("/categories", async (c) => {
     "SELECT * FROM categories WHERE is_active = 1 ORDER BY display_order ASC"
   ).all();
 
-  await c.env.KV.put(cacheKey, JSON.stringify(results), { expirationTtl: 3600 });
+  await safeKvPut(c.env.KV, cacheKey, JSON.stringify(results), { expirationTtl: 3600 });
   return c.json(results);
 });
 

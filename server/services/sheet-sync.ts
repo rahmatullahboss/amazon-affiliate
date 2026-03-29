@@ -42,6 +42,7 @@ interface SyncProductsFromSheetInput {
   db: D1Database;
   kv: KVNamespace;
   apiKey?: string;
+  fallbackApiKeys?: string[];
   config: SheetSyncConfig;
   credentials: GoogleCredentials;
   triggeredByUserId?: number;
@@ -210,6 +211,7 @@ export async function syncProductsFromSheet(
           asin,
           marketplace,
           apiKey: input.apiKey,
+          fallbackApiKeys: input.fallbackApiKeys,
           title: normalizeCell(row.title) || null,
           category: normalizeCell(row.category) || null,
           status,

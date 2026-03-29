@@ -16,7 +16,41 @@ agents.get('/', async (c) => {
     `SELECT a.*,
        (SELECT COUNT(*) FROM tracking_ids WHERE agent_id = a.id) as tracking_count,
        (SELECT COUNT(*) FROM agent_products WHERE agent_id = a.id) as product_count,
-       (SELECT COUNT(*) FROM clicks WHERE agent_id = a.id) as total_clicks
+       (SELECT COUNT(*) FROM clicks WHERE agent_id = a.id) as total_clicks,
+       (SELECT COUNT(*) FROM users WHERE agent_id = a.id AND is_active = 1) as user_count,
+       (SELECT MAX(clicked_at) FROM clicks WHERE agent_id = a.id) as last_click_at,
+       (
+         SELECT COALESCE(SUM(ac.ordered_items), 0)
+         FROM amazon_conversions ac
+         JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+         WHERE t.agent_id = a.id
+       ) as total_ordered_items,
+       (
+         SELECT COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         )
+         FROM amazon_conversions ac
+         JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+         WHERE t.agent_id = a.id
+       ) as total_returned_items,
+       (
+         SELECT COALESCE(SUM(ac.revenue_amount), 0)
+         FROM amazon_conversions ac
+         JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+         WHERE t.agent_id = a.id
+       ) as total_revenue,
+       (
+         SELECT COALESCE(SUM(ac.commission_amount), 0)
+         FROM amazon_conversions ac
+         JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+         WHERE t.agent_id = a.id
+       ) as total_commission
      FROM agents a ORDER BY a.created_at DESC`
   ).all();
 

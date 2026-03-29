@@ -1,3 +1,5 @@
+import { safeKvGetText, safeKvPut } from "../services/kv-safe";
+
 /**
  * Rate Limiting Middleware for Redirect Engine
  * Uses Cloudflare KV with TTL-based auto-expiry.
@@ -17,7 +19,7 @@ export async function checkRedirectRateLimit(
 
   // 1. Per-IP limit: 60 requests per minute
   const ipKey = `rl:ip:${ip}`;
-  const ipCount = parseInt((await kv.get(ipKey)) || '0');
+  const ipCount = parseInt((await safeKvGetText(kv, ipKey)) || '0');
 
   if (ipCount >= 60) {
     return { allowed: false, reason: 'IP rate limit exceeded (60/min)' };
@@ -25,7 +27,7 @@ export async function checkRedirectRateLimit(
 
   // 2. Per-Agent limit: 10,000 requests per hour
   const agentKey = `rl:agent:${agentSlug}`;
-  const agentCount = parseInt((await kv.get(agentKey)) || '0');
+  const agentCount = parseInt((await safeKvGetText(kv, agentKey)) || '0');
 
   if (agentCount >= 10_000) {
     return { allowed: false, reason: 'Agent rate limit exceeded (10000/hr)' };
@@ -48,15 +50,15 @@ export async function incrementRateLimitCounters(
   const agentKey = `rl:agent:${agentSlug}`;
 
   const [ipCount, agentCount] = await Promise.all([
-    kv.get(ipKey),
-    kv.get(agentKey),
+    safeKvGetText(kv, ipKey),
+    safeKvGetText(kv, agentKey),
   ]);
 
   await Promise.all([
-    kv.put(ipKey, String(parseInt(ipCount || '0') + 1), {
+    safeKvPut(kv, ipKey, String(parseInt(ipCount || '0') + 1), {
       expirationTtl: 60, // 1 minute window
     }),
-    kv.put(agentKey, String(parseInt(agentCount || '0') + 1), {
+    safeKvPut(kv, agentKey, String(parseInt(agentCount || '0') + 1), {
       expirationTtl: 3600, // 1 hour window
     }),
   ]);

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface Product {
   id: number;
@@ -77,8 +78,26 @@ interface SyncSummary {
 }
 
 const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 const PRODUCT_PAGE_SIZE = 12;
+
+function analyzeBulkAsins(text: string) {
+  const rawEntries = text
+    .split(/[\n,\t\s]+/)
+    .map((value) => value.trim().toUpperCase())
+    .filter(Boolean);
+  const validAsins = rawEntries.filter((value) => /^B[A-Z0-9]{9}$/.test(value));
+  const uniqueAsins = [...new Set(validAsins)];
+
+  return {
+    rawCount: rawEntries.length,
+    validCount: validAsins.length,
+    uniqueCount: uniqueAsins.length,
+    invalidCount: rawEntries.length - validAsins.length,
+    duplicateCount: validAsins.length - uniqueAsins.length,
+    uniqueAsins,
+  };
+}
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -108,6 +127,7 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [fetching, setFetching] = useState(false);
   const [refreshingProductId, setRefreshingProductId] = useState<number | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -243,6 +263,38 @@ export default function ProductsPage() {
     }
   }
 
+  async function handleProductDelete(productId: number) {
+    if (!window.confirm("Remove this product from active use? Existing pages will stop working for it.")) {
+      return;
+    }
+
+    setDeletingProductId(productId);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/products/${productId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "Failed to remove product");
+      }
+
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to remove product"
+      );
+    } finally {
+      setDeletingProductId(null);
+    }
+  }
+
   async function handleManualSubmit(event: React.FormEvent) {
     event.preventDefault();
     setError("");
@@ -271,10 +323,7 @@ export default function ProductsPage() {
   }
 
   function parseAsins(text: string): string[] {
-    return text
-      .split(/[\n,\t\s]+/)
-      .map((value) => value.trim().toUpperCase())
-      .filter((value) => /^B[A-Z0-9]{9}$/.test(value));
+    return analyzeBulkAsins(text).uniqueAsins;
   }
 
   function handleCsvUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -291,7 +340,7 @@ export default function ProductsPage() {
   }
 
   async function handleBulkImport() {
-    const asins = parseAsins(bulkAsins);
+    const asins = analyzeBulkAsins(bulkAsins).uniqueAsins;
     if (asins.length === 0) {
       setError("No valid ASINs found. ASINs start with 'B' and are 10 characters long.");
       return;
@@ -714,7 +763,7 @@ export default function ProductsPage() {
                   className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-2"
                 >
                   <span className="text-xs text-[#6b6b85]">
-                    {parseAsins(bulkAsins).length} valid ASINs detected
+                    {analyzeBulkAsins(bulkAsins).uniqueCount} unique valid ASINs detected
                   </span>
                   <div className="flex flex-wrap gap-3">
                     <input
@@ -729,6 +778,31 @@ export default function ProductsPage() {
                     </button>
                   </div>
                 </div>
+                {bulkAsins.trim() ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 xl:grid-cols-4 gap-2">
+                      {[
+                        { label: "Detected", value: analyzeBulkAsins(bulkAsins).rawCount },
+                        { label: "Valid", value: analyzeBulkAsins(bulkAsins).validCount },
+                        { label: "Unique", value: analyzeBulkAsins(bulkAsins).uniqueCount },
+                        {
+                          label: "Invalid/Duplicate",
+                          value:
+                            analyzeBulkAsins(bulkAsins).invalidCount +
+                            analyzeBulkAsins(bulkAsins).duplicateCount,
+                        },
+                      ].map((item) => (
+                        <div key={item.label} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                          <div className="text-[0.68rem] uppercase tracking-wide text-[#8b8ba7]">{item.label}</div>
+                          <div className="mt-1 text-base font-semibold text-[#f0f0f5]">{item.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-3 mb-0 text-xs text-[#8b8ba7] leading-relaxed">
+                      Only valid ASINs are imported. Duplicate ASINs in the pasted batch are merged automatically before submission.
+                    </p>
+                  </>
+                ) : null}
               </div>
 
               <button
@@ -948,17 +1022,30 @@ export default function ProductsPage() {
                     {product.total_clicks} clicks
                   </p>
                 </div>
-                <button
-                  onClick={() => void handleProductRefresh(product.id)}
-                  disabled={refreshingProductId === product.id}
-                  className={`mt-auto px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
-                    refreshingProductId === product.id
-                      ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
-                      : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
-                  }`}
-                >
-                  {refreshingProductId === product.id ? "Refreshing..." : "Refresh Data"}
-                </button>
+                <div className="mt-auto grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => void handleProductRefresh(product.id)}
+                    disabled={refreshingProductId === product.id || deletingProductId === product.id}
+                    className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                      refreshingProductId === product.id
+                        ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                        : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
+                    }`}
+                  >
+                    {refreshingProductId === product.id ? "Refreshing..." : "Refresh Data"}
+                  </button>
+                  <button
+                    onClick={() => void handleProductDelete(product.id)}
+                    disabled={deletingProductId === product.id || refreshingProductId === product.id}
+                    className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                      deletingProductId === product.id
+                        ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                        : "border-red-500/30 bg-red-500/10 text-red-300 cursor-pointer hover:bg-red-500/20"
+                    }`}
+                  >
+                    {deletingProductId === product.id ? "Removing..." : "Remove Product"}
+                  </button>
+                </div>
               </div>
             ))}
             {products.length === 0 ? (

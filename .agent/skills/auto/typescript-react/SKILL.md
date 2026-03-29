@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for amazon-affiliate. 1 gotchas, 12 conventions, 10 fixes."
+description: "Typescript React for amazon-affiliate. 28 gotchas, 23 conventions, 21 fixes, 1 error→fix pairs."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,22 +12,250 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **42 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
 > **CRITICAL:** These are real gotchas from this project. Ignoring them WILL cause bugs.
 
-### ❌ ⚠️ GOTCHA: Fixed null crash in TrackingId
--     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.trackingIds); }
-+     if (tRes.ok) { const d = await tRes.json() as { trackingIds: TrackingId[] }; setTrackingIds(d.trackingIds); }
--     if (aRes.ok) { const d = await aRes.json(); s
-- Modified 1 files
-- identifier: TrackingId
-- identifier: Agent
-
+| ❌ Don't | Details |
+|----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in Route — adds runtim | - import { extractApiErrorMessage } from "../../utils/api-errors"; + import type { Route } from "./+ |
+| ⚠️ GOTCHA: Fixed null crash in Route — parallelize | - import { getAuthToken } from "../../utils/auth-session"; + import type { Route } from "./+types/da |
+| ⚠️ GOTCHA: Fixed null crash in Route — formalizes  | - import { copyTextToClipboard } from "../../utils/clipboard"; + import type { Route } from "./+type |
+| ⚠️ GOTCHA: Fixed null crash in Route — formalizes  | - import { extractApiErrorMessage } from "../../utils/api-errors"; + import type { Route } from "./+ |
+| ⚠️ GOTCHA: Fixed null crash in AdminUser — paralle | -  + import { getAuthToken } from "../../utils/auth-session"; - interface AdminUser { +  -   id: num |
+| ⚠️ GOTCHA: Fixed null crash in PortalMeResponse —  | -  + import { getAuthToken } from "../../utils/auth-session"; - interface PortalMeResponse { +  -    |
+| ⚠️ GOTCHA: Fixed null crash in TrackingIdRow — add | -  + import { getAuthToken } from "../../utils/auth-session"; - interface TrackingIdRow { +  -   id: |
+| ⚠️ GOTCHA: Fixed null crash in TrackingId — parall | -  + import { getAuthToken } from "../../utils/auth-session"; - const getToken = () => localStorage. |
+| ⚠️ GOTCHA: Fixed null crash in Mapping — paralleli | -  + import { getAuthToken } from "../../utils/auth-session"; - const getToken = () => localStorage. |
+| ⚠️ GOTCHA: Fixed null crash in Product — paralleli | -  + import { getAuthToken } from "../../utils/auth-session"; - interface Product { +  -   id: numbe |
+| ⚠️ GOTCHA: Fixed null crash in OverviewData — prev | -  + import { getAuthToken } from "../../utils/auth-session"; - interface OverviewData { +  -   tota |
+| ⚠️ GOTCHA: Fixed null crash in Agent — formalizes  | -  + import { getAuthToken } from "../../utils/auth-session"; - interface Agent { +  -   id: number; |
+| ⚠️ GOTCHA: Fixed null crash in Route — hardens HTT | -  + import { persistAuthSession } from "../../utils/auth-session"; - export function meta({}: Route |
+| ⚠️ GOTCHA: Strengthened types Failed — prevents nu | -     } catch (err) { console.error("Failed to fetch dashboard data:", err); } +     } catch (reques |
+| ⚠️ GOTCHA: Fixed null crash in Boolean — paralleli | - export default function ProductsPage() { + function analyzeBulkAsins(text: string) { -   const [pr |
+| ⚠️ GOTCHA: Fixed null crash in AdminUser — paralle | - import { extractApiErrorMessage } from "../../utils/api-errors"; +  -  + interface AdminUser { - i |
+| ⚠️ GOTCHA: Fixed null crash in AgentsPage — improv | - } +   user_count: number; -  +   last_click_at: string - null; - const getToken = () => localStora |
+| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | -   revenueAmount: number; +   returnedItems: number; -   commissionAmount: number; +   revenueAmoun |
+| ⚠️ GOTCHA: Fixed null crash in SubmissionResponse  | - } +   bridge_page_url: string; -  +   redirect_url: string; - interface SubmissionResponse { + } - |
+| ⚠️ GOTCHA: Fixed null crash in ProductSummary — pa | - interface ImportResult { + interface ProductSummary { -   asin: string; +   totalProducts: number; |
+| ⚠️ GOTCHA: Fixed null crash in ProductPagination — | - interface ImportResult { + interface ProductPagination { -   asin: string; +   page: number; -   s |
+| ⚠️ GOTCHA: Fixed null crash in ProductSubmissionPa | - export default function PortalProductsPage() { + interface ProductSubmissionPayload { -   const [p |
+| ⚠️ GOTCHA: Fixed null crash in Authorization — add | -   const [editingId, setEditingId] = useState<number - null>(null); +   const [replacingId, setRepl |
+| ⚠️ GOTCHA: Fixed null crash in MARKETPLACES — impr | - } +   usage_count: number; -  + } - const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES" |
+| ⚠️ GOTCHA: Fixed null crash in PortalRegisterPage  | -   return { +   const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string }; -   |
+| ⚠️ GOTCHA: Fixed null crash in PortalLoginPage — i | -  + import { extractApiErrorMessage } from "../../utils/api-errors"; - export default function Port |
+| ⚠️ GOTCHA: Fixed null crash in PortalProduct — for | -  + import { copyTextToClipboard } from "../../utils/clipboard"; - interface PortalProduct { +  -   |
+| ⚠️ GOTCHA: Fixed null crash in TrackingId | -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.trackingIds); } +     if (tRes.ok |
 
 ## 🔧 Problem Playbooks
+
+### Known Error → Fix
+
+| Error Pattern | Fix | Seen |
+|-------|-----|------|
+| `- import { extractApiErrorMessage } from "../../ut` | Fixed null crash in Route — avoids unnecessary re-renders in | 2x |
+
+### Fixed null crash in OverviewData — hardens HTTP security headers
+- 
++ import { getAuthToken } from "../../utils/auth-session";
+- interface OverviewData {
++ 
+-   totalClicks: number;
++ interface OverviewData {
+-   totalViews: number;
++   totalClicks: number;
+-   clicksToday: number;
++   totalViews: number;
+-   viewsToday: number;
++   clicksToday: number;
+-   clicksThisWeek: number;
++   viewsToday: number;
+-   viewsThisWeek: number;
++   clicksThisWeek: number;
+- 
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: OverviewData
+3. identifier: Array
+4. identifier: ReportsResponse
+5. identifier: ImportFormState
+
+### Fixed null crash in URLSearchParams — parallelizes async operations for speed
+-     try {
++     setLoading(true);
+-       const query = new URLSearchParams({
++     try {
+-         page: String(page),
++       const query = new URLSearchParams({
+-         pageSize: String(PRODUCT_PAGE_SIZE),
++         page: String(page),
+-       });
++         pageSize: String(PRODUCT_PAGE_SIZE),
+-       const response = await fetch(`/api/products?${query.toString()}`, {
++       });
+-         
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: URLSearchParams
+3. identifier: String
+4. identifier: Authorization
+5. identifier: Bearer
+
+### problem-fix in tracking.tsx
+-                           const data = await response.json();
++                           const data = (await response.json()) as { message?: string; error?: unknown };
+-                           const data = await response.json();
++                           const data = (await response.json()) as { message?: string; error?: unknown };
+
+📌 IDE AST Context: Modified symbols likely include [Trac
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Fixed null crash in Route — avoids unnecessary re-renders in React
+- import { useState } from "react";
++ import { useCallback, useState } from "react";
+- import { extractApiErrorMessage } from "../../utils/api-errors";
++ import type { Route } from "./+types/register";
+- 
++ import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
+- export default function PortalRegisterPage() {
++ import { extractApiErrorMessage } from "../../utils/api-errors"
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Route
+3. identifier: GoogleSignInButton
+4. identifier: LoaderArgs
+5. identifier: PortalRegisterPage
+
+### problem-fix in root.tsx
+-     <main
++     <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+-       style={{
++       <h1 className="text-5xl font-extrabold bg-gradient-to-br from-[#ff9900] to-[#ffad33] bg-clip-text text-transparent mb-4">
+-         minHeight: "100vh",
++         {message}
+-         display: "flex",
++       </h1>
+-         flexDirection: "column",
++       <p classNam
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Fixed null crash in Delete
+-               <div className="flex items-center gap-2">
++               <div className="flex items-center gap-2 flex-wrap">
+-                 <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/25 rounded-full text-amber-500 text-xs font-bold">
++                 <button
+-                   {trackingId.is_default ? "Default" : "Saved"}
++                   type="button"
+-           
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Delete
+3. identifier: DELETE
+4. identifier: Authorization
+5. identifier: Bearer
+
+### Fixed null crash in Authorization
+-   const [editingId, setEditingId] = useState<number | null>(null);
++   const [deletingId, setDeletingId] = useState<number | null>(null);
+-   const [form, setForm] = useState({
++   const [editingId, setEditingId] = useState<number | null>(null);
+-     tag: "",
++   const [form, setForm] = useState({
+-     label: "",
++     tag: "",
+-     marketplace: "US",
++     label: "",
+-   });
++     marketplac
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Authorization
+3. identifier: Bearer
+4. identifier: Error
+5. identifier: Failed
+
+### problem-fix in dashboard.tsx
+-     return <p style={styles.copy}>Loading dashboard...</p>;
++     return <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">Loading dashboard...</p>;
+-       <section style={styles.grid}>
++       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+-         <article style={styles.card}>
++         <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+-           <h
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Fixed null crash in Authorization
+-   const [form, setForm] = useState({
++   const [editingId, setEditingId] = useState<number | null>(null);
+-     tag: "",
++   const [form, setForm] = useState({
+-     label: "",
++     tag: "",
+-     marketplace: "US",
++     label: "",
+-   });
++     marketplace: "US",
+- 
++   });
+-   async function loadTracking() {
++ 
+-     const token = localStorage.getItem("auth_token");
++   async function loadTr
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Authorization
+3. identifier: Bearer
+4. identifier: Error
+5. identifier: Failed
+
+### Fixed null crash in ProductCard — improves module reusability
+- import { useState } from "react";
++ import { ProductCard } from "../components/home/ProductCard";
+- import { ProductCard } from "../components/home/ProductCard";
++ import { ImageGallery } from "../components/product/ImageGallery";
+- // ─── Image Gallery Component ────────────────────
++ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
+- function ImageGallery({ mainIma
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: ProductCard
+3. identifier: ImageGallery
+4. identifier: ProductDetail
+5. identifier: Route
+
+### Fixed null crash in Link — prevents null/undefined runtime crashes
+- import "./bridge.css";
++ import { Link } from "react-router";
+- import { recordView } from "../../server/services/analytics";
++ import { ImageGallery } from "../components/product/ImageGallery";
+- 
++ import { recordView } from "../../server/services/analytics";
+- // ─── Types ───────────────────────────────────────
++ 
+- interface BridgeData {
++ // ─── Types ──────────────────────────────────────
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Link
+3. identifier: ImageGallery
+4. identifier: Types
+5. identifier: BridgeData
 
 ### Fixed null crash in PortalProduct — formalizes the data contract with explici...
 - 
@@ -43,258 +271,5 @@ Auto-compiled from **42 real patterns** in **amazon-affiliate**. This skill is a
 -   asin: string;
 +   product_id: number;
 -   marketplace: string;
-+   asin: string;
--   title: string;
-+   marketplace: string;
--   image_url: strin
 
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: PortalProduct
-3. identifier: SubmissionResponse
-4. identifier: PortalProductsPage
-5. identifier: Authorization
-
-### Fixed null crash in PortalRegisterPage — improves module reusability
-- 
-+ import { extractApiErrorMessage } from "../../utils/api-errors";
-- interface ValidationIssue {
-+ 
--   message?: string;
-+ export default function PortalRegisterPage() {
--   path?: string[];
-+   const navigate = useNavigate();
-- }
-+   const [form, setForm] = useState({
-- 
-+     agent_name: "",
-- function extractErrorMessage(payload: unknown): string {
-+     agent_slug: "",
--   if (!payload || 
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: PortalRegisterPage
-3. identifier: React
-4. identifier: FormEvent
-5. identifier: POST
-
-### problem-fix in register.tsx
-File updated (external): app/routes/portal/register.tsx
-
-Content summary (221 lines):
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-
-interface ValidationIssue {
-  message?: string;
-  path?: string[];
-}
-
-function extractErrorMessage(payload: unknown): string {
-  if (!payload || typeof payload !== "object") {
-    return "Registration failed";
-  }
-
-  const data =
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in login.tsx
-File updated (external): app/routes/portal/login.tsx
-
-Content summary (128 lines):
-import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-
-export default function PortalLoginPage() {
-  const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### Fixed null crash in SubmissionResponse — formalizes the data contract with ex...
-- export default function PortalProductsPage() {
-+ interface SubmissionResponse {
--   const [products, setProducts] = useState<PortalProduct[]>([]);
-+   message: string;
--   const [loading, setLoading] = useState(true);
-+   link: string;
--   const [error, setError] = useState("");
-+   redirectLink: string;
--   const [asin, setAsin] = useState("");
-+   status: string;
--   const [marketplace, setMar
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: SubmissionResponse
-3. identifier: PortalProductsPage
-4. identifier: PortalProduct
-5. identifier: Authorization
-
-### problem-fix in products.tsx
-File updated (external): app/routes/portal/products.tsx
-
-Content summary (199 lines):
-import { useEffect, useState } from "react";
-
-interface PortalProduct {
-  id: number;
-  custom_title: string | null;
-  product_id: number;
-  asin: string;
-  marketplace: string;
-  title: string;
-  image_url: string;
-  status: string;
-  tracking_tag: string;
-}
-
-export default function PortalProductsPage() {
-  cons
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### Fixed null crash in ImportResult — parallelizes async operations for speed
--   is_active: number;
-+   status: "active" | "pending_review" | "rejected";
--   agent_count: number;
-+   is_active: number;
--   total_clicks: number;
-+   agent_count: number;
-- }
-+   total_clicks: number;
-- 
-+ }
-- interface ImportResult {
-+ 
--   asin: string;
-+ interface ImportResult {
--   status: "created" | "exists" | "error";
-+   asin: string;
--   error?: string;
-+   status: "created" | "exist
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ImportResult
-3. identifier: SheetSyncConfig
-4. identifier: SheetSyncLog
-5. identifier: SheetConfigResponse
-
-### Fixed null crash in Link — adds runtime type validation before use
-- import { ProductCard } from "../components/home/ProductCard";
-+ import { Link } from "react-router";
-- import { AMAZON_DOMAINS } from "../../server/utils/types";
-+ import { ProductCard } from "../components/home/ProductCard";
-- 
-+ import { AMAZON_DOMAINS } from "../../server/utils/types";
-- export function meta({ data }: Route.MetaArgs) {
-+ 
--   if (!data) return [{ title: "Product Not Found — D
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Link
-3. identifier: ProductCard
-4. identifier: ProductRow
-5. identifier: RelatedProductRow
-
-### Fixed null crash in ImportResult — parallelizes async operations for speed
-- import { useState, useEffect, useRef } from "react";
-+ import { useEffect, useRef, useState } from "react";
--   id: number; asin: string; title: string; image_url: string;
-+   id: number;
--   marketplace: string; category: string | null; is_active: number;
-+   asin: string;
--   agent_count: number; total_clicks: number;
-+   title: string;
-- }
-+   image_url: string;
-- 
-+   marketplace: string;
-- 
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ImportResult
-3. identifier: SheetSyncConfig
-4. identifier: SheetSyncLog
-5. identifier: SheetConfigResponse
-
-### Fixed null crash in Agent
--       if (res.ok) { const data = await res.json(); setAgents(data.agents); }
-+       if (res.ok) { const data = await res.json() as { agents: Agent[] }; setAgents(data.agents); }
--       if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
-+       if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error); }
-
-📌 IDE AST Context: Modified symbols li
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Agent
-3. identifier: Error
-
-## 📐 Conventions & Best Practices
-
-### Project Conventions
-- 📐 **Fixed null crash in Meta — prevents null/undefined runtime crashes — confirmed 4x** — -   product: { asin: string; title: string; imageUrl: string };
-+   product: {
--   redirectUrl: stri
-- 📐 **Fixed null crash in Link — formalizes the data contract with explicit types — confirmed 5x** — - 
-+ import { Link } from "react-router";
-- interface PortalProduct {
-+ 
--   id: number;
-+ interface
-- 📐 **what-changed in home.tsx — confirmed 3x** — -       LIMIT 12
-+       LIMIT 36
-
-📌 IDE AST Context: Modified symbols likely include [ProductRow, 
-- 📐 **Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x** — -   topAgents: Array<{ name: string; slug: string; clicks: number }>;
-+   totalOrderedItems: number;
-- 📐 **Fixed null crash in ProductCard — confirmed 3x** — -   category: string;
-+   category: string | null;
--   price: string;
-+   price?: string;
-- }
-+   ma
-- 📐 **Strengthened types ProductRow — formalizes the data contract with explicit types** — - export function meta({}: Route.MetaArgs) {
-+ interface ProductRow {
--   return [
-+   id: number;
--
-- 📐 **Fixed null crash in Mapping — confirmed 3x** — -     if (mRes.ok) { const d = await mRes.json(); setMappings(d.mappings); }
-+     if (mRes.ok) { co
-- 📐 **Strengthened types Contact** — -     <div className="container mx-auto px-4 py-16 max-w-4xl">
-+     <div className="bg-gray-50 min-
-- 📐 **Strengthened types Route — wraps unsafe operation in error boundary** — - 
-+ import { AMAZON_DOMAINS } from "../../server/utils/types";
-- export function meta({ data }: Rou
-- 📐 **Strengthened types Route — parallelizes async operations for speed** — - interface HomepageData {
-+ export async function loader({ context }: Route.LoaderArgs) {
--   categ
-- 📐 **Strengthened types HeroBanner — parallelizes async operations for speed** — - 
-+ import { HeroBanner } from "../components/home/HeroBanner";
-- export function meta({}: Route.Me
-- 📐 **Updated categories database schema — parallelizes async operations for speed — confirmed 3x** — - export default function Home() {
-+ interface HomepageData {
--   return (
-+   categories: any[];
-- 
-
-## 🤔 Decisions & Trade-offs
-
-- **decision in product-detail.tsx** — -             <a href="/" className="hover:text-[#2c9cb4] transition-colors">Home</a>
-+             
-- **decision in home.tsx** — -                 <span className="text-[#1f8f9c] text-sm uppercase font-bold tracking-widest block 
-
----
-*Auto-generated by BrainSync 🧠 | 42 patterns | 2026-03-28*
+... [Truncated — see individual observations for full content]

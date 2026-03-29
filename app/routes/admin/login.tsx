@@ -1,6 +1,7 @@
 import type { Route } from "./+types/login";
 import { useState } from "react";
 import { useNavigate } from "react-router";
+import { persistAuthSession } from "../../utils/auth-session";
 
 export function meta({}: Route.MetaArgs) {
   return [{ title: "Admin Login — DealsRky" }];
@@ -31,9 +32,11 @@ export default function AdminLogin() {
         throw new Error(data.error || "Login failed");
       }
 
-      const data = await res.json() as { token: string; user: unknown };
-      localStorage.setItem("auth_token", data.token);
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      const data = await res.json() as {
+        token: string;
+        user: { id: number; username: string; role: string; agentId: number | null };
+      };
+      persistAuthSession(data.token, data.user);
       navigate("/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

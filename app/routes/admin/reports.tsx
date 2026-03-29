@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface AmazonReport {
   id: number;
@@ -21,7 +22,7 @@ interface ImportFormState {
   csv_content: string;
 }
 
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 
 export default function AdminReportsPage() {
   const [reports, setReports] = useState<AmazonReport[]>([]);

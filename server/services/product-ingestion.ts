@@ -28,6 +28,7 @@ interface EnsureProductInput {
   asin: string;
   marketplace: string;
   apiKey?: string;
+  fallbackApiKeys?: string[];
   title?: string | null;
   imageUrl?: string | null;
   category?: string | null;
@@ -85,6 +86,14 @@ export function buildFallbackImageUrl(asin: string): string {
   return `https://images-na.ssl-images-amazon.com/images/I/${asin}._AC_SL1500_.jpg`;
 }
 
+function toRapidApiCountryCode(marketplace: string): string {
+  if (marketplace === "UK") {
+    return "GB";
+  }
+
+  return marketplace;
+}
+
 function buildEditorialReviewContent(input: {
   title: string;
   category: string | null;
@@ -129,8 +138,9 @@ export async function fetchAmazonProductData(
   asin: string,
   marketplace: string
 ): Promise<AmazonProductData | null> {
+  const apiCountryCode = toRapidApiCountryCode(marketplace);
   const response = await fetch(
-    `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${marketplace}`,
+    `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${apiCountryCode}`,
     {
       headers: {
         "X-RapidAPI-Key": apiKey,
@@ -170,6 +180,33 @@ export async function fetchAmazonProductData(
   };
 }
 
+export function resolveAmazonApiKeys(input: {
+  primaryApiKey?: string;
+  fallbackApiKeys?: string[];
+}): string[] {
+  return [input.primaryApiKey, ...(input.fallbackApiKeys ?? [])]
+    .map((value) => value?.trim() || "")
+    .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
+}
+
+export async function fetchAmazonProductDataWithFallback(input: {
+  asin: string;
+  marketplace: string;
+  primaryApiKey?: string;
+  fallbackApiKeys?: string[];
+}): Promise<AmazonProductData | null> {
+  const apiKeys = resolveAmazonApiKeys(input);
+
+  for (const apiKey of apiKeys) {
+    const productData = await fetchAmazonProductData(apiKey, input.asin, input.marketplace);
+    if (productData) {
+      return productData;
+    }
+  }
+
+  return null;
+}
+
 export async function ensureProductRecord(input: EnsureProductInput): Promise<ProductRecord> {
   const asin = normalizeAsin(input.asin);
   const marketplace = input.marketplace;
@@ -195,7 +232,12 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
   if (!product) {
     const fetched =
       (!explicitTitle || !explicitImageUrl) && input.apiKey
-        ? await fetchAmazonProductData(input.apiKey, asin, marketplace)
+        ? await fetchAmazonProductDataWithFallback({
+            asin,
+            marketplace,
+            primaryApiKey: input.apiKey,
+            fallbackApiKeys: input.fallbackApiKeys,
+          })
         : null;
 
     if (!explicitTitle && !explicitImageUrl && input.requireRealProductData && !fetched) {
@@ -358,11 +400,17 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 export async function refreshProductRecord(input: {
   db: D1Database;
   apiKey: string;
+  fallbackApiKeys?: string[];
   asin: string;
   marketplace: string;
   status?: string;
 }): Promise<ProductRecord> {
-  const fetched = await fetchAmazonProductData(input.apiKey, input.asin, input.marketplace);
+  const fetched = await fetchAmazonProductDataWithFallback({
+    asin: input.asin,
+    marketplace: input.marketplace,
+    primaryApiKey: input.apiKey,
+    fallbackApiKeys: input.fallbackApiKeys,
+  });
 
   if (!fetched) {
     throw new Error("Fresh product data could not be fetched for this ASIN.");
@@ -373,6 +421,7 @@ export async function refreshProductRecord(input: {
     asin: input.asin,
     marketplace: input.marketplace,
     apiKey: input.apiKey,
+    fallbackApiKeys: input.fallbackApiKeys,
     title: fetched.title,
     imageUrl: fetched.imageUrl,
     category: fetched.category,

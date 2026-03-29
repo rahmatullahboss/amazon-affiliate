@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 interface Agent {
   id: number; slug: string; name: string; email: string | null;
   phone: string | null; is_active: number; tracking_count: number;
   product_count: number; total_clicks: number;
+  user_count: number;
+  last_click_at: string | null;
+  total_ordered_items: number;
+  total_returned_items: number;
+  total_revenue: number;
+  total_commission: number;
 }
 
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 
 export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -95,6 +102,12 @@ export default function AgentsPage() {
                 </div>
                 <div className="text-sm text-[#6b6b85] truncate mt-2">
                   /{agent.slug} · {agent.tracking_count} tags · {agent.product_count} products · {agent.total_clicks} clicks
+                </div>
+                <div className="text-sm text-[#8d8da6] mt-2 leading-relaxed">
+                  Orders: {agent.total_ordered_items} · Returns: {agent.total_returned_items} · Revenue: ${agent.total_revenue.toFixed(2)} · Commission: ${agent.total_commission.toFixed(2)}
+                </div>
+                <div className="text-xs text-[#6b6b85] mt-2 leading-relaxed">
+                  {agent.email || "No email"} · {agent.phone || "No phone"} · {agent.user_count} login account{agent.user_count === 1 ? "" : "s"} · Last click: {agent.last_click_at ? new Date(agent.last_click_at).toLocaleString() : "Never"}
                 </div>
               </div>
               <button onClick={() => void toggleActive(agent.id, agent.is_active)} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#a0a0b8] text-xs font-medium cursor-pointer hover:bg-white/10 transition-colors shrink-0">{agent.is_active ? "Deactivate" : "Activate"}</button>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 
 interface Mapping {
   id: number; agent_name: string; agent_slug: string; asin: string;

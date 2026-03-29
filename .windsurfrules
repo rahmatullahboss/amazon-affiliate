@@ -1,5 +1,5 @@
 # amazon-affiliate — Project Memory
-# Auto-synced | 453 observations
+# Auto-synced | 708 observations
 
 **Stack:** TypeScript · React + Tailwind
 
@@ -41,4 +41,4 @@
 > ℹ️ DO NOT call get_context() or get_gotchas() at startup — context above IS your context.
 
 ---
-*Auto-synced | 2026-03-28*
+*Auto-synced | 2026-03-29*

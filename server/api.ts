@@ -37,7 +37,9 @@ app.get('/api/health', (c) => {
 
   // Validate required secrets
   if (!c.env.JWT_SECRET) warnings.push('JWT_SECRET not set — admin auth will fail');
-  if (!c.env.AMAZON_API_KEY) warnings.push('AMAZON_API_KEY not set — ASIN auto-fetch disabled');
+  if (!c.env.AMAZON_API_KEY && !c.env.AMAZON_API_KEY_FALLBACK) {
+    warnings.push('Amazon API key not set — ASIN auto-fetch disabled');
+  }
 
   // Validate required bindings
   if (!c.env.DB) warnings.push('D1 database not bound');

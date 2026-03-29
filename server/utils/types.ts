@@ -10,6 +10,7 @@ export type Bindings = {
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
   AMAZON_API_KEY?: string;
+  AMAZON_API_KEY_FALLBACK?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;

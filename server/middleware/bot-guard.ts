@@ -1,3 +1,5 @@
+import { safeKvGetText, safeKvPut } from "../services/kv-safe";
+
 /**
  * Bot Guard — Detects and blocks non-human traffic on redirect engine.
  *
@@ -64,13 +66,13 @@ export async function isDuplicateClick(
   asin: string
 ): Promise<boolean> {
   const dedupKey = `dedup:${ipHash}:${asin}`;
-  const existing = await kv.get(dedupKey);
+  const existing = await safeKvGetText(kv, dedupKey);
 
   if (existing) {
     return true; // Duplicate — skip analytics insert
   }
 
   // Cloudflare KV requires a minimum TTL of 60 seconds.
-  await kv.put(dedupKey, '1', { expirationTtl: 60 });
+  await safeKvPut(kv, dedupKey, '1', { expirationTtl: 60 });
   return false;
 }

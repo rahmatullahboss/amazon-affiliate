@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getAuthToken } from "../../utils/auth-session";
 
 type SubmissionStatus = "pending_review" | "rejected" | "active";
 
@@ -17,7 +18,7 @@ interface ProductSubmission {
   submitted_by: string | null;
 }
 
-const getToken = () => localStorage.getItem("auth_token") || "";
+const getToken = () => getAuthToken();
 
 export default function ProductSubmissionsPage() {
   const [submissions, setSubmissions] = useState<ProductSubmission[]>([]);
