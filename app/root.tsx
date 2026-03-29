@@ -60,45 +60,15 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "2rem",
-        textAlign: "center",
-      }}
-    >
-      <h1
-        style={{
-          fontSize: "3rem",
-          fontWeight: 800,
-          background: "linear-gradient(135deg, #ff9900, #ffad33)",
-          WebkitBackgroundClip: "text",
-          WebkitTextFillColor: "transparent",
-          marginBottom: "1rem",
-        }}
-      >
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+      <h1 className="text-5xl font-extrabold bg-gradient-to-br from-[#ff9900] to-[#ffad33] bg-clip-text text-transparent mb-4">
         {message}
       </h1>
-      <p style={{ color: "var(--color-text-secondary)", fontSize: "1.125rem" }}>
+      <p className="text-[#a0a0b8] text-lg">
         {details}
       </p>
       {stack && (
-        <pre
-          style={{
-            marginTop: "1rem",
-            padding: "1rem",
-            background: "var(--color-bg-card)",
-            borderRadius: "0.5rem",
-            overflow: "auto",
-            maxWidth: "100%",
-            fontSize: "0.875rem",
-            color: "var(--color-text-muted)",
-          }}
-        >
+        <pre className="mt-4 p-4 bg-[#1a1a28] rounded-lg overflow-auto max-w-full text-sm text-[#6b6b85] text-left">
           {stack}
         </pre>
       )}

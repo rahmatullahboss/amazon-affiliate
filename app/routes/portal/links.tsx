@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { copyTextToClipboard } from "../../utils/clipboard";
 
 interface PortalLink {
   agentSlug: string;
@@ -16,6 +17,7 @@ export default function PortalLinksPage() {
   const [links, setLinks] = useState<PortalLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [copiedKey, setCopiedKey] = useState("");
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -31,29 +33,41 @@ export default function PortalLinksPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  const handleCopy = async (copyKey: string, text: string) => {
+    const copied = await copyTextToClipboard(text);
+    if (!copied) {
+      setError("Could not copy the full link. Please try again.");
+      return;
+    }
+
+    setCopiedKey(copyKey);
+    window.setTimeout(() => setCopiedKey((current) => (current === copyKey ? "" : current)), 2000);
+  };
+
   return (
-    <section style={styles.card}>
-      <h1 style={styles.title}>My Links</h1>
-      <p style={styles.copy}>Copy your unique bridge links and share them with buyers.</p>
+    <section className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+      <h1 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">My Links</h1>
+      <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">Copy your unique bridge links and share them with buyers.</p>
 
-      {loading ? <p style={styles.copy}>Loading...</p> : null}
-      {error ? <p style={styles.error}>{error}</p> : null}
-      {!loading && !error && links.length === 0 ? <p style={styles.copy}>No links available yet.</p> : null}
+      {loading ? <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">Loading...</p> : null}
+      {error ? <p className="text-red-300 my-3 bg-red-500/10 border border-red-500/25 rounded-xl p-3.5">{error}</p> : null}
+      {!loading && !error && links.length === 0 ? <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">No links available yet.</p> : null}
 
-      <div style={styles.list}>
+      <div className="grid gap-3 mt-4">
         {links.map((link) => (
-          <div key={`${link.agentSlug}-${link.asin}`} style={styles.item}>
-            <img src={link.imageUrl} alt={link.title} style={styles.image} />
-            <div style={styles.content}>
-              <p style={styles.itemTitle}>{link.title}</p>
-              <p style={styles.copy}>{link.asin} · {link.marketplace} · {link.trackingTag}</p>
-              <div style={styles.actions}>
-                <input style={styles.input} value={link.bridgePageUrl} readOnly />
+          <div key={`${link.agentSlug}-${link.asin}`} className="flex flex-col sm:flex-row gap-4 items-start sm:items-center border border-white/10 rounded-xl p-3">
+            <img src={link.imageUrl} alt={link.title} className="w-full sm:w-[88px] h-48 sm:h-[88px] object-contain bg-white rounded-xl shrink-0" />
+            <div className="flex flex-col gap-2 w-full min-w-0">
+              <p className="m-0 text-[#f9fafb] font-semibold leading-relaxed truncate">{link.title}</p>
+              <p className="m-0 text-[#cbd5e1] leading-relaxed text-sm truncate">{link.asin} · {link.marketplace} · {link.trackingTag}</p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full">
+                <input className="rounded-xl border border-white/10 bg-[#1f2937] text-[#f9fafb] px-4 py-2.5 w-full text-sm outline-none focus:ring-2 focus:ring-amber-500" value={link.bridgePageUrl} readOnly />
                 <button
-                  style={styles.button}
-                  onClick={() => navigator.clipboard.writeText(link.bridgePageUrl).catch(console.error)}
+                  className="shrink-0 border-none rounded-xl bg-amber-500 text-gray-900 font-bold px-5 py-2.5 cursor-pointer hover:bg-amber-400 transition-colors w-full sm:w-auto"
+                  type="button"
+                  onClick={() => void handleCopy(`${link.agentSlug}-${link.asin}`, link.bridgePageUrl)}
                 >
-                  Copy
+                  {copiedKey === `${link.agentSlug}-${link.asin}` ? "Copied" : "Copy"}
                 </button>
               </div>
             </div>
@@ -63,52 +77,3 @@ export default function PortalLinksPage() {
     </section>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  card: {
-    background: "#111827",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "1rem",
-    padding: "1.5rem",
-  },
-  title: { margin: "0 0 0.75rem", color: "#f9fafb", fontSize: "1.25rem", fontWeight: 700 },
-  copy: { margin: "0 0 0.5rem", color: "#cbd5e1", lineHeight: 1.6 },
-  error: {
-    color: "#fecaca",
-    margin: "0.75rem 0",
-    background: "rgba(239,68,68,0.12)",
-    border: "1px solid rgba(239,68,68,0.25)",
-    borderRadius: "0.75rem",
-    padding: "0.85rem 1rem",
-  },
-  list: { display: "grid", gap: "0.85rem", marginTop: "1rem" },
-  item: {
-    display: "grid",
-    gridTemplateColumns: "88px 1fr",
-    gap: "1rem",
-    alignItems: "center",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "0.85rem",
-    padding: "0.85rem",
-  },
-  image: { width: "88px", height: "88px", objectFit: "contain", background: "#fff", borderRadius: "0.75rem" },
-  content: { display: "grid", gap: "0.5rem" },
-  itemTitle: { margin: 0, color: "#f9fafb", fontWeight: 600, lineHeight: 1.5 },
-  actions: { display: "grid", gridTemplateColumns: "1fr auto", gap: "0.75rem" },
-  input: {
-    borderRadius: "0.75rem",
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#1f2937",
-    color: "#f9fafb",
-    padding: "0.85rem 1rem",
-  },
-  button: {
-    border: "none",
-    borderRadius: "0.75rem",
-    background: "#f59e0b",
-    color: "#111827",
-    fontWeight: 700,
-    padding: "0.9rem 1rem",
-    cursor: "pointer",
-  },
-};

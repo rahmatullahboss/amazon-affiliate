@@ -52,13 +52,6 @@ interface ImportFormState {
   csv_content: string;
 }
 
-const cardStyle: React.CSSProperties = {
-  background: "rgba(26, 26, 40, 0.9)",
-  border: "1px solid rgba(255, 255, 255, 0.06)",
-  borderRadius: "1rem",
-  padding: "1.5rem",
-};
-
 export default function AnalyticsPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [reports, setReports] = useState<ReportsResponse["reports"]>([]);
@@ -202,130 +195,84 @@ export default function AnalyticsPage() {
   ];
 
   if (loading) {
-    return <div style={{ color: "#a0a0b8", padding: "2rem" }}>Loading analytics...</div>;
+    return <div className="text-[#a0a0b8] p-8">Loading analytics...</div>;
   }
 
   return (
-    <div>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: "1rem",
-          marginBottom: "2rem",
-        }}
-      >
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 700,
-              color: "#f0f0f5",
-              marginBottom: "0.5rem",
-            }}
-          >
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] mb-2">
             Analytics
           </h1>
-          <p style={{ color: "#a0a0b8", fontSize: "0.9rem" }}>
+          <p className="text-[#a0a0b8] text-sm m-0">
             Traffic and imported Amazon conversion data in one place.
           </p>
         </div>
         <button
           onClick={() => void loadAnalytics(true)}
           disabled={refreshing}
-          style={{
-            padding: "0.75rem 1rem",
-            borderRadius: "0.75rem",
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.04)",
-            color: "#f0f0f5",
-            cursor: refreshing ? "not-allowed" : "pointer",
-            opacity: refreshing ? 0.7 : 1,
-          }}
+          className={`px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-[#f0f0f5] font-medium transition-colors hover:bg-white/10 ${refreshing ? "opacity-70 cursor-not-allowed" : "cursor-pointer"}`}
         >
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
 
-      {error ? (
-        <div style={{ ...cardStyle, marginBottom: "1.5rem", color: "#fca5a5" }}>
-          <p style={{ margin: 0, fontSize: "0.9rem" }}>{error}</p>
+      {error && (
+        <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-6 mb-6">
+          <p className="m-0 text-red-400 text-sm">{error}</p>
           <button
             onClick={() => void loadAnalytics()}
-            style={{
-              marginTop: "1rem",
-              padding: "0.625rem 0.9rem",
-              borderRadius: "0.75rem",
-              border: "none",
-              background: "#ff9900",
-              color: "#111",
-              fontWeight: 700,
-              cursor: "pointer",
-            }}
+            className="mt-4 px-4 py-2.5 rounded-xl border-none bg-[#ff9900] text-[#111] font-bold cursor-pointer hover:bg-[#ff9900]/90 transition-colors"
           >
             Retry
           </button>
         </div>
-      ) : null}
+      )}
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-          gap: "1rem",
-          marginBottom: "2rem",
-        }}
-      >
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} style={cardStyle}>
-            <div style={{ fontSize: "0.8rem", color: "#6b6b85", marginBottom: "0.75rem" }}>
+          <div key={stat.label} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6">
+            <div className="text-xs text-[#6b6b85] mb-3">
               {stat.label}
             </div>
-            <div style={{ fontSize: "1.65rem", fontWeight: 700, color: stat.color }}>
+            <div className="text-2xl font-bold break-words" style={{ color: stat.color }}>
               {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
             </div>
           </div>
         ))}
       </div>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.05fr 0.95fr",
-          gap: "1.5rem",
-          marginBottom: "1.5rem",
-        }}
-      >
-        <section style={cardStyle}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#f0f0f5", marginBottom: "1rem" }}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <section className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 overflow-hidden">
+          <h2 className="text-base font-bold text-[#f0f0f5] mb-4">
             Import Amazon report
           </h2>
-          <p style={{ color: "#8d8da6", fontSize: "0.85rem", marginBottom: "1rem", lineHeight: 1.6 }}>
-            Paste a CSV or TSV export with tracking IDs, ordered items, revenue,
+          <p className="text-[#8d8da6] text-sm mb-4 leading-relaxed">
+            Paste a CSV or TSV export with tags, ordered items, revenue,
             and commission columns. Supported headers include tracking id, ordered
             items, shipped items revenue, earnings, and ASIN.
           </p>
 
           <form onSubmit={handleImport}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
                 Marketplace
                 <select
                   value={form.marketplace}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, marketplace: event.target.value }))
                   }
-                  style={inputStyle}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-none"
                 >
                   {["US", "CA", "UK", "DE", "IT", "FR", "ES"].map((marketplace) => (
-                    <option key={marketplace} value={marketplace}>
+                    <option key={marketplace} value={marketplace} className="bg-[#1a1a28]">
                       {marketplace}
                     </option>
                   ))}
                 </select>
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+              <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
                 Source file name
                 <input
                   type="text"
@@ -337,14 +284,14 @@ export default function AnalyticsPage() {
                     }))
                   }
                   placeholder="tracking-summary-us.csv"
-                  style={inputStyle}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   required
                 />
               </label>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "0.75rem", marginBottom: "0.75rem" }}>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+              <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
                 Report type
                 <input
                   type="text"
@@ -352,10 +299,10 @@ export default function AnalyticsPage() {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, report_type: event.target.value }))
                   }
-                  style={inputStyle}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+              <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
                 Period start
                 <input
                   type="date"
@@ -363,10 +310,10 @@ export default function AnalyticsPage() {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, period_start: event.target.value }))
                   }
-                  style={inputStyle}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                 />
               </label>
-              <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+              <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
                 Period end
                 <input
                   type="date"
@@ -374,12 +321,12 @@ export default function AnalyticsPage() {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, period_end: event.target.value }))
                   }
-                  style={inputStyle}
+                  className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                 />
               </label>
             </div>
 
-            <label style={{ display: "flex", flexDirection: "column", gap: "0.35rem", color: "#a0a0b8", fontSize: "0.82rem" }}>
+            <label className="flex flex-col gap-1.5 text-[#a0a0b8] text-sm">
               CSV / TSV content
               <textarea
                 value={form.csv_content}
@@ -388,149 +335,115 @@ export default function AnalyticsPage() {
                 }
                 rows={12}
                 placeholder={"tracking_id,asin,ordered_items,shipped_items_revenue,earnings\nagent-us-01,B0EXAMPLE01,3,149.97,4.50"}
-                style={{ ...inputStyle, resize: "vertical", minHeight: "240px" }}
+                className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[#f0f0f5] placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-[#ff9900] resize-y min-h-[240px]"
                 required
               />
             </label>
 
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginTop: "1rem" }}>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mt-4">
               <button
                 type="submit"
                 disabled={importing}
-                style={{
-                  padding: "0.8rem 1rem",
-                  borderRadius: "0.75rem",
-                  border: "none",
-                  background: importing ? "rgba(255,153,0,0.5)" : "#ff9900",
-                  color: "#111",
-                  fontWeight: 700,
-                  cursor: importing ? "not-allowed" : "pointer",
-                }}
+                className={`px-4 py-3 rounded-xl border-none font-bold transition-colors ${importing ? "bg-[#ff9900]/50 text-[#111]/70 cursor-not-allowed" : "bg-[#ff9900] text-[#111] hover:bg-[#ff9900]/90 cursor-pointer"}`}
               >
                 {importing ? "Importing..." : "Import report"}
               </button>
-              {importMessage ? (
-                <p style={{ margin: 0, fontSize: "0.85rem", color: "#a0a0b8" }}>
+              {importMessage && (
+                <p className="m-0 text-sm text-[#a0a0b8]">
                   {importMessage}
                 </p>
-              ) : null}
+              )}
             </div>
           </form>
         </section>
 
-        <section style={cardStyle}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#f0f0f5", marginBottom: "1rem" }}>
+        <section className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6">
+          <h2 className="text-base font-bold text-[#f0f0f5] mb-4">
             Top agents by commission
           </h2>
-          {overview?.topAgentsByCommission.length ? (
-            overview.topAgentsByCommission.map((agent, index) => (
-              <div
-                key={`${agent.slug}-${index}`}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr auto",
-                  gap: "1rem",
-                  padding: "0.85rem 0",
-                  borderBottom:
-                    index < overview.topAgentsByCommission.length - 1
-                      ? "1px solid rgba(255,255,255,0.06)"
-                      : "none",
-                }}
-              >
-                <div>
-                  <div style={{ color: "#f0f0f5", fontWeight: 600, marginBottom: "0.35rem" }}>
-                    {agent.name}
+          <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
+            <div className="min-w-[300px]">
+              {overview?.topAgentsByCommission.length ? (
+                overview.topAgentsByCommission.map((agent, index) => (
+                  <div
+                    key={`${agent.slug}-${index}`}
+                    className={`grid grid-cols-[1fr_auto] gap-4 py-3 ${index < overview.topAgentsByCommission.length - 1 ? 'border-b border-white/5' : ''}`}
+                  >
+                    <div>
+                      <div className="text-[#f0f0f5] font-semibold mb-1">
+                        {agent.name}
+                      </div>
+                      <div className="text-[#8d8da6] text-xs sm:text-sm">
+                        {agent.orderedItems} ordered items · ${agent.revenueAmount.toFixed(2)} revenue
+                      </div>
+                    </div>
+                    <div className="text-[#a855f7] font-bold">
+                      ${agent.commissionAmount.toFixed(2)}
+                    </div>
                   </div>
-                  <div style={{ color: "#8d8da6", fontSize: "0.8rem" }}>
-                    {agent.orderedItems} ordered items · ${agent.revenueAmount.toFixed(2)} revenue
-                  </div>
+                ))
+              ) : (
+                <div className="text-[#8d8da6] text-sm">
+                  No imported commission data yet.
                 </div>
-                <div style={{ color: "#a855f7", fontWeight: 700 }}>
-                  ${agent.commissionAmount.toFixed(2)}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div style={{ color: "#8d8da6", fontSize: "0.85rem" }}>
-              No imported commission data yet.
+              )}
             </div>
-          )}
+          </div>
 
-          <h2
-            style={{
-              fontSize: "1rem",
-              fontWeight: 700,
-              color: "#f0f0f5",
-              marginTop: "2rem",
-              marginBottom: "1rem",
-            }}
-          >
+          <h2 className="text-base font-bold text-[#f0f0f5] mt-8 mb-4">
             Traffic leaders
           </h2>
           {overview?.topAgents.length ? (
-            overview.topAgents.map((agent, index) => (
-              <div
-                key={`${agent.slug}-${index}`}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: "1rem",
-                  padding: "0.75rem 0",
-                  borderBottom:
-                    index < overview.topAgents.length - 1
-                      ? "1px solid rgba(255,255,255,0.06)"
-                      : "none",
-                }}
-              >
-                <span style={{ color: "#a0a0b8", fontSize: "0.9rem" }}>{agent.name}</span>
-                <span style={{ color: "#ff9900", fontWeight: 700 }}>{agent.clicks}</span>
-              </div>
-            ))
+            <div className="space-y-1">
+              {overview.topAgents.map((agent, index) => (
+                <div
+                  key={`${agent.slug}-${index}`}
+                  className={`flex justify-between items-center gap-4 py-3 ${index < overview.topAgents.length - 1 ? 'border-b border-white/5' : ''}`}
+                >
+                  <span className="text-[#a0a0b8] text-sm truncate">{agent.name}</span>
+                  <span className="text-[#ff9900] font-bold">{agent.clicks}</span>
+                </div>
+              ))}
+            </div>
           ) : (
-            <div style={{ color: "#8d8da6", fontSize: "0.85rem" }}>No click data yet.</div>
+            <div className="text-[#8d8da6] text-sm">No click data yet.</div>
           )}
         </section>
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-        <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#f0f0f5", marginBottom: "1rem" }}>
+      <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6">
+        <h2 className="text-base font-bold text-[#f0f0f5] mb-4">
           Recent imported reports
         </h2>
         {reports.length ? (
-          <div style={{ display: "grid", gap: "0.75rem" }}>
-            {reports.map((report) => (
-              <div
-                key={report.id}
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "120px 1fr auto",
-                  gap: "1rem",
-                  alignItems: "center",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  borderRadius: "0.9rem",
-                  padding: "0.9rem 1rem",
-                }}
-              >
-                <div>
-                  <div style={{ color: "#f0f0f5", fontWeight: 700 }}>{report.marketplace}</div>
-                  <div style={{ color: "#8d8da6", fontSize: "0.75rem" }}>{report.report_type}</div>
-                </div>
-                <div>
-                  <div style={{ color: "#d4d4e4", fontSize: "0.9rem", marginBottom: "0.25rem" }}>
-                    {report.source_file_name}
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+            <div className="grid gap-3 min-w-[600px] mb-2">
+              {reports.map((report) => (
+                <div
+                  key={report.id}
+                  className="grid grid-cols-[100px_1fr_auto] gap-4 items-center border border-white/10 rounded-xl p-4 transition-colors hover:bg-white/5"
+                >
+                  <div>
+                    <div className="text-[#f0f0f5] font-bold">{report.marketplace}</div>
+                    <div className="text-[#8d8da6] text-xs">{report.report_type}</div>
                   </div>
-                  <div style={{ color: "#8d8da6", fontSize: "0.78rem" }}>
-                    {report.imported_by_username || "Unknown"} · {new Date(report.imported_at).toLocaleString()}
+                  <div>
+                    <div className="text-[#d4d4e4] text-sm mb-1">
+                      {report.source_file_name}
+                    </div>
+                    <div className="text-[#8d8da6] text-xs">
+                      {report.imported_by_username || "Unknown"} · {new Date(report.imported_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <div className="text-[#22c55e] font-bold text-sm">
+                    {report.conversions_count} rows
                   </div>
                 </div>
-                <div style={{ color: "#22c55e", fontWeight: 700 }}>
-                  {report.conversions_count} rows
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
-          <div style={{ color: "#8d8da6", fontSize: "0.85rem" }}>
+          <div className="text-[#8d8da6] text-sm">
             No reports imported yet.
           </div>
         )}
@@ -538,11 +451,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
-const inputStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,0.04)",
-  border: "1px solid rgba(255,255,255,0.08)",
-  borderRadius: "0.75rem",
-  padding: "0.85rem 0.95rem",
-  color: "#f0f0f5",
-};

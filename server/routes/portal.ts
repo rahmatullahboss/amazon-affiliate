@@ -2,9 +2,10 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { portalAsinSubmissionSchema, portalTrackingSetupSchema } from '../schemas';
+import { portalAsinSubmissionSchema, portalTrackingReplaceDeleteSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import { ensureProductRecord, extractAsinFromInput } from '../services/product-ingestion';
+import { getPublicAppOrigin } from '../utils/url';
 
 const portal = new Hono<AppEnv>();
 
@@ -47,6 +48,7 @@ portal.get('/products', async (c) => {
 
   const bindings = role === 'agent' ? [agentId] : [];
   const whereClause = role === 'agent' ? 'WHERE ap.agent_id = ?' : '';
+  const origin = getPublicAppOrigin(c.req.url, c.env);
 
   const { results } = await c.env.DB.prepare(
     `SELECT ap.id, ap.custom_title, ap.created_at, ap.updated_at,
@@ -63,7 +65,13 @@ portal.get('/products', async (c) => {
     .bind(...bindings)
     .all();
 
-  return c.json({ products: results ?? [] });
+  return c.json({
+    products: (results ?? []).map((product) => ({
+      ...product,
+      bridge_page_url: `${origin}/${product.agent_slug}/${product.asin}`,
+      redirect_url: `${origin}/go/${product.agent_slug}/${product.asin}`,
+    })),
+  });
 });
 
 portal.get('/links', async (c) => {
@@ -76,7 +84,7 @@ portal.get('/links', async (c) => {
 
   const bindings = role === 'agent' ? [agentId] : [];
   const whereClause = role === 'agent' ? 'WHERE ap.agent_id = ?' : '';
-  const origin = new URL(c.req.url).origin;
+  const origin = getPublicAppOrigin(c.req.url, c.env);
 
   const { results } = await c.env.DB.prepare(
     `SELECT a.slug as agent_slug, a.name as agent_name,
@@ -184,11 +192,16 @@ portal.get('/tracking', async (c) => {
   const agentId = c.get('agentId');
 
   if (role !== 'agent' || !agentId) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' });
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
   const { results } = await c.env.DB.prepare(
-    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+    `SELECT id, tag, label, marketplace, is_default, is_active, created_at,
+            (
+              SELECT COUNT(*)
+              FROM agent_products ap
+              WHERE ap.tracking_id = tracking_ids.id
+            ) as usage_count
      FROM tracking_ids
      WHERE agent_id = ?
      ORDER BY marketplace ASC, is_default DESC, created_at ASC`
@@ -202,6 +215,7 @@ portal.get('/tracking', async (c) => {
       is_default: number;
       is_active: number;
       created_at: string;
+      usage_count: number;
     }>();
 
   return c.json({ trackingIds: results ?? [] });
@@ -212,56 +226,202 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
   const agentId = c.get('agentId');
 
   if (role !== 'agent' || !agentId) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' });
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
   const body = c.req.valid('json');
 
-  const existing = await c.env.DB.prepare(
-    `SELECT id
-     FROM tracking_ids
-     WHERE agent_id = ? AND marketplace = ?
-     ORDER BY is_default DESC, created_at ASC
-     LIMIT 1`
-  )
-    .bind(agentId, body.marketplace)
-    .first<{ id: number }>();
-
-  await c.env.DB.prepare(
-    'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
-  )
-    .bind(agentId, body.marketplace)
-    .run();
-
-  if (existing) {
-    await c.env.DB.prepare(
-      `UPDATE tracking_ids
-       SET tag = ?, label = ?, is_default = 1, is_active = 1
-       WHERE id = ?`
+  try {
+    const existing = await c.env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE agent_id = ? AND marketplace = ?
+       ORDER BY is_default DESC, created_at ASC
+       LIMIT 1`
     )
-      .bind(body.tag, body.label || null, existing.id)
-      .run();
-  } else {
+      .bind(agentId, body.marketplace)
+      .first<{ id: number }>();
+
     await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
-       VALUES (?, ?, ?, ?, 1, 1)`
+      'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
     )
-      .bind(agentId, body.tag, body.label || null, body.marketplace)
+      .bind(agentId, body.marketplace)
       .run();
+
+    if (existing) {
+      await c.env.DB.prepare(
+        `UPDATE tracking_ids
+         SET tag = ?, label = ?, is_default = 1, is_active = 1
+         WHERE id = ?`
+      )
+        .bind(body.tag, body.label || null, existing.id)
+        .run();
+    } else {
+      await c.env.DB.prepare(
+        `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
+         VALUES (?, ?, ?, ?, 1, 1)`
+      )
+        .bind(agentId, body.tag, body.label || null, body.marketplace)
+        .run();
+    }
+
+    const trackingId = await c.env.DB.prepare(
+      `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+       FROM tracking_ids
+       WHERE agent_id = ? AND marketplace = ?
+       ORDER BY is_default DESC, created_at ASC
+       LIMIT 1`
+    )
+      .bind(agentId, body.marketplace)
+      .first();
+
+    return c.json({ trackingId, message: 'Tag saved successfully' }, existing ? 200 : 201);
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'This tag is already being used. Save the correct full tag for this agent.' });
+    }
+
+    throw error;
+  }
+});
+
+portal.delete('/tracking/:id', async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+  const id = Number.parseInt(c.req.param('id'), 10);
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
-  const trackingId = await c.env.DB.prepare(
-    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
-     FROM tracking_ids
-     WHERE agent_id = ? AND marketplace = ?
-     ORDER BY is_default DESC, created_at ASC
-     LIMIT 1`
-  )
-    .bind(agentId, body.marketplace)
-    .first();
+  if (Number.isNaN(id)) {
+    throw new HTTPException(400, { message: 'Invalid tag ID' });
+  }
 
-  return c.json({ trackingId, message: 'Tracking ID saved successfully' }, existing ? 200 : 201);
+  const current = await c.env.DB.prepare(
+    `SELECT id
+     FROM tracking_ids
+     WHERE id = ? AND agent_id = ?`
+  )
+    .bind(id, agentId)
+    .first<{ id: number }>();
+
+  if (!current) {
+    throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  const usage = await c.env.DB.prepare(
+    'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ?'
+  )
+    .bind(id)
+    .first<{ count: number }>();
+
+  const cascade = c.req.query('cascade') === '1';
+  const usageCount = usage?.count ?? 0;
+
+  if (usageCount > 0 && !cascade) {
+    throw new HTTPException(409, {
+      message: 'This tag is already linked to products. Replace it or delete it with its linked products.',
+    });
+  }
+
+  if (usageCount > 0 && cascade) {
+    await c.env.DB.prepare('DELETE FROM agent_products WHERE tracking_id = ?').bind(id).run();
+  }
+
+  await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
+
+  return c.json({
+    message:
+      usageCount > 0 && cascade
+        ? `Tag deleted successfully. Removed ${usageCount} linked product mapping${usageCount > 1 ? 's' : ''}.`
+        : 'Tag deleted successfully',
+  });
 });
+
+portal.post(
+  '/tracking/:id/replace-delete',
+  zValidator('json', portalTrackingReplaceDeleteSchema),
+  async (c) => {
+    const role = c.get('userRole');
+    const agentId = c.get('agentId');
+    const id = Number.parseInt(c.req.param('id'), 10);
+
+    if (role !== 'agent' || !agentId) {
+      throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
+    }
+
+    if (Number.isNaN(id)) {
+      throw new HTTPException(400, { message: 'Invalid tag ID' });
+    }
+
+    const body = c.req.valid('json');
+
+    const current = await c.env.DB.prepare(
+      `SELECT id, marketplace, is_default
+       FROM tracking_ids
+       WHERE id = ? AND agent_id = ?`
+    )
+      .bind(id, agentId)
+      .first<{ id: number; marketplace: string; is_default: number }>();
+
+    if (!current) {
+      throw new HTTPException(404, { message: 'Tag not found' });
+    }
+
+    const replacement = await c.env.DB.prepare(
+      `SELECT id, marketplace
+       FROM tracking_ids
+       WHERE id = ? AND agent_id = ? AND is_active = 1`
+    )
+      .bind(body.replacement_tracking_id, agentId)
+      .first<{ id: number; marketplace: string }>();
+
+    if (!replacement || replacement.id === current.id) {
+      throw new HTTPException(400, { message: 'Select another active tag to replace this one.' });
+    }
+
+    if (replacement.marketplace !== current.marketplace) {
+      throw new HTTPException(400, {
+        message: `Replacement tag must be from the same marketplace (${current.marketplace}).`,
+      });
+    }
+
+    const usage = await c.env.DB.prepare(
+      'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ?'
+    )
+      .bind(current.id)
+      .first<{ count: number }>();
+
+    const usageCount = usage?.count ?? 0;
+
+    await c.env.DB.prepare(
+      `UPDATE agent_products
+       SET tracking_id = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE tracking_id = ? AND agent_id = ?`
+    )
+      .bind(replacement.id, current.id, agentId)
+      .run();
+
+    if (current.is_default) {
+      await c.env.DB.prepare(
+        'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
+      )
+        .bind(agentId, current.marketplace)
+        .run();
+
+      await c.env.DB.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ?')
+        .bind(replacement.id)
+        .run();
+    }
+
+    await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(current.id).run();
+
+    return c.json({
+      message: `Tag replaced and deleted successfully. Moved ${usageCount} linked product mapping${usageCount > 1 ? 's' : ''}.`,
+    });
+  }
+);
 
 portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
   const role = c.get('userRole');
@@ -301,7 +461,7 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
 
   if (!trackingId) {
     throw new HTTPException(409, {
-      message: `No active tracking ID found for marketplace ${marketplace}. Create one first.`,
+      message: `No active tag found for marketplace ${marketplace}. Create one first.`,
     });
   }
 
@@ -347,15 +507,9 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
   }
 
   if (product.status === 'rejected') {
-    await c.env.DB.prepare(
-      `UPDATE products
-       SET status = 'active', updated_at = CURRENT_TIMESTAMP
-       WHERE id = ?`
-    )
-      .bind(product.id)
-      .run();
-
-    product.status = 'active';
+    throw new HTTPException(409, {
+      message: 'This product is currently blocked and must be reviewed by admin before it can be used again.',
+    });
   }
 
   await c.env.DB.prepare(
@@ -374,12 +528,13 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
   const cache = new CacheService(c.env.KV);
   c.executionCtx.waitUntil(cache.deletePageData(agent.slug, resolvedAsin));
   c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, resolvedAsin));
+  const origin = getPublicAppOrigin(c.req.url, c.env);
 
   return c.json(
     {
       message: 'Product link is ready.',
-      link: `/${agent.slug}/${resolvedAsin}`,
-      redirectLink: `/go/${agent.slug}/${resolvedAsin}`,
+      link: `${origin}/${agent.slug}/${resolvedAsin}`,
+      redirectLink: `${origin}/go/${agent.slug}/${resolvedAsin}`,
       status: product.status,
       product: {
         asin: resolvedAsin,

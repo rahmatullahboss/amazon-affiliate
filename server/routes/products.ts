@@ -4,7 +4,11 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createProductSchema, fetchAsinSchema, bulkAsinImportSchema, updateProductSchema } from '../schemas';
 import { CacheService } from '../services/cache';
-import { ensureProductRecord, fetchAmazonProductData } from '../services/product-ingestion';
+import {
+  ensureProductRecord,
+  fetchAmazonProductData,
+  refreshProductRecord,
+} from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
 
 const products = new Hono<AppEnv>();
@@ -13,14 +17,76 @@ const products = new Hono<AppEnv>();
  * GET /api/products — List all products
  */
 products.get('/', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.*,
-       (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id AND is_active = 1) as agent_count,
-       (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
-     FROM products p ORDER BY p.created_at DESC`
-  ).all();
+  const requestedPage = Number.parseInt(c.req.query('page') ?? '1', 10);
+  const requestedPageSize = Number.parseInt(c.req.query('pageSize') ?? '12', 10);
+  const page = Number.isNaN(requestedPage) ? 1 : Math.max(1, requestedPage);
+  const pageSize = Number.isNaN(requestedPageSize)
+    ? 12
+    : Math.min(48, Math.max(8, requestedPageSize));
 
-  return c.json({ products: results });
+  const totalResult = await c.env.DB.prepare('SELECT COUNT(*) as count FROM products')
+    .first<{ count: number | string }>();
+
+  const totalItems =
+    typeof totalResult?.count === 'string'
+      ? Number.parseInt(totalResult.count, 10) || 0
+      : totalResult?.count ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const normalizedPage = Math.min(page, totalPages);
+  const offset = (normalizedPage - 1) * pageSize;
+
+  const [productsResult, summaryResult] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT p.*,
+         (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id AND is_active = 1) as agent_count,
+         (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
+       FROM products p
+       ORDER BY p.created_at DESC
+       LIMIT ? OFFSET ?`
+    )
+      .bind(pageSize, offset)
+      .all(),
+    c.env.DB.prepare(
+      `SELECT
+         COUNT(*) as total_products,
+         SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_products,
+         SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END) as pending_review_products,
+         SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_products,
+         SUM(
+           CASE
+             WHEN title LIKE '%Amazon Product B0%'
+               OR title LIKE 'Product B0%'
+               OR image_url LIKE '%images-na.ssl-images-amazon.com%'
+             THEN 1
+             ELSE 0
+           END
+         ) as needs_refresh_products
+       FROM products`
+    ).first<{
+      total_products: number;
+      active_products: number;
+      pending_review_products: number;
+      rejected_products: number;
+      needs_refresh_products: number;
+    }>(),
+  ]);
+
+  return c.json({
+    products: productsResult.results,
+    summary: {
+      totalProducts: summaryResult?.total_products ?? 0,
+      activeProducts: summaryResult?.active_products ?? 0,
+      pendingReviewProducts: summaryResult?.pending_review_products ?? 0,
+      rejectedProducts: summaryResult?.rejected_products ?? 0,
+      needsRefreshProducts: summaryResult?.needs_refresh_products ?? 0,
+    },
+    pagination: {
+      page: normalizedPage,
+      pageSize,
+      totalItems,
+      totalPages,
+    },
+  });
 });
 
 /**
@@ -236,6 +302,86 @@ products.get('/export', async (c) => {
       'Content-Disposition': 'attachment; filename="dealsrky-products.csv"',
     },
   });
+});
+
+products.post('/:id/refresh', async (c) => {
+  const id = Number.parseInt(c.req.param('id'), 10);
+  if (Number.isNaN(id)) {
+    throw new HTTPException(400, { message: 'Invalid product ID' });
+  }
+
+  const apiKey = c.env.AMAZON_API_KEY;
+  if (!apiKey) {
+    throw new HTTPException(503, {
+      message: 'AMAZON_API_KEY not configured. Product refresh is unavailable.',
+    });
+  }
+
+  const product = await c.env.DB
+    .prepare(
+      `SELECT id, asin, marketplace, status
+       FROM products
+       WHERE id = ?`
+    )
+    .bind(id)
+    .first<{ id: number; asin: string; marketplace: string; status: string }>();
+
+  if (!product) {
+    throw new HTTPException(404, { message: 'Product not found' });
+  }
+
+  try {
+    const refreshed = await refreshProductRecord({
+      db: c.env.DB,
+      apiKey,
+      asin: product.asin,
+      marketplace: product.marketplace,
+      status: product.status || 'active',
+    });
+
+    const relatedAgents = await c.env.DB.prepare(
+      `SELECT a.slug
+       FROM agent_products ap
+       JOIN agents a ON a.id = ap.agent_id
+       WHERE ap.product_id = ?`
+    )
+      .bind(id)
+      .all<{ slug: string }>();
+
+    const cache = new CacheService(c.env.KV);
+    c.executionCtx.waitUntil(cache.invalidateForProduct(product.asin));
+    c.executionCtx.waitUntil(
+      Promise.all(
+        (relatedAgents.results ?? []).flatMap((agent) => [
+          cache.deletePageData(agent.slug, product.asin),
+          cache.deleteRedirectUrl(agent.slug, product.asin),
+        ])
+      )
+    );
+
+    c.executionCtx.waitUntil(
+      writeAuditLog(c.env.DB, {
+        userId: c.get('userId'),
+        action: 'product.refreshed',
+        entityType: 'product',
+        entityId: id,
+        details: {
+          asin: product.asin,
+          marketplace: product.marketplace,
+        },
+      })
+    );
+
+    return c.json({
+      product: refreshed,
+      message: 'Product refreshed successfully',
+    });
+  } catch (error) {
+    console.error('[Products] Refresh error:', error);
+    throw new HTTPException(502, {
+      message: 'Could not refresh live product data right now. Please retry later.',
+    });
+  }
 });
 
 /**

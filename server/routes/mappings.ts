@@ -4,6 +4,7 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createMappingSchema, bulkMappingSchema } from '../schemas';
 import { CacheService } from '../services/cache';
+import { getPublicAppOrigin } from '../utils/url';
 
 const mappings = new Hono<AppEnv>();
 
@@ -43,7 +44,7 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
 
   if (!agent) throw new HTTPException(404, { message: 'Agent not found or inactive' });
   if (!product) throw new HTTPException(404, { message: 'Product not found or inactive' });
-  if (!trackingId) throw new HTTPException(404, { message: 'Tracking ID not found or not owned by agent' });
+  if (!trackingId) throw new HTTPException(404, { message: 'Tag not found or not owned by agent' });
 
   try {
     await c.env.DB.prepare(
@@ -170,7 +171,7 @@ mappings.get('/links/:agentSlug', async (c) => {
     .bind(agentSlug)
     .all<{ asin: string; title: string; image_url: string; tag: string; marketplace: string; custom_title: string | null }>();
 
-  const host = new URL(c.req.url).origin;
+  const host = getPublicAppOrigin(c.req.url, c.env);
   const links = (results || []).map((r) => ({
     asin: r.asin,
     title: r.custom_title || r.title,

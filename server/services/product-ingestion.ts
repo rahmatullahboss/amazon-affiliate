@@ -16,6 +16,9 @@ interface ProductRecord {
   marketplace: string;
   category: string | null;
   status?: string;
+  description?: string | null;
+  features?: string | null;
+  review_content?: string | null;
   product_images?: string | null;
   aplus_images?: string | null;
 }
@@ -82,6 +85,45 @@ export function buildFallbackImageUrl(asin: string): string {
   return `https://images-na.ssl-images-amazon.com/images/I/${asin}._AC_SL1500_.jpg`;
 }
 
+function buildEditorialReviewContent(input: {
+  title: string;
+  category: string | null;
+  description: string | null;
+  features: string[];
+}): string | null {
+  const lines: string[] = [];
+  const cleanDescription = input.description?.trim() || "";
+  const primaryFeatures = input.features
+    .map((feature) => feature.trim())
+    .filter((feature) => feature.length > 0)
+    .slice(0, 4);
+
+  if (cleanDescription) {
+    lines.push(cleanDescription);
+  } else if (primaryFeatures.length > 0) {
+    lines.push(
+      `${input.title} is positioned as a practical ${input.category?.toLowerCase() || "Amazon"} pick with a focus on the features highlighted below.`
+    );
+  }
+
+  if (primaryFeatures.length > 0) {
+    lines.push("What stands out:");
+    for (const feature of primaryFeatures) {
+      lines.push(`• ${feature}`);
+    }
+  }
+
+  if (lines.length === 0) {
+    return null;
+  }
+
+  lines.push(
+    "Check Amazon for the latest pricing, delivery details, and customer review context before ordering."
+  );
+
+  return lines.join("\n");
+}
+
 export async function fetchAmazonProductData(
   apiKey: string,
   asin: string,
@@ -135,7 +177,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
   let product = await input.db
     .prepare(
-      `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
        FROM products
        WHERE asin = ? AND marketplace = ?`
     )
@@ -164,9 +206,18 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
     const imageUrl = explicitImageUrl || fetched?.imageUrl || buildFallbackImageUrl(asin);
     const category = explicitCategory ?? fetched?.category ?? null;
     const description = explicitDescription ?? fetched?.description ?? null;
-    const features = explicitFeatures ?? (fetched?.features.length ? JSON.stringify(fetched.features) : null);
+    const resolvedFeatures =
+      input.features?.length ? input.features : fetched?.features?.length ? fetched.features : [];
+    const features =
+      explicitFeatures ?? (resolvedFeatures.length ? JSON.stringify(resolvedFeatures) : null);
     const productImages = explicitProductImages ?? (fetched?.productImages?.length ? JSON.stringify(fetched.productImages) : null);
     const aplusImages = explicitAplusImages ?? (fetched?.aplusImages?.length ? JSON.stringify(fetched.aplusImages) : null);
+    const reviewContent = buildEditorialReviewContent({
+      title,
+      category,
+      description,
+      features: resolvedFeatures,
+    });
 
     await input.db
       .prepare(
@@ -178,11 +229,12 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
            category,
            description,
            features,
+           review_content,
            product_images,
            aplus_images,
            status,
            fetched_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         asin,
@@ -192,6 +244,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
         category,
         description,
         features,
+        reviewContent,
         productImages,
         aplusImages,
         status,
@@ -201,7 +254,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
     product = await input.db
       .prepare(
-        `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
+        `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
          FROM products
          WHERE asin = ? AND marketplace = ?`
       )
@@ -231,6 +284,39 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       updates.push("features = ?");
       values.push(explicitFeatures);
     }
+    if (
+      input.description !== undefined ||
+      input.features !== undefined ||
+      input.title !== undefined ||
+      input.category !== undefined
+    ) {
+      const resolvedReviewContent = buildEditorialReviewContent({
+        title: explicitTitle || product.title,
+        category:
+          input.category !== undefined
+            ? explicitCategory
+            : product.category ?? null,
+        description:
+          input.description !== undefined
+            ? explicitDescription
+            : product.description ?? null,
+        features:
+          input.features !== undefined
+            ? input.features ?? []
+            : (() => {
+                try {
+                  const parsed = JSON.parse(product.features || "[]") as unknown;
+                  return Array.isArray(parsed)
+                    ? parsed.filter((item): item is string => typeof item === "string")
+                    : [];
+                } catch {
+                  return [];
+                }
+              })(),
+      });
+      updates.push("review_content = ?");
+      values.push(resolvedReviewContent);
+    }
     if (input.productImages !== undefined) {
       updates.push("product_images = ?");
       values.push(explicitProductImages);
@@ -253,7 +339,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
       product = await input.db
         .prepare(
-          `SELECT id, asin, title, image_url, marketplace, category, status, product_images, aplus_images
+          `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
            FROM products
            WHERE id = ?`
         )
@@ -267,6 +353,37 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
   }
 
   return product;
+}
+
+export async function refreshProductRecord(input: {
+  db: D1Database;
+  apiKey: string;
+  asin: string;
+  marketplace: string;
+  status?: string;
+}): Promise<ProductRecord> {
+  const fetched = await fetchAmazonProductData(input.apiKey, input.asin, input.marketplace);
+
+  if (!fetched) {
+    throw new Error("Fresh product data could not be fetched for this ASIN.");
+  }
+
+  return ensureProductRecord({
+    db: input.db,
+    asin: input.asin,
+    marketplace: input.marketplace,
+    apiKey: input.apiKey,
+    title: fetched.title,
+    imageUrl: fetched.imageUrl,
+    category: fetched.category,
+    description: fetched.description,
+    features: fetched.features,
+    productImages: fetched.productImages,
+    aplusImages: fetched.aplusImages,
+    status: input.status || "active",
+    updateExistingFromInput: true,
+    requireRealProductData: true,
+  });
 }
 
 export function parseSheetProductRow(

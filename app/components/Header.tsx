@@ -11,35 +11,10 @@ const navLinks = [
 
 export function Header() {
   const location = useLocation();
-  const [isBannerOpen, setIsBannerOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 shadow-sm backdrop-blur">
-      {/* Dismissible Top Banner */}
-      {isBannerOpen && (
-        <div className="relative border-b border-gray-100 bg-[#f3f7f7] py-2">
-          <div className="mx-auto max-w-7xl px-4 text-center text-[11px] font-medium text-gray-600 sm:text-xs lg:px-6">
-            <p className="pr-6 sm:pr-0">
-              Curated Amazon affiliate storefront with transparent product pages and
-              direct Amazon checkout.{" "}
-              <Link to="/disclosure" className="font-semibold text-primary hover:underline">
-                Affiliate disclosure
-              </Link>
-            </p>
-            <button
-              onClick={() => setIsBannerOpen(false)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-900 sm:right-4"
-              aria-label="Dismiss banner"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="mx-auto max-w-7xl px-4 py-3 lg:px-6 lg:py-4">
         {/* Main Desktop & Top Mobile Row */}
         <div className="flex items-center justify-between gap-4">

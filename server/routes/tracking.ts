@@ -7,7 +7,7 @@ import { createTrackingIdSchema } from '../schemas';
 const tracking = new Hono<AppEnv>();
 
 /**
- * GET /api/tracking — List all tracking IDs with agent info
+ * GET /api/tracking — List all tags with agent info
  */
 tracking.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -21,7 +21,7 @@ tracking.get('/', async (c) => {
 });
 
 /**
- * POST /api/tracking — Create a new tracking ID
+ * POST /api/tracking — Create a new tag
  */
 tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
   const data = c.req.valid('json');
@@ -53,7 +53,7 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
       .bind(data.tag)
       .first();
 
-    return c.json({ trackingId, message: 'Tracking ID created' }, 201);
+    return c.json({ trackingId, message: 'Tag created' }, 201);
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new HTTPException(409, { message: 'Tracking tag already exists' });
@@ -63,18 +63,18 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
 });
 
 /**
- * PUT /api/tracking/:id — Update tracking ID
+ * PUT /api/tracking/:id — Update tag
  */
 tracking.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
-  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tracking ID' });
+  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
   const body = await c.req.json<{ label?: string; is_default?: boolean; is_active?: boolean }>();
 
   const current = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?')
     .bind(id)
     .first<{ id: number; agent_id: number; marketplace: string }>();
-  if (!current) throw new HTTPException(404, { message: 'Tracking ID not found' });
+  if (!current) throw new HTTPException(404, { message: 'Tag not found' });
 
   if (body.is_default) {
     await c.env.DB.prepare(
@@ -99,15 +99,15 @@ tracking.put('/:id', async (c) => {
   }
 
   const updated = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?').bind(id).first();
-  return c.json({ trackingId: updated, message: 'Tracking ID updated' });
+  return c.json({ trackingId: updated, message: 'Tag updated' });
 });
 
 /**
- * DELETE /api/tracking/:id — Delete tracking ID
+ * DELETE /api/tracking/:id — Delete tag
  */
 tracking.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
-  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tracking ID' });
+  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
   // Check if in use
   const usage = await c.env.DB.prepare(
@@ -118,12 +118,12 @@ tracking.delete('/:id', async (c) => {
 
   if (usage && usage.count > 0) {
     throw new HTTPException(409, {
-      message: `Cannot delete: tracking ID is used in ${usage.count} mapping(s). Remove mappings first.`,
+      message: `Cannot delete: tag is used in ${usage.count} mapping(s). Remove mappings first.`,
     });
   }
 
   await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
-  return c.json({ message: 'Tracking ID deleted' });
+  return c.json({ message: 'Tag deleted' });
 });
 
 export default tracking;

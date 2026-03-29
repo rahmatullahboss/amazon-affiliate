@@ -1,8 +1,17 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import type { Route } from "./+types/register";
+import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 
-export default function PortalRegisterPage() {
+export async function loader({ context }: Route.LoaderArgs) {
+  const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string };
+  return {
+    googleClientId: env.GOOGLE_CLIENT_ID || "",
+  };
+}
+
+export default function PortalRegisterPage({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const [form, setForm] = useState({
     agent_name: "",
@@ -14,6 +23,7 @@ export default function PortalRegisterPage() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { googleClientId } = loaderData;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -51,15 +61,82 @@ export default function PortalRegisterPage() {
     }
   };
 
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential }),
+        });
+
+        const data = (await response.json()) as {
+          token?: string;
+          user?: { id: number; username: string; role: string; agentId: number | null };
+          requiresCompletion?: boolean;
+          signupToken?: string;
+          profile?: { email?: string; name?: string | null };
+          error?: unknown;
+          message?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(extractApiErrorMessage(data, "Google sign-up failed"));
+        }
+
+        if (data.requiresCompletion && data.signupToken) {
+          const params = new URLSearchParams({
+            token: data.signupToken,
+            email: data.profile?.email || "",
+            name: data.profile?.name || "",
+          });
+          navigate(`/portal/complete-signup?${params.toString()}`);
+          return;
+        }
+
+        if (data.token && data.user) {
+          localStorage.setItem("auth_token", data.token);
+          localStorage.setItem("auth_user", JSON.stringify(data.user));
+          navigate("/portal");
+          return;
+        }
+
+        throw new Error("Google sign-up failed");
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Google sign-up failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate]
+  );
+
   return (
     <main style={styles.page}>
       <form onSubmit={handleSubmit} style={styles.card}>
         <h1 style={styles.title}>Create Agent Account</h1>
         <p style={styles.subtitle}>
-          Create your portal account first. Then add your Amazon tracking ID and start generating links.
+          Create your portal account first. Then add your Amazon tag and start generating links.
         </p>
 
         {error ? <p style={styles.error}>{error}</p> : null}
+
+        <GoogleSignInButton
+          clientId={googleClientId}
+          text="signup_with"
+          onCredential={(credential) => {
+            void handleGoogleCredential(credential);
+          }}
+        />
+
+        <div style={styles.dividerWrap}>
+          <span style={styles.divider} />
+          <span style={styles.dividerText}>or</span>
+          <span style={styles.divider} />
+        </div>
 
         <label style={styles.label}>
           Agent name
@@ -182,6 +259,9 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: "0.75rem",
     padding: "0.8rem 1rem",
   },
+  dividerWrap: { display: "flex", alignItems: "center", gap: "0.75rem" },
+  divider: { flex: 1, height: "1px", background: "rgba(255,255,255,0.1)" },
+  dividerText: { color: "#6b7280", fontSize: "0.8rem", textTransform: "uppercase" },
   switchText: { margin: 0, color: "#cbd5e1", fontSize: "0.9rem" },
   link: { color: "#fbbf24", textDecoration: "none", fontWeight: 600 },
 };

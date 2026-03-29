@@ -13,6 +13,21 @@ interface Product {
   total_clicks: number;
 }
 
+interface ProductPagination {
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+}
+
+interface ProductSummary {
+  totalProducts: number;
+  activeProducts: number;
+  pendingReviewProducts: number;
+  rejectedProducts: number;
+  needsRefreshProducts: number;
+}
+
 interface ImportResult {
   asin: string;
   status: "created" | "exists" | "error";
@@ -48,6 +63,12 @@ interface SheetConfigResponse {
   logs: SheetSyncLog[];
 }
 
+interface ProductsResponse {
+  products: Product[];
+  summary: ProductSummary;
+  pagination: ProductPagination;
+}
+
 interface SyncSummary {
   totalRows: number;
   createdCount: number;
@@ -57,9 +78,23 @@ interface SyncSummary {
 
 const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
 const getToken = () => localStorage.getItem("auth_token") || "";
+const PRODUCT_PAGE_SIZE = 12;
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [productSummary, setProductSummary] = useState<ProductSummary>({
+    totalProducts: 0,
+    activeProducts: 0,
+    pendingReviewProducts: 0,
+    rejectedProducts: 0,
+    needsRefreshProducts: 0,
+  });
+  const [productPagination, setProductPagination] = useState<ProductPagination>({
+    page: 1,
+    pageSize: PRODUCT_PAGE_SIZE,
+    totalItems: 0,
+    totalPages: 1,
+  });
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [mode, setMode] = useState<"asin" | "manual" | "bulk">("bulk");
@@ -72,6 +107,7 @@ export default function ProductsPage() {
   });
   const [error, setError] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [refreshingProductId, setRefreshingProductId] = useState<number | null>(null);
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -97,17 +133,24 @@ export default function ProductsPage() {
   const [sheetMessage, setSheetMessage] = useState("");
 
   useEffect(() => {
-    void Promise.all([fetchProducts(), fetchSheetConfig()]);
+    void Promise.all([fetchProducts(1), fetchSheetConfig()]);
   }, []);
 
-  async function fetchProducts() {
+  async function fetchProducts(page = productPagination.page) {
+    setLoading(true);
     try {
-      const response = await fetch("/api/products", {
+      const query = new URLSearchParams({
+        page: String(page),
+        pageSize: String(PRODUCT_PAGE_SIZE),
+      });
+      const response = await fetch(`/api/products?${query.toString()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
       if (response.ok) {
-        const data = (await response.json()) as { products: Product[] };
+        const data = (await response.json()) as ProductsResponse;
         setProducts(data.products);
+        setProductSummary(data.summary);
+        setProductPagination(data.pagination);
       }
     } catch (requestError) {
       console.error(requestError);
@@ -164,11 +207,39 @@ export default function ProductsPage() {
 
       setShowForm(false);
       setForm({ asin: "", title: "", image_url: "", marketplace: "US", category: "" });
-      await fetchProducts();
+      await fetchProducts(1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to fetch ASIN");
     } finally {
       setFetching(false);
+    }
+  }
+
+  async function handleProductRefresh(productId: number) {
+    setRefreshingProductId(productId);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/products/${productId}/refresh`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "Failed to refresh product");
+      }
+
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to refresh product"
+      );
+    } finally {
+      setRefreshingProductId(null);
     }
   }
 
@@ -193,7 +264,7 @@ export default function ProductsPage() {
 
       setShowForm(false);
       setForm({ asin: "", title: "", image_url: "", marketplace: "US", category: "" });
-      await fetchProducts();
+      await fetchProducts(1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to add product");
     }
@@ -259,7 +330,7 @@ export default function ProductsPage() {
       };
 
       setImportResults(data);
-      await fetchProducts();
+      await fetchProducts(1);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Import failed");
     } finally {
@@ -351,7 +422,7 @@ export default function ProductsPage() {
       setSheetMessage(
         `Sheet import complete. Created ${summary?.createdCount ?? 0}, updated ${summary?.updatedCount ?? 0}, skipped ${summary?.skippedCount ?? 0}.`
       );
-      await Promise.all([fetchProducts(), fetchSheetConfig()]);
+      await Promise.all([fetchProducts(1), fetchSheetConfig()]);
     } catch (requestError) {
       setSheetMessage(
         requestError instanceof Error ? requestError.message : "Sheet import failed"
@@ -394,71 +465,18 @@ export default function ProductsPage() {
     }
   }
 
-  const cardStyle: React.CSSProperties = {
-    background: "rgba(26, 26, 40, 0.9)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: "1rem",
-    padding: "1.5rem",
-  };
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "0.625rem 0.875rem",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "0.5rem",
-    color: "#f0f0f5",
-    fontSize: "0.875rem",
-    outline: "none",
-  };
-  const btnPrimary: React.CSSProperties = {
-    padding: "0.625rem 1.5rem",
-    background: "linear-gradient(135deg, #ff9900, #ffad33)",
-    border: "none",
-    borderRadius: "0.5rem",
-    color: "#000",
-    fontWeight: 600,
-    cursor: "pointer",
-    fontSize: "0.875rem",
-  };
-  const btnSecondary: React.CSSProperties = {
-    padding: "0.5rem 1rem",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "0.5rem",
-    color: "#a0a0b8",
-    fontWeight: 500,
-    cursor: "pointer",
-    fontSize: "0.8rem",
-  };
-
-  const tabBtn = (active: boolean, color: string): React.CSSProperties => ({
-    padding: "0.375rem 0.75rem",
-    borderRadius: "0.375rem",
-    border: "none",
-    cursor: "pointer",
-    background: active ? color : "rgba(255,255,255,0.05)",
-    color: active ? (color === "#ff9900" ? "#000" : "#fff") : "#a0a0b8",
-    fontWeight: 600,
-    fontSize: "0.8rem",
-  });
+  // Styles migrated to Tailwind CSS
 
   return (
     <div>
       <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "1.5rem",
-          flexWrap: "wrap",
-          gap: "0.75rem",
-        }}
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6"
       >
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#f0f0f5" }}>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">
           Products
         </h1>
-        <div style={{ display: "flex", gap: "0.5rem" }}>
-          <button onClick={() => void handleExport()} style={btnSecondary}>
+        <div className="flex flex-wrap gap-3">
+          <button onClick={() => void handleExport()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
             📥 Export CSV
           </button>
           <button
@@ -467,60 +485,41 @@ export default function ProductsPage() {
               setImportResults(null);
               setError("");
             }}
-            style={btnPrimary}
+            className="px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm hover:opacity-90 transition-opacity"
           >
             {showForm ? "Cancel" : "+ Add Product"}
           </button>
         </div>
       </div>
 
-      <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
+      <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
         <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: "1rem",
-            marginBottom: "1rem",
-            flexWrap: "wrap",
-          }}
+          className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"
         >
           <div>
-            <h2 style={{ color: "#f0f0f5", fontSize: "1rem", fontWeight: 700, marginBottom: "0.35rem" }}>
+            <h2 className="text-[#f0f0f5] text-base font-bold m-0 mb-2">
               Google Sheet Sync
             </h2>
-            <p style={{ color: "#8d8da6", fontSize: "0.82rem", maxWidth: "720px", lineHeight: 1.6 }}>
+            <p className="text-[#8d8da6] text-sm max-w-[720px] leading-relaxed m-0">
               Use Google Sheets as an optional product ingestion source. The database
               remains the source of truth. Import and export both run through the
               Google Sheets API using backend credentials.
             </p>
           </div>
           <div
-            style={{
-              padding: "0.45rem 0.8rem",
-              borderRadius: "999px",
-              fontSize: "0.78rem",
-              fontWeight: 700,
-              background: sheetForm.is_active ? "rgba(16,185,129,0.16)" : "rgba(255,255,255,0.08)",
-              color: sheetForm.is_active ? "#34d399" : "#a0a0b8",
-            }}
+            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${sheetForm.is_active ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-[#a0a0b8]"}`}
           >
             {sheetForm.is_active ? "Sync Enabled" : "Sync Disabled"}
           </div>
         </div>
 
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1.1fr 0.9fr 0.7fr",
-              gap: "1rem",
-              marginBottom: "1rem",
-            }}
+            className="grid grid-cols-1 md:grid-cols-[1.1fr_0.9fr_0.7fr] gap-4 mb-6"
           >
           <div>
-            <label style={labelStyle}>Public Sheet URL</label>
+            <label className="block text-sm text-[#a0a0b8] mb-1.5">Public Sheet URL</label>
             <input
-              style={inputStyle}
+              className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
               value={sheetForm.sheet_url}
               onChange={(event) =>
                 setSheetForm((current) => ({ ...current, sheet_url: event.target.value }))
@@ -529,9 +528,9 @@ export default function ProductsPage() {
             />
           </div>
           <div>
-            <label style={labelStyle}>Sheet Tab Name (optional)</label>
+            <label className="block text-sm text-[#a0a0b8] mb-1.5">Sheet Tab Name (optional)</label>
             <input
-              style={inputStyle}
+              className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
               value={sheetForm.sheet_tab_name}
               onChange={(event) =>
                 setSheetForm((current) => ({ ...current, sheet_tab_name: event.target.value }))
@@ -540,9 +539,9 @@ export default function ProductsPage() {
             />
           </div>
           <div>
-            <label style={labelStyle}>Default Marketplace</label>
+            <label className="block text-sm text-[#a0a0b8] mb-1.5">Default Marketplace</label>
             <select
-              style={{ ...inputStyle, appearance: "auto" }}
+              className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto"
               value={sheetForm.default_marketplace}
               onChange={(event) =>
                 setSheetForm((current) => ({
@@ -560,23 +559,15 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        <div style={{ marginBottom: "1rem", color: "#6b6b85", fontSize: "0.78rem", lineHeight: 1.7 }}>
+        <div className="text-[#6b6b85] text-sm leading-relaxed mb-6">
           Backend credentials must have access to the sheet. Share the spreadsheet with the
           configured Google service account email, then import/export will run server-side.
         </div>
 
         <label
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            color: "#a0a0b8",
-            fontSize: "0.85rem",
-            marginBottom: "1rem",
-          }}
+          className="inline-flex items-center gap-2 text-[#a0a0b8] text-sm mb-6 cursor-pointer"
         >
-          <input
-            type="checkbox"
+          <input type="checkbox" className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
             checked={sheetForm.is_active}
             onChange={(event) =>
               setSheetForm((current) => ({ ...current, is_active: event.target.checked }))
@@ -585,106 +576,80 @@ export default function ProductsPage() {
           Enable sheet import
         </label>
 
-        <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", marginBottom: "1rem" }}>
+        <div className="flex flex-wrap gap-3 mb-6">
           <button
             onClick={() => void handleSheetSave()}
             disabled={sheetSaving}
-            style={{ ...btnPrimary, opacity: sheetSaving ? 0.7 : 1 }}
+            className={`px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm transition-opacity ${sheetSaving ? "opacity-70" : "hover:opacity-90"}`}
           >
             {sheetSaving ? "Saving..." : "Save Sheet Config"}
           </button>
           <button
             onClick={() => void handleSheetImport()}
             disabled={sheetImporting || !sheetForm.is_active}
-            style={{
-              ...btnSecondary,
-              borderColor: "rgba(16,185,129,0.4)",
-              color: sheetForm.is_active ? "#34d399" : "#6b6b85",
-              cursor: sheetForm.is_active ? "pointer" : "not-allowed",
-            }}
+            className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${sheetForm.is_active ? "border-emerald-500/40 bg-white/5 text-emerald-400 cursor-pointer hover:bg-emerald-500/10" : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"}`}
           >
             {sheetImporting ? "Importing..." : "Import From Sheet"}
           </button>
           <button
             onClick={() => void handleSheetExport()}
             disabled={sheetExporting || sheetForm.sheet_url.trim().length === 0}
-            style={{
-              ...btnSecondary,
-              borderColor: "rgba(99,102,241,0.4)",
-              color: sheetForm.sheet_url.trim().length > 0 ? "#a5b4fc" : "#6b6b85",
-              cursor: sheetForm.sheet_url.trim().length > 0 ? "pointer" : "not-allowed",
-            }}
+            className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${sheetForm.sheet_url.trim().length > 0 ? "border-indigo-500/40 bg-white/5 text-indigo-300 cursor-pointer hover:bg-indigo-500/10" : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"}`}
           >
             {sheetExporting ? "Exporting..." : "Export DB To Sheet"}
           </button>
         </div>
 
-        <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap", marginBottom: "1rem" }}>
-          <span style={metaStyle}>
+        <div className="flex flex-wrap gap-6 mb-6">
+          <span className="text-[#6b6b85] text-sm">
             Last import: {sheetConfig?.last_imported_at ? new Date(sheetConfig.last_imported_at).toLocaleString() : "Never"}
           </span>
-          <span style={metaStyle}>
+          <span className="text-[#6b6b85] text-sm">
             Last export: {sheetConfig?.last_exported_at ? new Date(sheetConfig.last_exported_at).toLocaleString() : "Never"}
           </span>
         </div>
 
         {sheetMessage ? (
           <div
-            style={{
-              marginBottom: "1rem",
-              padding: "0.85rem 1rem",
-              borderRadius: "0.75rem",
-              background: "rgba(255,255,255,0.04)",
-              border: "1px solid rgba(255,255,255,0.06)",
-              color: "#d4d4e4",
-              fontSize: "0.84rem",
-            }}
+            className="mb-6 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-[#d4d4e4] text-sm"
           >
             {sheetMessage}
           </div>
         ) : null}
 
         <div>
-          <h3 style={{ color: "#f0f0f5", fontSize: "0.92rem", fontWeight: 700, marginBottom: "0.75rem" }}>
-            Recent sync logs
+          <h3 className="text-[#f0f0f5] text-sm font-bold m-0 mb-4">
+            Recent sync logs (latest 10)
           </h3>
           {sheetLogs.length > 0 ? (
-            <div style={{ display: "grid", gap: "0.75rem" }}>
+            <div className="space-y-3">
               {sheetLogs.map((log) => (
                 <div
                   key={log.id}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "110px 1fr auto",
-                    gap: "1rem",
-                    alignItems: "center",
-                    padding: "0.85rem 1rem",
-                    border: "1px solid rgba(255,255,255,0.06)",
-                    borderRadius: "0.75rem",
-                  }}
+                  className="grid grid-cols-1 sm:grid-cols-[110px_1fr_auto] gap-3 sm:gap-4 items-center p-3.5 border border-white/5 rounded-xl bg-white/[0.02]"
                 >
                   <div>
-                    <div style={{ color: "#f0f0f5", fontWeight: 700, textTransform: "capitalize" }}>
+                    <div className="text-[#f0f0f5] font-bold capitalize">
                       {log.direction}
                     </div>
-                    <div style={{ color: log.status === "success" ? "#34d399" : "#f87171", fontSize: "0.78rem" }}>
+                    <div className={`text-xs ${log.status === "success" ? "text-emerald-400" : "text-red-400"}`}>
                       {log.status}
                     </div>
                   </div>
-                  <div style={{ color: "#a0a0b8", fontSize: "0.8rem", lineHeight: 1.6 }}>
+                  <div className="text-[#a0a0b8] text-xs leading-relaxed">
                     {log.total_rows} rows · created {log.created_count} · updated {log.updated_count} · skipped {log.skipped_count}
                     <br />
                     {log.triggered_by_username || "System"} · {new Date(log.created_at).toLocaleString()}
                     {log.error_message ? ` · ${log.error_message}` : ""}
                   </div>
-                  <div style={{ color: "#6b6b85", fontSize: "0.76rem" }}>
+                  <div className="text-[#6b6b85] text-xs">
                     #{log.id}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <p style={{ color: "#6b6b85", fontSize: "0.8rem" }}>
+            <p className="text-[#6b6b85] text-sm m-0">
               No sheet sync activity yet.
             </p>
           )}
@@ -692,15 +657,15 @@ export default function ProductsPage() {
       </div>
 
       {showForm ? (
-        <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-            <button onClick={() => setMode("bulk")} style={tabBtn(mode === "bulk", "#10b981")}>
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button onClick={() => setMode("bulk")} className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mode === "bulk" ? "bg-emerald-500 text-black" : "bg-white/5 text-[#a0a0b8] hover:bg-white/10"}`}>
               📋 Bulk Import
             </button>
-            <button onClick={() => setMode("asin")} style={tabBtn(mode === "asin", "#ff9900")}>
+            <button onClick={() => setMode("asin")} className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mode === "asin" ? "bg-[#ff9900] text-black" : "bg-white/5 text-[#a0a0b8] hover:bg-white/10"}`}>
               🔍 Fetch by ASIN
             </button>
-            <button onClick={() => setMode("manual")} style={tabBtn(mode === "manual", "#6366f1")}>
+            <button onClick={() => setMode("manual")} className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mode === "manual" ? "bg-indigo-500 text-white" : "bg-white/5 text-[#a0a0b8] hover:bg-white/10"}`}>
               ✏️ Manual Entry
             </button>
           </div>
@@ -708,17 +673,12 @@ export default function ProductsPage() {
           {mode === "bulk" ? (
             <div>
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "1rem",
-                  marginBottom: "1rem",
-                }}
+                className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4"
               >
                 <div>
-                  <label style={labelStyle}>Marketplace*</label>
+                  <label className="block text-sm text-[#a0a0b8] mb-1.5">Marketplace*</label>
                   <select
-                    style={{ ...inputStyle, appearance: "auto" }}
+                    className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto"
                     value={bulkMarketplace}
                     onChange={(event) => setBulkMarketplace(event.target.value)}
                   >
@@ -730,9 +690,9 @@ export default function ProductsPage() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Title Prefix (optional)</label>
+                  <label className="block text-sm text-[#a0a0b8] mb-1.5">Title Prefix (optional)</label>
                   <input
-                    style={inputStyle}
+                    className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                     value={bulkPrefix}
                     onChange={(event) => setBulkPrefix(event.target.value)}
                     placeholder="e.g. Electronics"
@@ -740,42 +700,31 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: "1rem" }}>
-                <label style={labelStyle}>
+              <div className="mb-6">
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">
                   Paste ASINs (one per line, comma-separated, or mixed text)
                 </label>
                 <textarea
-                  style={{
-                    ...inputStyle,
-                    minHeight: "160px",
-                    resize: "vertical",
-                    fontFamily: "monospace",
-                    lineHeight: 1.6,
-                  }}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] min-h-[160px] resize-y font-mono leading-relaxed"
                   value={bulkAsins}
                   onChange={(event) => setBulkAsins(event.target.value)}
                   placeholder={"B0DNMW96QT\nB0DZLWGSZZ\nB0DYNXCHND"}
                 />
                 <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginTop: "0.5rem",
-                  }}
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-2"
                 >
-                  <span style={{ fontSize: "0.75rem", color: "#6b6b85" }}>
+                  <span className="text-xs text-[#6b6b85]">
                     {parseAsins(bulkAsins).length} valid ASINs detected
                   </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div className="flex flex-wrap gap-3">
                     <input
                       type="file"
                       ref={fileInputRef}
                       accept=".csv,.txt"
-                      style={{ display: "none" }}
+                      className="hidden"
                       onChange={handleCsvUpload}
                     />
-                    <button onClick={() => fileInputRef.current?.click()} style={btnSecondary}>
+                    <button onClick={() => fileInputRef.current?.click()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
                       📂 Upload CSV/TXT
                     </button>
                   </div>
@@ -785,37 +734,24 @@ export default function ProductsPage() {
               <button
                 onClick={() => void handleBulkImport()}
                 disabled={importing || parseAsins(bulkAsins).length === 0}
-                style={{
-                  ...btnPrimary,
-                  background: importing ? "#666" : "linear-gradient(135deg, #10b981, #34d399)",
-                  width: "100%",
-                  padding: "0.75rem",
-                }}
+                className={`w-full px-6 py-3 border-none rounded-lg font-bold text-sm transition-opacity ${importing ? "bg-white/20 text-white/50 cursor-not-allowed" : "bg-gradient-to-br from-emerald-500 to-emerald-400 text-black cursor-pointer hover:opacity-90"}`}
               >
                 {importing ? "⏳ Importing..." : `🚀 Import ${parseAsins(bulkAsins).length} ASINs`}
               </button>
 
               {importResults ? (
-                <div
-                  style={{
-                    marginTop: "1rem",
-                    padding: "1rem",
-                    background: "rgba(16, 185, 129, 0.1)",
-                    border: "1px solid rgba(16, 185, 129, 0.2)",
-                    borderRadius: "0.75rem",
-                  }}
-                >
-                  <h4 style={{ color: "#10b981", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.5rem" }}>
+                <div className="mt-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                  <h4 className="text-emerald-400 font-semibold mb-3 m-0">
                     ✅ Import Complete
                   </h4>
-                  <div style={{ display: "flex", gap: "1.5rem", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "0.85rem", color: "#f0f0f5" }}>
+                  <div className="flex flex-wrap gap-6">
+                    <span className="text-sm text-[#f0f0f5]">
                       📊 Total: <strong>{importResults.summary.total}</strong>
                     </span>
-                    <span style={{ fontSize: "0.85rem", color: "#10b981" }}>
+                    <span className="text-sm text-emerald-400">
                       ✅ Created: <strong>{importResults.summary.created}</strong>
                     </span>
-                    <span style={{ fontSize: "0.85rem", color: "#f59e0b" }}>
+                    <span className="text-sm text-amber-500">
                       ⚠️ Already existed: <strong>{importResults.summary.already_existed}</strong>
                     </span>
                   </div>
@@ -825,11 +761,11 @@ export default function ProductsPage() {
           ) : null}
 
           {mode === "asin" ? (
-            <div style={{ display: "flex", gap: "0.75rem", alignItems: "flex-end" }}>
-              <div style={{ flex: 1 }}>
-                <label style={labelStyle}>ASIN*</label>
+            <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+              <div className="flex-1">
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">ASIN*</label>
                 <input
-                  style={inputStyle}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   value={form.asin}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, asin: event.target.value.toUpperCase() }))
@@ -838,7 +774,7 @@ export default function ProductsPage() {
                   maxLength={10}
                 />
               </div>
-              <button onClick={() => void handleFetchAsin()} disabled={fetching} style={{ ...btnPrimary, opacity: fetching ? 0.6 : 1 }}>
+              <button onClick={() => void handleFetchAsin()} disabled={fetching} className={`px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm transition-opacity ${fetching ? "opacity-60" : "hover:opacity-90"}`}>
                 {fetching ? "Fetching..." : "Fetch"}
               </button>
             </div>
@@ -847,12 +783,12 @@ export default function ProductsPage() {
           {mode === "manual" ? (
             <form
               onSubmit={(event) => void handleManualSubmit(event)}
-              style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
             >
               <div>
-                <label style={labelStyle}>ASIN*</label>
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">ASIN*</label>
                 <input
-                  style={inputStyle}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   value={form.asin}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, asin: event.target.value.toUpperCase() }))
@@ -862,9 +798,9 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Title*</label>
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">Title*</label>
                 <input
-                  style={inputStyle}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   value={form.title}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, title: event.target.value }))
@@ -873,9 +809,9 @@ export default function ProductsPage() {
                 />
               </div>
               <div>
-                <label style={labelStyle}>Marketplace</label>
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">Marketplace</label>
                 <select
-                  style={{ ...inputStyle, appearance: "auto" }}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto"
                   value={form.marketplace}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, marketplace: event.target.value }))
@@ -889,19 +825,19 @@ export default function ProductsPage() {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Category</label>
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">Category</label>
                 <input
-                  style={inputStyle}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   value={form.category}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, category: event.target.value }))
                   }
                 />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <label style={labelStyle}>Image URL*</label>
+              <div className="col-span-1 sm:col-span-2">
+                <label className="block text-sm text-[#a0a0b8] mb-1.5">Image URL*</label>
                 <input
-                  style={inputStyle}
+                  className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                   value={form.image_url}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, image_url: event.target.value }))
@@ -910,8 +846,8 @@ export default function ProductsPage() {
                   type="url"
                 />
               </div>
-              <div style={{ gridColumn: "1 / -1" }}>
-                <button type="submit" style={{ ...btnPrimary, background: "#6366f1" }}>
+              <div className="col-span-1 sm:col-span-2">
+                <button type="submit" className="px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer text-sm hover:bg-indigo-600 transition-colors">
                   Add Product
                 </button>
               </div>
@@ -919,7 +855,7 @@ export default function ProductsPage() {
           ) : null}
 
           {error ? (
-            <p style={{ color: "#ef4444", fontSize: "0.8rem", marginTop: "0.75rem" }}>
+            <p className="text-red-500 text-sm mt-4 m-0">
               ❌ {error}
             </p>
           ) : null}
@@ -927,130 +863,143 @@ export default function ProductsPage() {
       ) : null}
 
       {loading ? (
-        <p style={{ color: "#6b6b85" }}>Loading...</p>
+        <p className="text-[#6b6b85] m-0">Loading...</p>
       ) : (
         <div>
-          <p style={{ color: "#6b6b85", fontSize: "0.8rem", marginBottom: "1rem" }}>
-            {products.length} products total
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+            {[
+              {
+                label: "Total",
+                value: productSummary.totalProducts,
+                tone: "text-[#f0f0f5]",
+              },
+              {
+                label: "Active",
+                value: productSummary.activeProducts,
+                tone: "text-emerald-400",
+              },
+              {
+                label: "Pending Review",
+                value: productSummary.pendingReviewProducts,
+                tone: "text-amber-400",
+              },
+              {
+                label: "Rejected",
+                value: productSummary.rejectedProducts,
+                tone: "text-red-400",
+              },
+              {
+                label: "Needs Refresh",
+                value: productSummary.needsRefreshProducts,
+                tone: "text-indigo-300",
+              },
+            ].map((item) => (
+              <div
+                key={item.label}
+                className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4"
+              >
+                <p className="text-[#8d8da6] text-xs uppercase tracking-[0.2em] mb-2 m-0">
+                  {item.label}
+                </p>
+                <p className={`text-2xl font-bold m-0 ${item.tone}`}>{item.value}</p>
+              </div>
+            ))}
+          </div>
+          <p className="text-[#6b6b85] text-sm mb-4 m-0">
+            Showing {products.length} of {productPagination.totalItems} products
           </p>
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: "1rem",
-            }}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           >
             {products.map((product) => (
               <div
                 key={product.id}
-                style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: "0.75rem" }}
+                className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 flex flex-col gap-3"
               >
                 <div
-                  style={{
-                    width: "100%",
-                    aspectRatio: "1",
-                    background: "#fff",
-                    borderRadius: "0.75rem",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    overflow: "hidden",
-                  }}
+                  className="w-full aspect-square bg-white rounded-xl flex items-center justify-center overflow-hidden"
                 >
                   <img
                     src={product.image_url}
                     alt={product.title}
-                    style={{ maxWidth: "80%", maxHeight: "80%", objectFit: "contain" }}
+                    className="max-w-[80%] max-h-[80%] object-contain"
                   />
                 </div>
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.45rem", flexWrap: "wrap" }}>
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span
-                      style={{
-                        padding: "0.16rem 0.55rem",
-                        borderRadius: "999px",
-                        background:
-                          product.status === "active"
-                            ? "rgba(34,197,94,0.15)"
-                            : product.status === "rejected"
-                              ? "rgba(239,68,68,0.15)"
-                              : "rgba(245,158,11,0.15)",
-                        color:
-                          product.status === "active"
-                            ? "#4ade80"
-                            : product.status === "rejected"
-                              ? "#f87171"
-                              : "#fbbf24",
-                        fontSize: "0.72rem",
-                        fontWeight: 700,
-                        textTransform: "capitalize",
-                      }}
+                      className={`px-2 py-0.5 rounded-full text-xs font-bold capitalize ${product.status === "active" ? "bg-emerald-500/15 text-emerald-400" : product.status === "rejected" ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}
                     >
                       {product.status.replace("_", " ")}
                     </span>
                     {!product.is_active ? (
                       <span
-                        style={{
-                          padding: "0.16rem 0.55rem",
-                          borderRadius: "999px",
-                          background: "rgba(239,68,68,0.15)",
-                          color: "#fca5a5",
-                          fontSize: "0.72rem",
-                          fontWeight: 700,
-                        }}
+                        className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 text-xs font-bold"
                       >
                         inactive
                       </span>
                     ) : null}
                   </div>
-                  <h3
-                    style={{
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      color: "#f0f0f5",
-                      lineHeight: 1.4,
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
+                  <h3 className="text-sm font-semibold text-[#f0f0f5] leading-snug line-clamp-2 m-0 mt-1">
                     {product.title}
                   </h3>
-                  <p style={{ fontSize: "0.75rem", color: "#6b6b85", marginTop: "0.25rem" }}>
+                  <p className="text-xs text-[#6b6b85] mt-2 m-0 leading-relaxed">
                     ASIN: {product.asin} · {product.marketplace} · {product.agent_count} agents ·{" "}
                     {product.total_clicks} clicks
                   </p>
                 </div>
+                <button
+                  onClick={() => void handleProductRefresh(product.id)}
+                  disabled={refreshingProductId === product.id}
+                  className={`mt-auto px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                    refreshingProductId === product.id
+                      ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                      : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
+                  }`}
+                >
+                  {refreshingProductId === product.id ? "Refreshing..." : "Refresh Data"}
+                </button>
               </div>
             ))}
             {products.length === 0 ? (
-              <p
-                style={{
-                  color: "#6b6b85",
-                  textAlign: "center",
-                  padding: "2rem",
-                  gridColumn: "1 / -1",
-                }}
-              >
+              <p className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 text-center text-[#6b6b85] p-8 m-0">
                 No products yet. Use bulk import, portal submissions, or sheet sync to add ASINs.
               </p>
             ) : null}
           </div>
+          {productPagination.totalPages > 1 ? (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mt-6">
+              <p className="text-[#6b6b85] text-sm m-0">
+                Page {productPagination.page} of {productPagination.totalPages}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => void fetchProducts(productPagination.page - 1)}
+                  disabled={loading || productPagination.page <= 1}
+                  className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                    productPagination.page > 1
+                      ? "border-white/10 bg-white/5 text-[#d4d4e4] cursor-pointer hover:bg-white/10"
+                      : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                  }`}
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => void fetchProducts(productPagination.page + 1)}
+                  disabled={loading || productPagination.page >= productPagination.totalPages}
+                  className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                    productPagination.page < productPagination.totalPages
+                      ? "border-white/10 bg-white/5 text-[#d4d4e4] cursor-pointer hover:bg-white/10"
+                      : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: "0.8rem",
-  color: "#a0a0b8",
-  marginBottom: "0.375rem",
-};
-
-const metaStyle: React.CSSProperties = {
-  color: "#6b6b85",
-  fontSize: "0.78rem",
-};

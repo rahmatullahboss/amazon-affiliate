@@ -1,57 +1,56 @@
+import { pbkdf2Sync, randomBytes, timingSafeEqual } from "node:crypto";
+
 const PBKDF2_ITERATIONS = 100_000;
+const LEGACY_PBKDF2_ITERATIONS = 310_000;
 const SALT_LENGTH = 16;
 
+function parseStoredHash(storedHash: string): {
+  iterations: number;
+  saltHex: string;
+  expectedHash: string;
+} | null {
+  if (storedHash.includes('$')) {
+    const [iterationsRaw, payload] = storedHash.split('$', 2);
+    const [saltHex, expectedHash] = payload?.split(':') ?? [];
+    const iterations = Number.parseInt(iterationsRaw, 10);
+
+    if (!Number.isFinite(iterations) || !saltHex || !expectedHash) return null;
+
+    return { iterations, saltHex, expectedHash };
+  }
+
+  const [saltHex, expectedHash] = storedHash.split(':');
+  if (!saltHex || !expectedHash) return null;
+
+  return {
+    iterations: LEGACY_PBKDF2_ITERATIONS,
+    saltHex,
+    expectedHash,
+  };
+}
+
 export async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const salt = randomBytes(SALT_LENGTH);
+  const hash = pbkdf2Sync(password, salt, PBKDF2_ITERATIONS, 32, "sha256");
+  const saltHex = salt.toString("hex");
+  const hashHex = hash.toString("hex");
 
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
-
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-
-  const hashArray = Array.from(new Uint8Array(derivedBits));
-  const saltHex = Array.from(salt).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-  const hashHex = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
-
-  return `${saltHex}:${hashHex}`;
+  return `${PBKDF2_ITERATIONS}$${saltHex}:${hashHex}`;
 }
 
 export async function verifyPassword(password: string, storedHash: string): Promise<boolean> {
-  const [saltHex, expectedHash] = storedHash.split(':');
-  if (!saltHex || !expectedHash) return false;
+  const parsed = parseStoredHash(storedHash);
+  if (!parsed) return false;
 
-  const encoder = new TextEncoder();
-  const salt = new Uint8Array(saltHex.match(/.{2}/g)?.map((byte) => parseInt(byte, 16)) ?? []);
+  const salt = Buffer.from(parsed.saltHex, "hex");
+  const expected = Buffer.from(parsed.expectedHash, "hex");
+  const actual = pbkdf2Sync(password, salt, parsed.iterations, expected.length, "sha256");
 
-  const keyMaterial = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(password),
-    'PBKDF2',
-    false,
-    ['deriveBits']
-  );
+  if (actual.length !== expected.length) {
+    return false;
+  }
 
-  const derivedBits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
-    keyMaterial,
-    256
-  );
-
-  const hashHex = Array.from(new Uint8Array(derivedBits))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-
-  return hashHex === expectedHash;
+  return timingSafeEqual(actual, expected);
 }
 
 export async function createJwt(payload: Record<string, unknown>, secret: string): Promise<string> {

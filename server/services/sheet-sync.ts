@@ -155,7 +155,7 @@ export async function getSheetSyncLogs(db: D1Database): Promise<SheetSyncLog[]> 
        FROM sheet_sync_logs ssl
        LEFT JOIN users u ON u.id = ssl.triggered_by_user_id
        ORDER BY ssl.created_at DESC
-       LIMIT 20`
+       LIMIT 10`
     )
     .all<SheetSyncLog>();
 

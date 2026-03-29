@@ -6,6 +6,20 @@ export type Marketplace = (typeof MARKETPLACES)[number];
 export const PRODUCT_STATUSES = ['active', 'pending_review', 'rejected'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
 
+function normalizeTrackingTag(value: string): string {
+  return value.trim().replace(/^\?/i, '').replace(/^tag=/i, '');
+}
+
+const trackingTagSchema = z
+  .string()
+  .min(1, 'Tag is required')
+  .max(50)
+  .transform(normalizeTrackingTag)
+  .refine(
+    (value) => /^[a-zA-Z0-9][a-zA-Z0-9-]*-[a-zA-Z0-9]+$/.test(value),
+    'Use the full tag, like jahid29000-21 or tag=jahid29000-21'
+  );
+
 // ─── Agent Schemas ─────────────────────────────────────
 export const createAgentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -56,11 +70,7 @@ export const updateProductSchema = z.object({
 // ─── Tracking ID Schemas ───────────────────────────────
 export const createTrackingIdSchema = z.object({
   agent_id: z.number().int().positive(),
-  tag: z
-    .string()
-    .min(1, 'Tag is required')
-    .max(50)
-    .regex(/^[a-zA-Z0-9-]+$/, 'Tag must be alphanumeric with hyphens'),
+  tag: trackingTagSchema,
   label: z.string().max(100).optional().nullable(),
   marketplace: z.enum(MARKETPLACES).default('US'),
   is_default: z.boolean().default(false),
@@ -84,6 +94,15 @@ export const loginSchema = z.object({
   password: z.string().min(6),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email('Valid email is required'),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, 'Reset token is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+
 export const setupSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email().optional().nullable(),
@@ -103,6 +122,22 @@ export const agentRegistrationSchema = z.object({
   password: z.string().min(8),
 });
 
+export const googleAuthSchema = z.object({
+  credential: z.string().min(1, 'Google credential is required'),
+});
+
+export const googleCompleteSignupSchema = z.object({
+  token: z.string().min(1, 'Signup token is required'),
+  agent_name: z.string().min(1).max(100),
+  agent_slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens'),
+  phone: z.string().max(20).optional().nullable(),
+  username: z.string().min(3).max(50),
+});
+
 export const portalAsinSubmissionSchema = z.object({
   asin: z.string().min(1, 'ASIN or Amazon link is required').max(1000),
   marketplace: z.enum(MARKETPLACES).default('US'),
@@ -110,13 +145,13 @@ export const portalAsinSubmissionSchema = z.object({
 });
 
 export const portalTrackingSetupSchema = z.object({
-  tag: z
-    .string()
-    .min(1, 'Tracking ID is required')
-    .max(50)
-    .regex(/^[a-zA-Z0-9-]+$/, 'Tracking ID must be alphanumeric with hyphens'),
+  tag: trackingTagSchema,
   label: z.string().max(100).optional().nullable(),
   marketplace: z.enum(MARKETPLACES).default('US'),
+});
+
+export const portalTrackingReplaceDeleteSchema = z.object({
+  replacement_tracking_id: z.number().int().positive(),
 });
 
 export const createUserSchema = z.object({

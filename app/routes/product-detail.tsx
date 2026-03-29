@@ -1,7 +1,7 @@
 import type { Route } from "./+types/product-detail";
 import { Link } from "react-router";
-import { useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
+import { ImageGallery } from "../components/product/ImageGallery";
 import { AMAZON_DOMAINS } from "../../server/utils/types";
 
 interface ProductRow {
@@ -93,7 +93,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const marketplace = product.marketplace || "US";
   const domain = AMAZON_DOMAINS[marketplace] || AMAZON_DOMAINS.US;
-  const defaultTag = "dealsrky-20";
+  const defaultTag = env.DEFAULT_AMAZON_TAG || "dealsrky-20";
   const amazonUrl = `https://${domain}/dp/${asin}?tag=${defaultTag}`;
 
   return {
@@ -114,52 +114,6 @@ function parseJsonArray(raw: string | null): string[] {
     return [];
   }
   return [];
-}
-
-// ─── Image Gallery Component ────────────────────
-function ImageGallery({ mainImage, galleryImages, title }: { mainImage: string; galleryImages: string[]; title: string }) {
-  const allImages = galleryImages.length > 0 ? galleryImages : [mainImage];
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const currentImage = allImages[selectedIndex] || mainImage;
-
-  return (
-    <div>
-      {/* Main Image */}
-      <div className="rounded-[1.75rem] bg-[#f5f8f8] p-6">
-        <img
-          src={currentImage}
-          alt={title}
-          className="mx-auto max-h-[520px] w-full object-contain transition-all duration-300"
-          loading="eager"
-        />
-      </div>
-
-      {/* Thumbnail Strip */}
-      {allImages.length > 1 ? (
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-          {allImages.map((img, i) => (
-            <button
-              key={`thumb-${i}`}
-              onClick={() => setSelectedIndex(i)}
-              className={`flex-shrink-0 rounded-xl border-2 p-1.5 transition-all duration-200 ${
-                i === selectedIndex
-                  ? "border-primary ring-2 ring-primary/20"
-                  : "border-gray-200 hover:border-gray-300"
-              }`}
-              aria-label={`View image ${i + 1}`}
-            >
-              <img
-                src={img}
-                alt={`${title} - ${i + 1}`}
-                className="h-16 w-16 rounded-lg object-contain"
-                loading="lazy"
-              />
-            </button>
-          ))}
-        </div>
-      ) : null}
-    </div>
-  );
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
@@ -191,6 +145,16 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
       <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
         <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
           <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-4 md:hidden">
+              <a
+                href={amazonUrl}
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
+                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              >
+                Continue to Amazon
+              </a>
+            </div>
             <ImageGallery
               mainImage={product.image_url}
               galleryImages={galleryImages}
@@ -244,22 +208,10 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                 href={amazonUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow sponsored"
-                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary"
+                className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
               >
                 Read Amazon reviews
               </a>
-            </div>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              {[
-                "Direct Amazon checkout",
-                "Affiliate disclosure included",
-                "No stored payment data",
-              ].map((item) => (
-                <div key={item} className="rounded-2xl bg-gray-50 p-4 text-sm font-medium text-gray-700">
-                  {item}
-                </div>
-              ))}
             </div>
 
             {product.description ? (

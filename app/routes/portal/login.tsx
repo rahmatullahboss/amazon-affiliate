@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import type { Route } from "./+types/login";
+import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
-export default function PortalLoginPage() {
+export async function loader({ context }: Route.LoaderArgs) {
+  const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string };
+  return {
+    googleClientId: env.GOOGLE_CLIENT_ID || "",
+  };
+}
+
+export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { googleClientId } = loaderData;
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -21,8 +32,8 @@ export default function PortalLoginPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Login failed");
+        const data = await response.json();
+        throw new Error(extractApiErrorMessage(data, "Login failed"));
       }
 
       const data = (await response.json()) as {
@@ -40,23 +51,85 @@ export default function PortalLoginPage() {
     }
   };
 
+  const handleGoogleCredential = useCallback(
+    async (credential: string) => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch("/api/auth/google", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credential }),
+        });
+
+        const data = (await response.json()) as {
+          token?: string;
+          user?: { id: number; username: string; role: string; agentId: number | null };
+          requiresCompletion?: boolean;
+          signupToken?: string;
+          profile?: { email?: string; name?: string | null };
+          error?: unknown;
+          message?: string;
+        };
+
+        if (!response.ok) {
+          throw new Error(extractApiErrorMessage(data, "Google sign-in failed"));
+        }
+
+        if (data.requiresCompletion && data.signupToken) {
+          const params = new URLSearchParams({
+            token: data.signupToken,
+            email: data.profile?.email || "",
+            name: data.profile?.name || "",
+          });
+          navigate(`/portal/complete-signup?${params.toString()}`);
+          return;
+        }
+
+        if (data.token && data.user) {
+          localStorage.setItem("auth_token", data.token);
+          localStorage.setItem("auth_user", JSON.stringify(data.user));
+          navigate("/portal");
+          return;
+        }
+
+        throw new Error("Google sign-in failed");
+      } catch (requestError) {
+        setError(requestError instanceof Error ? requestError.message : "Google sign-in failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [navigate]
+  );
+
   return (
-    <main style={styles.page}>
-      <form onSubmit={handleLogin} style={styles.card}>
-        <h1 style={styles.title}>Agent Portal</h1>
-        <p style={styles.subtitle}>Log in to submit ASINs and manage your affiliate links.</p>
+    <main className="min-h-screen flex text-left items-center justify-center p-8 bg-slate-900">
+      <form onSubmit={handleLogin} className="w-full max-w-[420px] bg-slate-900/90 border border-white/10 rounded-2xl p-8 grid gap-4 shadow-xl">
+        <div className="text-center mb-2">
+          <h1 className="m-0 text-2xl font-bold text-gray-50">Agent Portal</h1>
+          <p className="m-0 text-sm text-slate-400 mt-1 leading-relaxed">
+            Log in to submit ASINs and manage your affiliate links.
+          </p>
+        </div>
 
-        {error ? <p style={styles.error}>{error}</p> : null}
+        {error ? <p className="m-0 mb-2 py-3 px-4 bg-red-500/10 border border-red-500/30 rounded-lg text-red-300 text-sm text-center">{error}</p> : null}
 
-        <label style={styles.label}>
+        <label className="grid gap-2 text-sm font-medium text-slate-300">
           Username
-          <input style={styles.input} value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <input
+            className="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-xl text-gray-50 outline-none transition-colors focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
         </label>
 
-        <label style={styles.label}>
+        <label className="grid gap-2 text-sm font-medium text-slate-300">
           Password
           <input
-            style={styles.input}
+            className="w-full px-4 py-3 bg-slate-800 border border-white/10 rounded-xl text-gray-50 outline-none transition-colors focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -64,64 +137,36 @@ export default function PortalLoginPage() {
           />
         </label>
 
-        <button type="submit" style={styles.button} disabled={loading}>
+        <button
+          type="submit"
+          className="w-full mt-2 px-4 py-3.5 bg-gradient-to-br from-amber-500 to-amber-400 text-slate-900 text-base font-bold border-none rounded-xl cursor-pointer transition-all hover:brightness-110 disabled:opacity-70 disabled:cursor-not-allowed"
+          disabled={loading}
+        >
           {loading ? "Signing in..." : "Sign In"}
         </button>
 
-        <p style={styles.switchText}>
-          Need an account? <Link style={styles.link} to="/portal/register">Create agent account</Link>
+        <div className="flex items-center gap-3 my-1">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="text-xs uppercase tracking-[0.25em] text-slate-500">or</span>
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+
+        <GoogleSignInButton
+          clientId={googleClientId}
+          text="signin_with"
+          onCredential={(credential) => {
+            void handleGoogleCredential(credential);
+          }}
+        />
+
+        <p className="m-0 text-sm text-slate-300 text-center mt-2">
+          <Link className="text-amber-500 font-semibold no-underline hover:text-amber-400 transition-colors" to="/portal/forgot-password">Forgot password?</Link>
+        </p>
+
+        <p className="m-0 text-sm text-slate-300 text-center">
+          Need an account? <Link className="text-amber-500 font-semibold no-underline hover:text-amber-400 transition-colors" to="/portal/register">Create agent account</Link>
         </p>
       </form>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#0f172a",
-    padding: "2rem",
-  },
-  card: {
-    width: "100%",
-    maxWidth: "420px",
-    background: "#111827",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "1rem",
-    padding: "2rem",
-    display: "grid",
-    gap: "1rem",
-  },
-  title: { margin: 0, color: "#f9fafb", fontSize: "1.75rem", fontWeight: 700 },
-  subtitle: { margin: 0, color: "#9ca3af", fontSize: "0.95rem", lineHeight: 1.5 },
-  label: { display: "grid", gap: "0.5rem", color: "#d1d5db", fontSize: "0.9rem" },
-  input: {
-    borderRadius: "0.75rem",
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#1f2937",
-    color: "#f9fafb",
-    padding: "0.85rem 1rem",
-  },
-  button: {
-    border: "none",
-    borderRadius: "0.75rem",
-    background: "linear-gradient(135deg, #f59e0b, #fbbf24)",
-    color: "#111827",
-    fontWeight: 700,
-    padding: "0.9rem 1rem",
-    cursor: "pointer",
-  },
-  switchText: { margin: 0, color: "#cbd5e1", fontSize: "0.9rem" },
-  link: { color: "#fbbf24", textDecoration: "none", fontWeight: 600 },
-  error: {
-    margin: 0,
-    color: "#fecaca",
-    background: "rgba(239, 68, 68, 0.12)",
-    border: "1px solid rgba(239, 68, 68, 0.25)",
-    borderRadius: "0.75rem",
-    padding: "0.8rem 1rem",
-  },
-};

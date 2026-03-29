@@ -1,9 +1,6 @@
 import { type RouteConfig, index, route, layout } from "@react-router/dev/routes";
 
 export default [
-  // Bridge landing page (buyer-facing, Amazon TOS compliant) — NO header/footer intentionally
-  route(":agent/:asin", "routes/bridge.tsx"),
-
   // All public pages wrapped in Header + Footer layout
   layout("routes/public-layout.tsx", [
     // Home page
@@ -19,6 +16,7 @@ export default [
     route("deals", "routes/deals.tsx"),
     route("deals/:asin", "routes/product-detail.tsx"),
     route("category/:slug", "routes/category.tsx"),
+    route(":agent/:asin", "routes/bridge.tsx"),
   ]),
 
   // Admin routes — separate layout
@@ -38,6 +36,9 @@ export default [
 
   route("portal/login", "routes/portal/login.tsx"),
   route("portal/register", "routes/portal/register.tsx"),
+  route("portal/forgot-password", "routes/portal/forgot-password.tsx"),
+  route("portal/reset-password", "routes/portal/reset-password.tsx"),
+  route("portal/complete-signup", "routes/portal/complete-signup.tsx"),
   route("portal", "routes/portal/layout.tsx", [
     index("routes/portal/dashboard.tsx"),
     route("asins/new", "routes/portal/asin-new.tsx"),

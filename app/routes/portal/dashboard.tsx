@@ -70,16 +70,16 @@ export default function PortalDashboardPage() {
   }
 
   if (loading) {
-    return <p style={styles.copy}>Loading dashboard...</p>;
+    return <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">Loading dashboard...</p>;
   }
 
   if (error) {
     return (
-      <section style={styles.grid}>
-        <article style={styles.card}>
-          <h2 style={styles.heading}>Portal Dashboard</h2>
-          <p style={styles.copy}>{error}</p>
-          <button onClick={() => void loadDashboard()} style={styles.retryButton}>
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Portal Dashboard</h2>
+          <p className="m-0 mb-2 text-[#cbd5e1] leading-relaxed">{error}</p>
+          <button onClick={() => void loadDashboard()} className="px-4 py-3 bg-[#0f766e] rounded-xl text-[#f8fafc] font-semibold cursor-pointer border-none mt-2">
             Retry
           </button>
         </article>
@@ -92,124 +92,69 @@ export default function PortalDashboardPage() {
     { label: "Total Clicks", value: performance?.totalClicks ?? 0, color: "#f59e0b" },
     { label: "CTR", value: `${performance?.ctr ?? "0.00"}%`, color: "#34d399" },
     { label: "Ordered Items", value: performance?.orderedItems ?? 0, color: "#a78bfa" },
-    {
-      label: "Revenue",
-      value: `$${(performance?.revenueAmount ?? 0).toFixed(2)}`,
-      color: "#22c55e",
-    },
-    {
-      label: "Commission",
-      value: `$${(performance?.commissionAmount ?? 0).toFixed(2)}`,
-      color: "#f472b6",
-    },
   ];
 
   return (
-    <section style={styles.stack}>
-      <div style={styles.grid}>
-        <article style={styles.card}>
-          <h2 style={styles.heading}>Portal Overview</h2>
-          <p style={styles.copy}>
-            Submit ASINs, copy your tracked links, and monitor traffic and imported
-            sales performance from one place.
-          </p>
-        </article>
-
-        <article style={styles.card}>
-          <h2 style={styles.heading}>Signed In As</h2>
-          <p style={styles.copy}>Username: {profile?.user?.username ?? "Unknown"}</p>
-          <p style={styles.copy}>Role: {profile?.user?.role ?? "Unknown"}</p>
-          <p style={styles.copy}>Agent: {profile?.user?.agent_name ?? "Not linked yet"}</p>
-          <p style={styles.copy}>Slug: {profile?.user?.agent_slug ?? "-"}</p>
+    <section className="grid gap-4">
+      <div className="grid grid-cols-1 gap-4">
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Signed In As</h2>
+          <p className="m-0 mb-2 text-[#cbd5e1]">Username: {profile?.user?.username ?? "Unknown"}</p>
+          <p className="m-0 mb-2 text-[#cbd5e1]">Role: {profile?.user?.role ?? "Unknown"}</p>
+          <p className="m-0 mb-2 text-[#cbd5e1]">Agent: {profile?.user?.agent_name ?? "Not linked yet"}</p>
+          <p className="m-0 mb-2 text-[#cbd5e1]">Slug: {profile?.user?.agent_slug ?? "-"}</p>
         </article>
       </div>
 
-      <div style={styles.metricsGrid}>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-2 xl:grid-cols-4">
         {metrics.map((metric) => (
-          <article key={metric.label} style={styles.card}>
-            <div style={{ color: "#94a3b8", fontSize: "0.8rem", marginBottom: "0.5rem" }}>
+          <article key={metric.label} className="bg-[#111827] border border-white/10 rounded-2xl p-6 text-center xl:text-left">
+            <div className="text-[#94a3b8] text-sm mb-2">
               {metric.label}
             </div>
-            <div style={{ color: metric.color, fontSize: "1.75rem", fontWeight: 700 }}>
+            <div className="text-2xl font-bold" style={{ color: metric.color }}>
               {typeof metric.value === "number" ? metric.value.toLocaleString() : metric.value}
             </div>
           </article>
         ))}
       </div>
 
-      <div style={styles.grid}>
-        <article style={styles.card}>
-          <h2 style={styles.heading}>Top Products</h2>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Top Products</h2>
           {performance?.topProducts.length ? (
             performance.topProducts.map((product) => (
-              <div key={product.asin} style={styles.listRow}>
+              <div key={product.asin} className="flex justify-between gap-4 py-3 border-b border-white/5">
                 <div>
-                  <div style={styles.rowPrimary}>{product.title}</div>
-                  <div style={styles.rowSecondary}>{product.asin}</div>
+                  <div className="text-[#f8fafc] text-sm font-semibold mb-1">{product.title}</div>
+                  <div className="text-[#94a3b8] text-xs">{product.asin}</div>
                 </div>
-                <div style={styles.rowValue}>{product.clicks}</div>
+                <div className="text-[#f59e0b] font-bold self-center">{product.clicks}</div>
               </div>
             ))
           ) : (
-            <p style={styles.copy}>No tracked clicks yet.</p>
+            <p className="m-0 mb-2 text-[#cbd5e1]">No tracked clicks yet.</p>
           )}
         </article>
 
-        <article style={styles.card}>
-          <h2 style={styles.heading}>Recent Clicks</h2>
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Recent Clicks</h2>
           {performance?.recentClicks.length ? (
             performance.recentClicks.map((click) => (
-              <div key={`${click.tracking_tag}-${click.clicked_at}`} style={styles.listRow}>
+              <div key={`${click.tracking_tag}-${click.clicked_at}`} className="flex justify-between gap-4 py-3 border-b border-white/5">
                 <div>
-                  <div style={styles.rowPrimary}>{click.tracking_tag}</div>
-                  <div style={styles.rowSecondary}>
+                  <div className="text-[#f8fafc] text-sm font-semibold mb-1">{click.tracking_tag}</div>
+                  <div className="text-[#94a3b8] text-xs">
                     {click.country || "Unknown country"} · {new Date(click.clicked_at).toLocaleString()}
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <p style={styles.copy}>No recent clicks yet.</p>
+            <p className="m-0 mb-2 text-[#cbd5e1]">No recent clicks yet.</p>
           )}
         </article>
       </div>
     </section>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  stack: { display: "grid", gap: "1rem" },
-  grid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: "1rem" },
-  metricsGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-    gap: "1rem",
-  },
-  card: {
-    background: "#111827",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "1rem",
-    padding: "1.5rem",
-  },
-  heading: { margin: "0 0 0.75rem", color: "#f9fafb", fontSize: "1.25rem", fontWeight: 700 },
-  copy: { margin: "0 0 0.5rem", color: "#cbd5e1", lineHeight: 1.6 },
-  retryButton: {
-    padding: "0.75rem 1rem",
-    background: "#0f766e",
-    border: "none",
-    borderRadius: "0.75rem",
-    color: "#f8fafc",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-  listRow: {
-    display: "flex",
-    justifyContent: "space-between",
-    gap: "1rem",
-    padding: "0.75rem 0",
-    borderBottom: "1px solid rgba(255,255,255,0.06)",
-  },
-  rowPrimary: { color: "#f8fafc", fontSize: "0.9rem", fontWeight: 600, marginBottom: "0.25rem" },
-  rowSecondary: { color: "#94a3b8", fontSize: "0.78rem" },
-  rowValue: { color: "#f59e0b", fontWeight: 700, alignSelf: "center" },
-};

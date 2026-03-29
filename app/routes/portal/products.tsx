@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { copyTextToClipboard } from "../../utils/clipboard";
 
 interface PortalProduct {
   id: number;
@@ -12,6 +13,8 @@ interface PortalProduct {
   image_url: string;
   status: string;
   tracking_tag: string;
+  bridge_page_url: string;
+  redirect_url: string;
 }
 
 interface SubmissionResponse {
@@ -27,6 +30,12 @@ interface SubmissionResponse {
   };
 }
 
+interface ProductSubmissionPayload {
+  asin: string;
+  marketplace: string;
+  custom_title: string | null;
+}
+
 export default function PortalProductsPage() {
   const [products, setProducts] = useState<PortalProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +45,9 @@ export default function PortalProductsPage() {
   const [customTitle, setCustomTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SubmissionResponse | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [copiedProductKey, setCopiedProductKey] = useState("");
+  const [lastPayload, setLastPayload] = useState<ProductSubmissionPayload | null>(null);
 
   const loadProducts = async () => {
     const token = localStorage.getItem("auth_token");
@@ -57,11 +69,12 @@ export default function PortalProductsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitProduct = async (payload: ProductSubmissionPayload) => {
     setSubmitting(true);
     setError("");
     setSuccess(null);
+    setCopied(false);
+    setLastPayload(payload);
 
     try {
       const token = localStorage.getItem("auth_token");
@@ -71,11 +84,7 @@ export default function PortalProductsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          asin: asin.toUpperCase(),
-          marketplace,
-          custom_title: customTitle || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -97,89 +106,178 @@ export default function PortalProductsPage() {
     }
   };
 
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    await submitProduct({
+      asin: asin.toUpperCase(),
+      marketplace,
+      custom_title: customTitle || null,
+    });
+  };
+
+  const handleRetrySubmit = async () => {
+    if (!lastPayload || submitting) {
+      return;
+    }
+
+    await submitProduct(lastPayload);
+  };
+
+  const handleCopy = async () => {
+    if (!success) return;
+
+    const copyOk = await copyTextToClipboard(success.link);
+    if (!copyOk) {
+      setError("Could not copy the full link. Please try again.");
+      return;
+    }
+
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleProductCopy = async (product: PortalProduct) => {
+    const copiedOk = await copyTextToClipboard(product.bridge_page_url);
+    if (!copiedOk) {
+      setError("Could not copy the full link. Please try again.");
+      return;
+    }
+
+    const copyKey = `${product.id}`;
+    setCopiedProductKey(copyKey);
+    window.setTimeout(() => {
+      setCopiedProductKey((current) => (current === copyKey ? "" : current));
+    }, 2000);
+  };
+
   return (
-    <section style={styles.wrap}>
-      <article style={styles.card}>
-        <h1 style={styles.title}>Submit ASIN</h1>
-        <p style={styles.copy}>Paste an ASIN or full Amazon product link. If live product data is fetched successfully, your tracked link will be ready instantly.</p>
-        <p style={styles.helper}>
-          First time here? Add your marketplace tracking ID in <Link style={styles.link} to="/portal/tracking">Tracking IDs</Link>.
+    <section className="flex flex-col lg:grid lg:grid-cols-[minmax(320px,420px)_1fr] gap-4">
+      <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+        <h1 className="m-0 mb-3 text-gray-50 text-xl font-bold">Submit ASIN</h1>
+        <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">Paste an ASIN or full Amazon product link. If live product data is fetched successfully, your tracked link will be ready instantly.</p>
+        <p className="m-0 mb-3 text-blue-300 leading-relaxed text-sm">
+          First time here? Add your marketplace tag in <Link className="text-amber-400 no-underline font-semibold hover:text-amber-300" to="/portal/tracking">Tags</Link>.
         </p>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
+        <form onSubmit={(e) => void handleSubmit(e)} className="grid gap-3">
           <input
-            style={styles.input}
+            className="rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
             placeholder="ASIN or Amazon product link"
             value={asin}
             onChange={(e) => setAsin(e.target.value)}
             maxLength={1000}
             required
           />
-          <select style={styles.input} value={marketplace} onChange={(e) => setMarketplace(e.target.value)}>
+          <select className="rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-auto" value={marketplace} onChange={(e) => setMarketplace(e.target.value)}>
             {["US", "CA", "UK", "DE", "IT", "FR", "ES"].map((item) => (
               <option key={item} value={item}>{item}</option>
             ))}
           </select>
           <input
-            style={styles.input}
+            className="rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
             placeholder="Custom title (optional)"
             value={customTitle}
             onChange={(e) => setCustomTitle(e.target.value)}
           />
-          <button style={styles.button} type="submit" disabled={submitting}>
+          <button className="border-none rounded-xl bg-amber-500 text-gray-900 font-bold px-4 py-3.5 cursor-pointer hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" type="submit" disabled={submitting}>
             {submitting ? "Submitting..." : "Submit ASIN"}
           </button>
         </form>
 
-        {error ? <p style={styles.error}>{error}</p> : null}
+        {error ? (
+          <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm">
+            <p className="m-0 text-red-200">{error}</p>
+            {lastPayload ? (
+              <button
+                className="mt-3 border-none rounded-lg bg-red-400/20 px-4 py-2 text-sm font-semibold text-red-100 cursor-pointer hover:bg-red-400/30 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => void handleRetrySubmit()}
+                disabled={submitting}
+              >
+                {submitting ? "Retrying..." : "Retry"}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {success ? (
-          <div style={styles.success}>
-            <p style={styles.successTitle}>{success.message}</p>
-            <p style={styles.copy}>
+          <div className="mt-4 bg-emerald-500/10 border border-emerald-500/25 rounded-xl p-4">
+            <p className="m-0 mb-2 text-emerald-100 font-bold">{success.message}</p>
+            <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">
               {success.product.asin} · {success.product.marketplace}
             </p>
-            <div style={styles.linkRow}>
-              <input style={styles.input} readOnly value={success.link} />
+            <div className="flex flex-col sm:flex-row gap-3 mt-4">
+              <input className="flex-1 rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none text-sm" readOnly value={success.link} />
               <button
-                style={styles.button}
+                className="border-none rounded-xl bg-amber-500 text-gray-900 font-bold px-6 py-3 cursor-pointer hover:bg-amber-400 transition-colors whitespace-nowrap"
                 type="button"
-                onClick={() => navigator.clipboard.writeText(success.link).catch(console.error)}
+                onClick={() => void handleCopy()}
               >
-                Copy
+                {copied ? "Copied" : "Copy"}
               </button>
             </div>
           </div>
         ) : null}
       </article>
 
-      <article style={styles.card}>
-        <h2 style={styles.title}>My Products</h2>
-        {loading ? <p style={styles.copy}>Loading...</p> : null}
-        {!loading && products.length === 0 ? <p style={styles.copy}>No products submitted yet.</p> : null}
+      <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
+        <h2 className="m-0 mb-3 text-gray-50 text-xl font-bold">My Products</h2>
+        {loading ? <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">Loading...</p> : null}
+        {!loading && error && products.length === 0 ? (
+          <button
+            className="mb-3 border-none rounded-xl bg-[#0f766e] text-[#f8fafc] font-semibold px-4 py-3 cursor-pointer hover:bg-[#115e59] transition-colors"
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setError("");
+              loadProducts()
+                .catch((err) =>
+                  setError(err instanceof Error ? err.message : "Failed to load products")
+                )
+                .finally(() => setLoading(false));
+            }}
+          >
+            Retry loading products
+          </button>
+        ) : null}
+        {!loading && products.length === 0 ? <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">No products submitted yet.</p> : null}
 
-        <div style={styles.list}>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-3">
           {products.map((product) => (
-            <div key={product.id} style={styles.item}>
-              <img src={product.image_url} alt={product.title} style={styles.image} />
-              <div>
-                <p style={styles.itemTitle}>{product.custom_title || product.title}</p>
-                <p style={styles.copy}>
+            <div key={product.id} className="grid grid-cols-[72px_1fr] sm:grid-cols-[80px_1fr] gap-3 items-center border border-white/10 rounded-xl p-3 bg-white/[0.02]">
+              <img src={product.image_url} alt={product.title} className="w-[72px] h-[72px] sm:w-[80px] sm:h-[80px] object-contain bg-white rounded-lg p-1" />
+              <div className="min-w-0">
+                <p className="m-0 mb-1.5 text-gray-50 font-semibold leading-tight truncate">{product.custom_title || product.title}</p>
+                <p className="m-0 mb-1.5 text-slate-300 leading-relaxed text-xs">
                   {product.asin} · {product.marketplace} · {product.tracking_tag}
                 </p>
                 <p
-                  style={{
-                    ...styles.copy,
-                    color:
-                      product.status === "active"
-                        ? "#4ade80"
-                        : product.status === "rejected"
-                          ? "#f87171"
-                          : "#fbbf24",
-                    marginBottom: 0,
-                  }}
+                  className={`m-0 text-xs font-bold capitalize ${
+                    product.status === "active"
+                      ? "text-emerald-400"
+                      : product.status === "rejected"
+                        ? "text-red-400"
+                        : "text-amber-400"
+                  }`}
                 >
                   Status: {product.status.replace("_", " ")}
                 </p>
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    className="w-full sm:w-auto rounded-lg bg-amber-500 px-3 py-2 text-sm font-bold text-gray-900 transition-colors hover:bg-amber-400"
+                    onClick={() => void handleProductCopy(product)}
+                  >
+                    {copiedProductKey === String(product.id) ? "Copied" : "Copy Link"}
+                  </button>
+                  <a
+                    href={product.bridge_page_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full sm:w-auto rounded-lg border border-white/15 px-3 py-2 text-center text-sm font-semibold text-slate-200 no-underline transition-colors hover:bg-white/5"
+                  >
+                    Open
+                  </a>
+                </div>
               </div>
             </div>
           ))}
@@ -189,66 +287,4 @@ export default function PortalProductsPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  wrap: { display: "grid", gridTemplateColumns: "minmax(320px, 420px) 1fr", gap: "1rem" },
-  card: {
-    background: "#111827",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "1rem",
-    padding: "1.5rem",
-  },
-  title: { margin: "0 0 0.75rem", color: "#f9fafb", fontSize: "1.25rem", fontWeight: 700 },
-  copy: { margin: "0 0 0.5rem", color: "#cbd5e1", lineHeight: 1.6 },
-  helper: { margin: "0 0 0.75rem", color: "#93c5fd", lineHeight: 1.6 },
-  link: { color: "#fbbf24", textDecoration: "none", fontWeight: 600 },
-  form: { display: "grid", gap: "0.75rem" },
-  input: {
-    borderRadius: "0.75rem",
-    border: "1px solid rgba(255,255,255,0.12)",
-    background: "#1f2937",
-    color: "#f9fafb",
-    padding: "0.85rem 1rem",
-  },
-  button: {
-    border: "none",
-    borderRadius: "0.75rem",
-    background: "#f59e0b",
-    color: "#111827",
-    fontWeight: 700,
-    padding: "0.9rem 1rem",
-    cursor: "pointer",
-  },
-  error: {
-    color: "#fecaca",
-    margin: "0.75rem 0 0",
-    background: "rgba(239,68,68,0.12)",
-    border: "1px solid rgba(239,68,68,0.25)",
-    borderRadius: "0.75rem",
-    padding: "0.85rem 1rem",
-  },
-  success: {
-    marginTop: "0.85rem",
-    background: "rgba(16,185,129,0.12)",
-    border: "1px solid rgba(16,185,129,0.25)",
-    borderRadius: "0.85rem",
-    padding: "1rem",
-  },
-  successTitle: {
-    margin: "0 0 0.5rem",
-    color: "#d1fae5",
-    fontWeight: 700,
-  },
-  list: { display: "grid", gap: "0.75rem" },
-  linkRow: { display: "grid", gridTemplateColumns: "1fr auto", gap: "0.75rem", marginTop: "0.75rem" },
-  item: {
-    display: "grid",
-    gridTemplateColumns: "72px 1fr",
-    gap: "0.85rem",
-    alignItems: "center",
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "0.85rem",
-    padding: "0.75rem",
-  },
-  image: { width: "72px", height: "72px", objectFit: "contain", background: "#fff", borderRadius: "0.75rem" },
-  itemTitle: { margin: "0 0 0.4rem", color: "#f9fafb", fontWeight: 600, lineHeight: 1.5 },
-};
+// Styles migrated to Tailwind CSS

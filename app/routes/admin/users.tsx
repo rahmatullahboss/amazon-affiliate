@@ -109,77 +109,62 @@ export default function AdminUsersPage() {
     }
   };
 
-  const cardStyle: React.CSSProperties = {
-    background: "rgba(26, 26, 40, 0.9)",
-    border: "1px solid rgba(255,255,255,0.06)",
-    borderRadius: "1rem",
-    padding: "1.5rem",
-  };
-  const inputStyle: React.CSSProperties = {
-    width: "100%",
-    padding: "0.625rem 0.875rem",
-    background: "rgba(255,255,255,0.05)",
-    border: "1px solid rgba(255,255,255,0.1)",
-    borderRadius: "0.5rem",
-    color: "#f0f0f5",
-    fontSize: "0.875rem",
-  };
-
+  // Styles migrated to Tailwind CSS
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#f0f0f5" }}>Users</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Users</h1>
         <button
           onClick={() => setShowForm((value) => !value)}
-          style={{ padding: "0.5rem 1rem", background: "linear-gradient(135deg, #ff9900, #ffad33)", border: "none", borderRadius: "0.5rem", color: "#000", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
+          className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap"
         >
           {showForm ? "Cancel" : "+ Add User"}
         </button>
       </div>
 
       {showForm ? (
-        <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-          <form onSubmit={handleCreate} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
+          <form onSubmit={(e) => void handleCreate(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label style={labelStyle}>Username*</label>
-              <input style={inputStyle} value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Username*</label>
+              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
             </div>
             <div>
-              <label style={labelStyle}>Email</label>
-              <input style={inputStyle} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Email</label>
+              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
             </div>
             <div>
-              <label style={labelStyle}>Password*</label>
-              <input style={inputStyle} type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Password*</label>
+              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
             </div>
             <div>
-              <label style={labelStyle}>Role*</label>
-              <select style={inputStyle} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "super_admin" | "admin" | "agent" })}>
-                <option value="agent">agent</option>
-                <option value="admin">admin</option>
-                <option value="super_admin">super_admin</option>
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Role*</label>
+              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "super_admin" | "admin" | "agent" })}>
+                <option className="bg-gray-800" value="agent">agent</option>
+                <option className="bg-gray-800" value="admin">admin</option>
+                <option className="bg-gray-800" value="super_admin">super_admin</option>
               </select>
             </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              <label style={labelStyle}>Agent Link {form.role === "agent" ? "*" : "(optional)"}</label>
+            <div className="col-span-1 sm:col-span-2">
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Agent Link {form.role === "agent" ? "*" : "(optional)"}</label>
               <select
-                style={inputStyle}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto disabled:opacity-50 disabled:cursor-not-allowed"
                 value={form.agent_id}
                 onChange={(e) => setForm({ ...form, agent_id: Number(e.target.value) })}
                 required={form.role === "agent"}
                 disabled={form.role !== "agent"}
               >
-                <option value={0}>Select agent...</option>
+                <option className="bg-gray-800" value={0}>Select agent...</option>
                 {agents.map((agent) => (
-                  <option key={agent.id} value={agent.id}>
+                  <option className="bg-gray-800" key={agent.id} value={agent.id}>
                     {agent.name} (/{agent.slug})
                   </option>
                 ))}
               </select>
             </div>
-            {error ? <p style={{ color: "#ef4444", fontSize: "0.8rem", margin: 0 }}>{error}</p> : null}
-            <div style={{ gridColumn: "1 / -1" }}>
-              <button type="submit" style={{ padding: "0.625rem 1.5rem", background: "#6366f1", border: "none", borderRadius: "0.5rem", color: "#fff", fontWeight: 600, cursor: "pointer" }}>
+            {error ? <div className="col-span-1 sm:col-span-2"><p className="text-red-500 text-sm m-0 mt-2">{error}</p></div> : null}
+            <div className="col-span-1 sm:col-span-2 mt-2">
+              <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer hover:bg-indigo-600 transition-colors">
                 Create User
               </button>
             </div>
@@ -188,42 +173,35 @@ export default function AdminUsersPage() {
       ) : null}
 
       {loading ? (
-        <p style={{ color: "#a0a0b8" }}>Loading users...</p>
+        <p className="text-[#a0a0b8] m-0">Loading users...</p>
       ) : (
-        <div style={{ display: "grid", gap: "0.75rem" }}>
+        <div className="flex flex-col gap-3">
           {users.map((user) => (
-            <div key={user.id} style={{ ...cardStyle, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <span style={{ fontSize: "1rem", fontWeight: 600, color: "#f0f0f5" }}>{user.username}</span>
-                  <span style={{ fontSize: "0.7rem", padding: "0.125rem 0.5rem", borderRadius: "9999px", background: "rgba(99,102,241,0.15)", color: "#818cf8" }}>{user.role}</span>
-                  <span style={{ fontSize: "0.7rem", padding: "0.125rem 0.5rem", borderRadius: "9999px", background: user.is_active ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)", color: user.is_active ? "#22c55e" : "#ef4444" }}>
+            <div key={user.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="min-w-0 w-full sm:w-auto">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <span className="text-base font-semibold text-[#f0f0f5] truncate">{user.username}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 text-xs font-medium">{user.role}</span>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${user.is_active ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}>
                     {user.is_active ? "Active" : "Inactive"}
                   </span>
                 </div>
-                <div style={{ fontSize: "0.8rem", color: "#6b6b85", marginTop: "0.25rem" }}>
+                <div className="text-sm text-[#6b6b85] truncate mt-2">
                   {user.email || "No email"} · {user.agent_name ? `${user.agent_name} (/${user.agent_slug})` : "No linked agent"}
                 </div>
               </div>
 
               <button
-                onClick={() => toggleActive(user)}
-                style={{ padding: "0.375rem 0.75rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "0.375rem", color: "#a0a0b8", fontSize: "0.75rem", cursor: "pointer" }}
+                onClick={() => void toggleActive(user)}
+                className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#a0a0b8] text-xs font-medium cursor-pointer hover:bg-white/10 transition-colors shrink-0"
               >
                 {user.is_active ? "Deactivate" : "Activate"}
               </button>
             </div>
           ))}
-          {users.length === 0 ? <p style={{ color: "#6b6b85", textAlign: "center", padding: "2rem" }}>No users yet.</p> : null}
+          {users.length === 0 ? <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No users yet.</p> : null}
         </div>
       )}
     </div>
   );
 }
-
-const labelStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: "0.8rem",
-  color: "#a0a0b8",
-  marginBottom: "0.375rem",
-};

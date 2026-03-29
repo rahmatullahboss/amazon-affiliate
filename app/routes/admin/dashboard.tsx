@@ -32,7 +32,7 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <div style={{ color: "#a0a0b8", padding: "2rem" }}>Loading dashboard...</div>;
+    return <div className="text-[#a0a0b8] p-8">Loading dashboard...</div>;
   }
 
   const stats = [
@@ -49,46 +49,46 @@ export default function Dashboard() {
 
   return (
     <div>
-      <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#f0f0f5", marginBottom: "2rem" }}>
+      <h1 className="text-2xl font-bold text-[#f0f0f5] mb-8">
         Dashboard
       </h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "1rem", marginBottom: "2.5rem" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
         {stats.map((stat) => (
-          <div key={stat.label} style={{ background: "rgba(26, 26, 40, 0.9)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "1rem", padding: "1.25rem" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
-              <span style={{ fontSize: "1.25rem" }}>{stat.icon}</span>
-              <span style={{ fontSize: "0.8rem", color: "#6b6b85", fontWeight: 500 }}>{stat.label}</span>
+          <div key={stat.label} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">{stat.icon}</span>
+              <span className="text-sm text-[#6b6b85] font-medium">{stat.label}</span>
             </div>
-            <div style={{ fontSize: "1.75rem", fontWeight: 700, color: stat.color }}>
+            <div className="text-2xl font-bold" style={{ color: stat.color }}>
               {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
             </div>
           </div>
         ))}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
-        <div style={{ background: "rgba(26, 26, 40, 0.9)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "1rem", padding: "1.5rem" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "#f0f0f5", marginBottom: "1rem" }}>Top Agents</h2>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="text-base font-semibold text-[#f0f0f5] mb-4">Top Agents</h2>
           {(data?.topAgents ?? []).length === 0 ? (
-            <p style={{ color: "#6b6b85", fontSize: "0.875rem" }}>No click data yet</p>
+            <p className="text-[#6b6b85] text-sm">No click data yet</p>
           ) : (
             data?.topAgents.map((agent, i) => (
-              <div key={agent.slug} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.625rem 0", borderBottom: i < (data?.topAgents.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                <span style={{ color: "#a0a0b8", fontSize: "0.875rem" }}>{agent.name}</span>
-                <span style={{ color: "#ff9900", fontWeight: 600, fontSize: "0.875rem" }}>{agent.clicks}</span>
+              <div key={agent.slug} className={`flex justify-between items-center py-2.5 ${i < (data?.topAgents.length ?? 0) - 1 ? "border-b border-white/5" : ""}`}>
+                <span className="text-[#a0a0b8] text-sm">{agent.name}</span>
+                <span className="text-[#ff9900] font-semibold text-sm">{agent.clicks}</span>
               </div>
             ))
           )}
         </div>
-        <div style={{ background: "rgba(26, 26, 40, 0.9)", border: "1px solid rgba(255, 255, 255, 0.06)", borderRadius: "1rem", padding: "1.5rem" }}>
-          <h2 style={{ fontSize: "1rem", fontWeight: 600, color: "#f0f0f5", marginBottom: "1rem" }}>Top Products</h2>
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="text-base font-semibold text-[#f0f0f5] mb-4">Top Products</h2>
           {(data?.topProducts ?? []).length === 0 ? (
-            <p style={{ color: "#6b6b85", fontSize: "0.875rem" }}>No click data yet</p>
+            <p className="text-[#6b6b85] text-sm">No click data yet</p>
           ) : (
             data?.topProducts.map((product, i) => (
-              <div key={product.asin} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.625rem 0", borderBottom: i < (data?.topProducts.length ?? 0) - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}>
-                <span style={{ color: "#a0a0b8", fontSize: "0.875rem", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{product.title}</span>
-                <span style={{ color: "#6366f1", fontWeight: 600, fontSize: "0.875rem" }}>{product.clicks}</span>
+              <div key={product.asin} className={`flex justify-between items-center py-2.5 ${i < (data?.topProducts.length ?? 0) - 1 ? "border-b border-white/5" : ""}`}>
+                <span className="text-[#a0a0b8] text-sm max-w-[200px] sm:max-w-xs truncate">{product.title}</span>
+                <span className="text-[#6366f1] font-semibold text-sm">{product.clicks}</span>
               </div>
             ))
           )}

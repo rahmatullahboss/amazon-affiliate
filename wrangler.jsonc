@@ -27,7 +27,9 @@
   // Environment Variables
   "vars": {
     "ENVIRONMENT": "production",
-    "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES"
+    "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES",
+    "PUBLIC_APP_URL": "https://dealsrky.com",
+    "DEFAULT_AMAZON_TAG": "dealsrky-20"
   }
 
   // Secrets (set via `wrangler secret put`):

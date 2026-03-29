@@ -43,37 +43,39 @@ export default function AdminLogin() {
   };
 
   return (
-    <div style={styles.container}>
-      <form onSubmit={handleLogin} style={styles.form}>
-        <div style={styles.logoBox}>
-          <span style={styles.logo}>D</span>
+    <div className="min-h-screen flex text-left items-center justify-center p-8 bg-gradient-to-b from-[#0a0a0f] to-[#12121a]">
+      <form onSubmit={handleLogin} className="w-full max-w-[380px] bg-[#1a1a28]/90 border border-white/10 rounded-3xl p-10 flex flex-col gap-5 shadow-[0_20px_25px_rgba(0,0,0,0.5)]">
+        <div className="flex justify-center mb-2">
+          <span className="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-400 rounded-xl flex items-center justify-center text-xl font-extrabold text-black shadow-[0_4px_20px_rgba(255,153,0,0.3)]">D</span>
         </div>
-        <h1 style={styles.title}>Admin Login</h1>
-        <p style={styles.subtitle}>Sign in to manage your affiliate bridge</p>
+        <div className="text-center">
+            <h1 className="m-0 text-2xl font-bold text-gray-50">Admin Login</h1>
+            <p className="m-0 text-sm text-slate-400 mt-1">Sign in to manage your affiliate bridge</p>
+        </div>
 
-        {error && <div style={styles.error}>{error}</div>}
+        {error && <div className="bg-red-500/10 border border-red-500/30 rounded-lg py-3 px-4 text-red-400 text-sm text-center">{error}</div>}
 
-        <div style={styles.field}>
-          <label htmlFor="username" style={styles.label}>Username</label>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="username" className="text-sm font-medium text-slate-400">Username</label>
           <input
             id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={styles.input}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-50 text-base outline-none transition-colors focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
             required
             autoComplete="username"
           />
         </div>
 
-        <div style={styles.field}>
-          <label htmlFor="password" style={styles.label}>Password</label>
+        <div className="flex flex-col gap-2">
+          <label htmlFor="password" className="text-sm font-medium text-slate-400">Password</label>
           <input
             id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={styles.input}
+            className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-gray-50 text-base outline-none transition-colors focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50"
             required
             autoComplete="current-password"
           />
@@ -82,10 +84,7 @@ export default function AdminLogin() {
         <button
           type="submit"
           disabled={loading}
-          style={{
-            ...styles.button,
-            opacity: loading ? 0.7 : 1,
-          }}
+          className="w-full mt-2 px-4 py-3.5 bg-gradient-to-br from-amber-500 to-amber-400 text-black text-base font-bold border-none rounded-xl cursor-pointer transition-all hover:brightness-110 shadow-[0_4px_16px_rgba(255,153,0,0.2)] disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {loading ? "Signing in..." : "Sign In"}
         </button>
@@ -93,43 +92,3 @@ export default function AdminLogin() {
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "2rem", background: "linear-gradient(180deg, #0a0a0f 0%, #12121a 100%)",
-  },
-  form: {
-    width: "100%", maxWidth: "380px", background: "rgba(26, 26, 40, 0.9)",
-    border: "1px solid rgba(255, 255, 255, 0.08)", borderRadius: "1.5rem",
-    padding: "2.5rem 2rem", display: "flex", flexDirection: "column",
-    gap: "1.25rem", boxShadow: "0 20px 25px rgba(0, 0, 0, 0.5)",
-  },
-  logoBox: { display: "flex", justifyContent: "center", marginBottom: "0.5rem" },
-  logo: {
-    width: "48px", height: "48px", background: "linear-gradient(135deg, #ff9900, #ffad33)",
-    borderRadius: "12px", display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "1.25rem", fontWeight: 800, color: "#000",
-    boxShadow: "0 4px 20px rgba(255, 153, 0, 0.3)",
-  },
-  title: { fontSize: "1.5rem", fontWeight: 700, textAlign: "center", color: "#f0f0f5" },
-  subtitle: { fontSize: "0.875rem", textAlign: "center", color: "#a0a0b8", marginTop: "-0.5rem" },
-  error: {
-    background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.3)",
-    borderRadius: "0.5rem", padding: "0.75rem 1rem", color: "#ef4444",
-    fontSize: "0.875rem", textAlign: "center",
-  },
-  field: { display: "flex", flexDirection: "column", gap: "0.5rem" },
-  label: { fontSize: "0.875rem", fontWeight: 500, color: "#a0a0b8" },
-  input: {
-    padding: "0.75rem 1rem", background: "rgba(255, 255, 255, 0.05)",
-    border: "1px solid rgba(255, 255, 255, 0.1)", borderRadius: "0.75rem",
-    color: "#f0f0f5", fontSize: "1rem", outline: "none", transition: "border-color 0.25s ease",
-  },
-  button: {
-    padding: "0.875rem", background: "linear-gradient(135deg, #ff9900, #ffad33)",
-    color: "#000", fontSize: "1rem", fontWeight: 700, border: "none",
-    borderRadius: "0.75rem", cursor: "pointer", marginTop: "0.5rem",
-    transition: "all 0.25s ease", boxShadow: "0 4px 16px rgba(255, 153, 0, 0.2)",
-  },
-};

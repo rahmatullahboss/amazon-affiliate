@@ -68,73 +68,74 @@ export default function MappingsPage() {
     alert(`Link copied: ${link}`);
   };
 
-  const inputStyle: React.CSSProperties = { width: "100%", padding: "0.625rem 0.875rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "0.5rem", color: "#f0f0f5", fontSize: "0.875rem" };
-  const cardStyle: React.CSSProperties = { background: "rgba(26,26,40,0.9)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "1rem", padding: "1.5rem" };
+  // Styles migrated to Tailwind CSS
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={{ fontSize: "1.75rem", fontWeight: 700, color: "#f0f0f5" }}>Agent ↔ Product Mappings</h1>
-        <button onClick={() => setShowForm(!showForm)} style={{ padding: "0.5rem 1rem", background: "linear-gradient(135deg, #ff9900, #ffad33)", border: "none", borderRadius: "0.5rem", color: "#000", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}>{showForm ? "Cancel" : "+ Create Mapping"}</button>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Agent ↔ Product Mappings</h1>
+        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap">
+          {showForm ? "Cancel" : "+ Create Mapping"}
+        </button>
       </div>
 
       {showForm && (
-        <div style={{ ...cardStyle, marginBottom: "1.5rem" }}>
-          <form onSubmit={handleSubmit} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
+          <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#a0a0b8", marginBottom: "0.375rem" }}>Agent*</label>
-              <select style={inputStyle} value={form.agent_id} onChange={e => setForm({...form, agent_id: Number(e.target.value), tracking_id: 0})} required>
-                <option value={0}>Select agent...</option>
-                {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Agent*</label>
+              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.agent_id} onChange={e => setForm({...form, agent_id: Number(e.target.value), tracking_id: 0})} required>
+                <option className="bg-gray-800" value={0}>Select agent...</option>
+                {agents.map(a => <option className="bg-gray-800" key={a.id} value={a.id}>{a.name}</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#a0a0b8", marginBottom: "0.375rem" }}>Product*</label>
-              <select style={inputStyle} value={form.product_id} onChange={e => setForm({...form, product_id: Number(e.target.value)})} required>
-                <option value={0}>Select product...</option>
-                {products.map(p => <option key={p.id} value={p.id}>{p.title} ({p.asin})</option>)}
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Product*</label>
+              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.product_id} onChange={e => setForm({...form, product_id: Number(e.target.value)})} required>
+                <option className="bg-gray-800" value={0}>Select product...</option>
+                {products.map(p => <option className="bg-gray-800" key={p.id} value={p.id}>{p.title} ({p.asin})</option>)}
               </select>
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#a0a0b8", marginBottom: "0.375rem" }}>Tracking ID*</label>
-              <select style={inputStyle} value={form.tracking_id} onChange={e => setForm({...form, tracking_id: Number(e.target.value)})} required>
-                <option value={0}>Select tracking tag...</option>
-                {filteredTracking.map(t => <option key={t.id} value={t.id}>{t.tag} {t.label ? `(${t.label})` : ""}</option>)}
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Tag*</label>
+              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.tracking_id} onChange={e => setForm({...form, tracking_id: Number(e.target.value)})} required>
+                <option className="bg-gray-800" value={0}>Select tracking tag...</option>
+                {filteredTracking.map(t => <option className="bg-gray-800" key={t.id} value={t.id}>{t.tag} {t.label ? `(${t.label})` : ""}</option>)}
               </select>
               {form.agent_id > 0 && filteredTracking.length === 0 && (
-                <p style={{ fontSize: "0.7rem", color: "#f59e0b", marginTop: "0.25rem" }}>No tracking IDs for this agent. Create one first.</p>
+                <p className="text-[0.7rem] text-[#f59e0b] mt-1 m-0">No tags for this agent. Create one first.</p>
               )}
             </div>
             <div>
-              <label style={{ display: "block", fontSize: "0.8rem", color: "#a0a0b8", marginBottom: "0.375rem" }}>Custom Title (optional)</label>
-              <input style={inputStyle} value={form.custom_title} onChange={e => setForm({...form, custom_title: e.target.value})} placeholder="Override product title" />
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Custom Title (optional)</label>
+              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.custom_title} onChange={e => setForm({...form, custom_title: e.target.value})} placeholder="Override product title" />
             </div>
-            <div style={{ gridColumn: "1 / -1" }}>
-              {error && <p style={{ color: "#ef4444", fontSize: "0.8rem", marginBottom: "0.5rem" }}>{error}</p>}
-              <button type="submit" style={{ padding: "0.625rem 1.5rem", background: "#6366f1", border: "none", borderRadius: "0.5rem", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Create Mapping</button>
+            <div className="col-span-1 sm:col-span-2 mt-2">
+              {error && <p className="text-red-500 text-sm mb-3 m-0">{error}</p>}
+              <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer hover:bg-indigo-600 transition-colors">Create Mapping</button>
             </div>
           </form>
         </div>
       )}
 
-      {loading ? <p style={{ color: "#6b6b85" }}>Loading...</p> : (
-        <div style={{ display: "grid", gap: "0.5rem" }}>
+      {loading ? <p className="text-[#6b6b85] m-0">Loading...</p> : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {mappings.map(m => (
-            <div key={m.id} style={{ ...cardStyle, display: "flex", alignItems: "center", justifyContent: "space-between", padding: "1rem 1.5rem" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-                <img src={m.image_url} alt="" style={{ width: "40px", height: "40px", objectFit: "contain", borderRadius: "0.375rem", background: "#fff" }} />
-                <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "#f0f0f5" }}>{m.agent_name} → {m.custom_title || m.product_title}</div>
-                  <div style={{ fontSize: "0.75rem", color: "#6b6b85" }}>ASIN: {m.asin} · Tag: <code style={{ color: "#ff9900" }}>{m.tracking_tag}</code></div>
+            <div key={m.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl flex flex-col gap-4 p-5 justify-between">
+              <div className="flex items-center gap-3">
+                <img src={m.image_url} alt="" className="w-12 h-12 object-contain rounded-lg bg-white shrink-0 p-1" />
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-[#f0f0f5] truncate">{m.agent_name} → {m.custom_title || m.product_title}</div>
+                  <div className="text-xs text-[#6b6b85] mt-1 truncate">ASIN: {m.asin} · Tag: <code className="text-[#ff9900] bg-white/5 px-1 rounded">{m.tracking_tag}</code></div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: "0.5rem" }}>
-                <button onClick={() => copyLink(m.agent_slug, m.asin)} style={{ padding: "0.25rem 0.5rem", background: "rgba(99,102,241,0.1)", border: "1px solid rgba(99,102,241,0.2)", borderRadius: "0.375rem", color: "#818cf8", fontSize: "0.7rem", cursor: "pointer" }}>📋 Copy Link</button>
-                <button onClick={() => handleDelete(m.id)} style={{ padding: "0.25rem 0.5rem", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: "0.375rem", color: "#ef4444", fontSize: "0.7rem", cursor: "pointer" }}>Delete</button>
+              <div className="flex gap-2 justify-end mt-auto pt-2 border-t border-white/5">
+                <button onClick={() => void copyLink(m.agent_slug, m.asin)} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-md text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors">📋 Copy Link</button>
+                <button onClick={() => void handleDelete(m.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors">Delete</button>
               </div>
             </div>
           ))}
-          {mappings.length === 0 && <p style={{ color: "#6b6b85", textAlign: "center", padding: "2rem" }}>No mappings yet. Create one to generate shareable links.</p>}
+          {mappings.length === 0 && <p className="col-span-1 md:col-span-2 xl:col-span-3 text-center text-[#6b6b85] p-8 m-0">No mappings yet. Create one to generate shareable links.</p>}
         </div>
       )}
     </div>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 export default function AdminLayout() {
   const navigate = useNavigate();
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
@@ -37,87 +38,79 @@ export default function AdminLayout() {
   ];
 
   return (
-    <div style={styles.layout}>
-      <aside style={styles.sidebar}>
-        <div style={styles.sidebarHeader}>
-          <span style={styles.sidebarLogo}>D</span>
-          <span style={styles.sidebarTitle}>DealsRky</span>
+    <div className="flex min-h-screen bg-[#0a0a0f] text-[#f0f0f5]">
+      {/* Mobile Top Header */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#12121a]/95 border-b border-white/5 flex items-center justify-between px-4 z-40 backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#ff9900] to-[#ffad33] flex items-center justify-center text-black font-bold text-xs shadow-lg">D</div>
+          <span className="font-bold text-lg text-[#f0f0f5]">DealsRky</span>
+        </div>
+        <button 
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="text-[#a0a0b8] hover:text-white p-2"
+        >
+          {isMobileMenuOpen ? (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          ) : (
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+          )}
+        </button>
+      </div>
+
+      {/* Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#12121a]/95 border-r border-white/5 flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:h-screen ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="hidden lg:flex items-center gap-3 px-5 py-6 border-b border-white/5">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#ff9900] to-[#ffad33] flex items-center justify-center text-black font-bold text-sm shadow-lg">D</div>
+          <span className="font-bold text-lg text-[#f0f0f5]">DealsRky</span>
         </div>
 
-        <nav style={styles.nav}>
+        <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto md:mt-0 mt-4">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               end={item.end}
-              style={({ isActive }) => ({
-                ...styles.navLink,
-                background: isActive ? "rgba(255, 153, 0, 0.1)" : "transparent",
-                color: isActive ? "#ff9900" : "#a0a0b8",
-                borderLeft: isActive ? "3px solid #ff9900" : "3px solid transparent",
-              })}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200
+                ${isActive 
+                  ? "bg-[#ff9900]/10 text-[#ff9900] border-l-[3px] border-[#ff9900]" 
+                  : "text-[#a0a0b8] border-l-[3px] border-transparent hover:bg-white/5 hover:text-white"
+                }
+              `}
             >
-              <span>{item.icon}</span>
+              <span className="text-lg">{item.icon}</span>
               <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div style={styles.sidebarFooter}>
-          <div style={styles.userInfo}>
-            <span style={styles.userName}>{user.username}</span>
-            <span style={styles.userRole}>{user.role}</span>
+        <div className="px-5 py-4 border-t border-white/5 flex items-center justify-between">
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-[#f0f0f5]">{user.username}</span>
+            <span className="text-xs text-[#6b6b85] capitalize">{user.role}</span>
           </div>
-          <button onClick={handleLogout} style={styles.logoutBtn}>
+          <button 
+            onClick={handleLogout}
+            className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 text-xs font-medium hover:bg-red-500/20 transition-colors"
+          >
             Logout
           </button>
         </div>
       </aside>
 
-      <main style={styles.main}>
+      {/* Main Content */}
+      <main className="flex-1 p-4 lg:p-8 overflow-y-auto w-full pt-20 lg:pt-8">
         <Outlet />
       </main>
     </div>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  layout: { display: "flex", minHeight: "100vh", background: "#0a0a0f" },
-  sidebar: {
-    width: "260px", background: "rgba(18, 18, 26, 0.95)",
-    borderRight: "1px solid rgba(255, 255, 255, 0.06)",
-    display: "flex", flexDirection: "column", flexShrink: 0,
-    position: "sticky" as const, top: 0, height: "100vh",
-  },
-  sidebarHeader: {
-    display: "flex", alignItems: "center", gap: "0.75rem",
-    padding: "1.5rem 1.25rem", borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
-  },
-  sidebarLogo: {
-    width: "36px", height: "36px", background: "linear-gradient(135deg, #ff9900, #ffad33)",
-    borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: "0.875rem", fontWeight: 800, color: "#000",
-  },
-  sidebarTitle: { fontSize: "1.125rem", fontWeight: 700, color: "#f0f0f5" },
-  nav: {
-    flex: 1, padding: "1rem 0.75rem", display: "flex", flexDirection: "column", gap: "0.25rem",
-  },
-  navLink: {
-    display: "flex", alignItems: "center", gap: "0.75rem", padding: "0.625rem 1rem",
-    borderRadius: "0.5rem", fontSize: "0.875rem", fontWeight: 500,
-    textDecoration: "none", transition: "all 0.2s ease",
-  },
-  sidebarFooter: {
-    padding: "1rem 1.25rem", borderTop: "1px solid rgba(255, 255, 255, 0.06)",
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-  },
-  userInfo: { display: "flex", flexDirection: "column" },
-  userName: { fontSize: "0.875rem", fontWeight: 600, color: "#f0f0f5" },
-  userRole: { fontSize: "0.75rem", color: "#6b6b85", textTransform: "capitalize" as const },
-  logoutBtn: {
-    padding: "0.375rem 0.75rem", background: "rgba(239, 68, 68, 0.1)",
-    border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "0.375rem",
-    color: "#ef4444", fontSize: "0.75rem", fontWeight: 500, cursor: "pointer",
-  },
-  main: { flex: 1, padding: "2rem", overflowY: "auto" as const },
-};

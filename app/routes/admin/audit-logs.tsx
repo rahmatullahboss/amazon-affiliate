@@ -42,71 +42,53 @@ export default function AuditLogsPage() {
   }
 
   if (loading) {
-    return <p style={{ color: "#a0a0b8" }}>Loading audit logs...</p>;
+    return <p className="text-[#a0a0b8]">Loading audit logs...</p>;
   }
 
   if (error) {
     return (
       <div>
-        <h1 style={titleStyle}>Audit Logs</h1>
-        <p style={{ color: "#f87171" }}>{error}</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5]">Audit Logs</h1>
+        <p className="text-red-400">{error}</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
-        <h1 style={titleStyle}>Audit Logs</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5]">Audit Logs</h1>
         <button
           onClick={() => void fetchLogs()}
-          style={{
-            padding: "0.5rem 0.9rem",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: "0.5rem",
-            color: "#f0f0f5",
-            cursor: "pointer",
-          }}
+          className="px-3.5 py-2 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] cursor-pointer hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
         >
           Refresh
         </button>
       </div>
 
       {logs.length === 0 ? (
-        <p style={{ color: "#6b6b85" }}>No audit entries yet.</p>
+        <p className="text-[#6b6b85]">No audit entries yet.</p>
       ) : (
-        <div style={{ display: "grid", gap: "0.75rem" }}>
+        <div className="grid gap-3">
           {logs.map((log) => (
-            <article key={log.id} style={cardStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "1rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+            <article key={log.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
+              <div className="flex justify-between gap-4 mb-3 flex-wrap">
                 <div>
-                  <div style={{ color: "#f0f0f5", fontWeight: 700 }}>{log.action}</div>
-                  <div style={{ color: "#8d8da6", fontSize: "0.8rem" }}>
+                  <div className="text-[#f0f0f5] font-bold">{log.action}</div>
+                  <div className="text-[#8d8da6] text-sm">
                     {log.entityType}{log.entityId ? ` · ${log.entityId}` : ""}
                   </div>
                 </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ color: "#cbd5e1", fontSize: "0.8rem" }}>
+                <div className="text-right">
+                  <div className="text-slate-300 text-sm">
                     {log.username || "System"}
                   </div>
-                  <div style={{ color: "#6b6b85", fontSize: "0.76rem" }}>
+                  <div className="text-[#6b6b85] text-xs">
                     {new Date(log.createdAt).toLocaleString()}
                   </div>
                 </div>
               </div>
-              <pre
-                style={{
-                  margin: 0,
-                  padding: "0.85rem",
-                  borderRadius: "0.75rem",
-                  background: "rgba(255,255,255,0.03)",
-                  color: "#a0a0b8",
-                  fontSize: "0.78rem",
-                  overflowX: "auto",
-                  whiteSpace: "pre-wrap",
-                }}
-              >
+              <pre className="m-0 p-3.5 rounded-xl bg-white/5 text-[#a0a0b8] text-xs overflow-x-auto whitespace-pre-wrap font-mono">
                 {JSON.stringify(log.details, null, 2)}
               </pre>
             </article>
@@ -116,16 +98,3 @@ export default function AuditLogsPage() {
     </div>
   );
 }
-
-const titleStyle: React.CSSProperties = {
-  fontSize: "1.75rem",
-  fontWeight: 700,
-  color: "#f0f0f5",
-};
-
-const cardStyle: React.CSSProperties = {
-  background: "rgba(26, 26, 40, 0.9)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderRadius: "1rem",
-  padding: "1.25rem",
-};

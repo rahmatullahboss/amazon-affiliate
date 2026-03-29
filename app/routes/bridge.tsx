@@ -1,5 +1,6 @@
 import type { Route } from "./+types/bridge";
-import "./bridge.css";
+import { Link } from "react-router";
+import { ImageGallery } from "../components/product/ImageGallery";
 import { recordView } from "../../server/services/analytics";
 
 // ─── Types ───────────────────────────────────────
@@ -149,97 +150,111 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
   const data = loaderData as BridgeData;
   const galleryImages = data.product.productImages?.length
     ? data.product.productImages
-    : [data.product.imageUrl];
+    : [];
   const aplusImages = data.product.aplusImages ?? [];
   const features = data.product.features ?? [];
 
   return (
-    <div className="bridge-page">
-      {/* Header */}
-      <header className="bridge-header">
-        <div className="bridge-logo">
-          <span className="bridge-logo-icon">D</span>
-          <span>DealsRky</span>
+    <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
+      <div className="border-b border-gray-200 bg-white/70">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-4 text-sm text-gray-500 lg:px-6">
+          <Link to="/" className="hover:text-primary">
+            Home
+          </Link>
+          <span>/</span>
+          <Link to="/deals" className="hover:text-primary">
+            Deals
+          </Link>
+          <span>/</span>
+          <span>{data.product.asin}</span>
         </div>
-      </header>
+      </div>
 
-      {/* Main Content */}
-      <main className="bridge-main">
-        <article className="product-card">
-          {/* Product Image */}
-          <div className="product-image-container">
-            <span className="product-badge">Amazon Verified</span>
-            <img
-              src={data.product.imageUrl}
-              alt={data.product.title}
-              className="product-image"
-              loading="eager"
-              fetchPriority="high"
-              width="400"
-              height="400"
+      <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
+        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
+          <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-4 md:hidden">
+              <a
+                href={data.redirectUrl}
+                rel="nofollow sponsored"
+                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              >
+                Continue to Amazon
+              </a>
+            </div>
+            <ImageGallery
+              mainImage={data.product.imageUrl}
+              galleryImages={galleryImages}
+              title={data.product.title}
             />
-          </div>
+          </section>
 
-          {/* Product Info */}
-          <div className="product-info">
-            <h1 className="product-title">{data.product.title}</h1>
-            {data.product.description ? (
-              <p className="product-description">{data.product.description}</p>
-            ) : null}
-            {features.length > 0 ? (
-              <ul className="feature-list">
-                {features.map((feature) => (
-                  <li key={feature}>{feature}</li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-
-          {/* Buy Button */}
-          <div className="buy-button-container">
-            <a
-              href={data.redirectUrl}
-              className="buy-button"
-              rel="noopener noreferrer nofollow sponsored"
-              id="buy-on-amazon-btn"
-            >
-              <span className="buy-button-icon">🛒</span>
-              <span className="buy-button-text">
-                <span className="buy-button-label">Buy on Amazon</span>
-                <span className="buy-button-subtitle">Fast &amp; Secure Checkout</span>
+          <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
+                {data.marketplace}
               </span>
-            </a>
-          </div>
+              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
+                Agent link
+              </span>
+            </div>
 
-          {/* Trust Signals */}
-          <div className="trust-signals">
-            <div className="trust-item">
-              <span className="trust-icon">✓</span>
-              <span>Amazon Verified</span>
-            </div>
-            <div className="trust-item">
-              <span className="trust-icon">✓</span>
-              <span>Secure Checkout</span>
-            </div>
-            <div className="trust-item">
-              <span className="trust-icon">✓</span>
-              <span>Fast Delivery</span>
-            </div>
-          </div>
-        </article>
+            <h1 className="mt-5 text-3xl font-black leading-tight text-gray-950 md:text-4xl">
+              {data.product.title}
+            </h1>
 
-        {galleryImages.length > 1 ? (
-          <section className="bridge-section">
-            <h2 className="bridge-section-title">Product images</h2>
-            <div className="image-grid">
-              {galleryImages.map((image, index) => (
-                <div key={`${image}-${index}`} className="gallery-card">
-                  <img
-                    src={image}
-                    alt={`${data.product.title} image ${index + 1}`}
-                    className="gallery-image"
-                    loading="lazy"
-                  />
+            {data.product.description ? (
+              <p className="mt-5 text-sm leading-7 text-gray-600">{data.product.description}</p>
+            ) : null}
+
+            <div className="mt-6 rounded-[1.5rem] border border-primary/20 bg-primary/5 p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">
+                Amazon checkout
+              </p>
+              <p className="mt-2 text-lg font-bold text-gray-900">
+                Continue to Amazon for live pricing
+              </p>
+              <p className="mt-2 text-sm leading-6 text-gray-600">
+                This link is tracked for the assigned agent. Final price, delivery,
+                availability, and reviews are always shown on Amazon.
+              </p>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={data.redirectUrl}
+                rel="nofollow sponsored"
+                className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              >
+                Buy on Amazon
+              </a>
+              <a
+                href={data.redirectUrl}
+                rel="nofollow sponsored"
+                className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
+              >
+                Continue securely
+              </a>
+            </div>
+
+            {data.product.description ? (
+              <div className="mt-8 border-t border-gray-100 pt-6">
+                <h2 className="text-lg font-bold text-gray-900">Product overview</h2>
+                <p className="mt-3 text-sm leading-7 text-gray-600">
+                  {data.product.description}
+                </p>
+              </div>
+            ) : null}
+          </section>
+        </div>
+
+        {features.length > 0 ? (
+          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <h2 className="text-2xl font-black text-gray-950">Key features</h2>
+            <div className="mt-6 grid gap-4 md:grid-cols-2">
+              {features.map((feature) => (
+                <div key={feature} className="rounded-2xl bg-gray-50 p-4 text-sm leading-6 text-gray-700">
+                  {feature}
                 </div>
               ))}
             </div>
@@ -247,15 +262,25 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
         ) : null}
 
         {aplusImages.length > 0 ? (
-          <section className="bridge-section">
-            <h2 className="bridge-section-title">More product details</h2>
-            <div className="aplus-stack">
+          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mb-6">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                From the manufacturer
+              </p>
+              <h2 className="mt-2 text-2xl font-black text-gray-950">
+                Product details
+              </h2>
+            </div>
+            <div className="flex flex-col gap-4">
               {aplusImages.map((image, index) => (
-                <div key={`${image}-${index}`} className="aplus-card">
+                <div
+                  key={`${image}-${index}`}
+                  className="overflow-hidden rounded-2xl border border-gray-100"
+                >
                   <img
                     src={image}
                     alt={`${data.product.title} detail ${index + 1}`}
-                    className="aplus-image"
+                    className="w-full object-contain"
                     loading="lazy"
                   />
                 </div>
@@ -263,18 +288,17 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
             </div>
           </section>
         ) : null}
-      </main>
 
-      {/* Affiliate Disclosure — REQUIRED by Amazon Associates TOS */}
-      <footer className="bridge-footer">
-        <p className="affiliate-disclosure">
-          Affiliate Disclosure: As an Amazon Associate, we earn from qualifying
-          purchases. This page contains affiliate links, which means we may
-          receive a commission at no additional cost to you when you click through
-          and make a purchase on Amazon. Product prices and availability are
-          subject to change. We encourage you to verify current pricing on Amazon.
-        </p>
-      </footer>
+        <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 text-sm leading-7 text-gray-600 shadow-sm md:p-8">
+          <p>
+            Affiliate Disclosure: As an Amazon Associate, we earn from qualifying
+            purchases. This page contains affiliate links, which means we may
+            receive a commission at no additional cost to you when you click through
+            and make a purchase on Amazon. Product prices and availability are
+            subject to change. We encourage you to verify current pricing on Amazon.
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

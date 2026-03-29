@@ -4,8 +4,16 @@ export type Bindings = {
   KV: KVNamespace;
   ENVIRONMENT: string;
   SUPPORTED_MARKETPLACES: string;
+  PUBLIC_APP_URL?: string;
+  DEFAULT_AMAZON_TAG?: string;
   JWT_SECRET: string;
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
   AMAZON_API_KEY?: string;
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
+  RESEND_REPLY_TO?: string;
+  GOOGLE_CLIENT_ID?: string;
   IP_SALT?: string;
   GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
