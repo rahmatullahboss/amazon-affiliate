@@ -1,11 +1,13 @@
 import type { Route } from "./+types/deals";
 import { ProductCard } from "../components/home/ProductCard";
+import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "All Deals — DealsRky" },
-    { name: "description", content: "Browse all curated Amazon deals on DealsRky." },
-  ];
+  return buildSeoMeta({
+    title: "All Deals — DealsRky",
+    description: "Browse all curated Amazon deals on DealsRky.",
+    path: "/deals",
+  });
 }
 
 export async function loader({ request, context }: Route.LoaderArgs) {

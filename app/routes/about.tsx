@@ -1,14 +1,13 @@
 import type { Route } from "./+types/about";
 import { Link } from "react-router";
+import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "About | DealsRky" },
-    {
-      name: "description",
-      content: "About DealsRky and how the site curates Amazon product pages and affiliate links.",
-    },
-  ];
+  return buildSeoMeta({
+    title: "About | DealsRky",
+    description: "About DealsRky and how the site curates Amazon product pages and affiliate links.",
+    path: "/about",
+  });
 }
 
 export default function About() {

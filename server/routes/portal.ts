@@ -4,7 +4,11 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { portalAsinSubmissionSchema, portalTrackingReplaceDeleteSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
-import { ensureProductRecord, extractAsinFromInput } from '../services/product-ingestion';
+import {
+  ensureProductRecord,
+  extractAsinFromInput,
+  getAmazonProductFetchErrorMessage,
+} from '../services/product-ingestion';
 import { getPublicAppOrigin } from '../utils/url';
 
 const portal = new Hono<AppEnv>();
@@ -168,33 +172,28 @@ portal.get('/links', async (c) => {
     redirectUrl: `${origin}/go/${row.agent_slug}/${row.asin}`,
   }));
 
-  const { results: shortcutResults } = await c.env.DB.prepare(
-    `SELECT a.slug as agent_slug, a.name as agent_name, t.tag as tracking_tag, t.marketplace
+  const { results: dynamicBridgeResults } = await c.env.DB.prepare(
+    `SELECT DISTINCT a.slug as agent_slug, a.name as agent_name
      FROM tracking_ids t
      JOIN agents a ON a.id = t.agent_id
      ${role === 'agent' ? 'WHERE a.id = ?' : 'WHERE 1 = 1'}
        AND t.is_active = 1
        AND a.is_active = 1
-     ORDER BY a.name ASC, t.is_default DESC, t.created_at ASC`
+     ORDER BY a.name ASC`
   )
     .bind(...bindings)
     .all<{
       agent_slug: string;
       agent_name: string;
-      tracking_tag: string;
-      marketplace: string;
     }>();
 
-  const shortcutTemplates = (shortcutResults ?? []).map((row) => ({
+  const dynamicBridgeTemplates = (dynamicBridgeResults ?? []).map((row) => ({
     agentSlug: row.agent_slug,
     agentName: row.agent_name,
-    trackingTag: row.tracking_tag,
-    marketplace: row.marketplace,
-    bridgeTemplateUrl: `${origin}/t/${row.tracking_tag}/{ASIN}`,
-    redirectTemplateUrl: `${origin}/go/t/${row.tracking_tag}/{ASIN}`,
+    bridgeTemplateUrl: `${origin}/${row.agent_slug}/{ASIN}`,
   }));
 
-  return c.json({ links, shortcutTemplates });
+  return c.json({ links, dynamicBridgeTemplates });
 });
 
 portal.get('/performance', async (c) => {
@@ -743,9 +742,9 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
         image_url: ensuredProduct.image_url,
         status: ensuredProduct.status || 'active',
       };
-    } catch {
+    } catch (error) {
       throw new HTTPException(502, {
-        message: 'Could not fetch live product data for this ASIN. Try another ASIN or ask admin to review it.',
+        message: getAmazonProductFetchErrorMessage(error),
       });
     }
   }

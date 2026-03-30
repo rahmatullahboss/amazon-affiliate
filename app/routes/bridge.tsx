@@ -1,7 +1,13 @@
 import type { Route } from "./+types/bridge";
-import { Link } from "react-router";
+import { Link, redirect } from "react-router";
+import { useEffect, type MouseEvent } from "react";
 import { ImageGallery } from "../components/product/ImageGallery";
 import { recordView } from "../../server/services/analytics";
+import {
+  DynamicLinkResolutionError,
+  ensureDynamicLinkByAgentSlug,
+} from "../../server/services/dynamic-links";
+import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
 
 // ─── Types ───────────────────────────────────────
 interface BridgeData {
@@ -30,7 +36,7 @@ export function meta({ data }: Route.MetaArgs) {
 
   const pageData = data as BridgeData;
   return [
-    { title: `${pageData.product.title} — Buy on Amazon` },
+    { title: `${pageData.product.title} — View on Amazon` },
     {
       name: "description",
       content: `Check out ${pageData.product.title} on Amazon. Verified product with secure checkout.`,
@@ -54,44 +60,72 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     throw new Response("Invalid link", { status: 400 });
   }
 
-  const { env, ctx } = context.cloudflare;
+  const storefrontPath = `/${agentSlug}`;
 
-  // Direct D1 access — no HTTP fetch, no network hop, sub-millisecond
-  const row = await env.DB.prepare(
-    `SELECT
-       a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-       p.asin, p.title as product_title, p.image_url, p.description, p.features,
-       p.product_images, p.aplus_images, p.id as product_id,
-       t.tag as tracking_tag, t.marketplace,
-       ap.custom_title
-     FROM agent_products ap
-     JOIN agents a ON a.id = ap.agent_id
-     JOIN products p ON p.id = ap.product_id
-     JOIN tracking_ids t ON t.id = ap.tracking_id
-     WHERE a.slug = ? AND p.asin = ?
-       AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
-     LIMIT 1`
-  )
-    .bind(agentSlug, asin)
-    .first<{
-      agent_slug: string;
-      agent_name: string;
-      agent_id: number;
-      asin: string;
-      product_title: string;
-      image_url: string;
-      description: string | null;
-      features: string | null;
-      product_images: string | null;
-      aplus_images: string | null;
-      product_id: number;
-      tracking_tag: string;
-      marketplace: string;
-      custom_title: string | null;
-    }>();
+  const { env, ctx } = context.cloudflare;
+  const workerEnv = env as Env & { AMAZON_API_KEY_FALLBACK?: string };
+
+  const loadBridgeRow = async () =>
+    env.DB.prepare(
+      `SELECT
+         a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
+         p.asin, p.title as product_title, p.image_url, p.description, p.features,
+         p.product_images, p.aplus_images, p.id as product_id,
+         t.tag as tracking_tag, t.marketplace,
+         ap.custom_title
+       FROM agent_products ap
+       JOIN agents a ON a.id = ap.agent_id
+       JOIN products p ON p.id = ap.product_id
+       JOIN tracking_ids t ON t.id = ap.tracking_id
+       WHERE a.slug = ? AND p.asin = ?
+         AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+       LIMIT 1`
+    )
+      .bind(agentSlug, asin)
+      .first<{
+        agent_slug: string;
+        agent_name: string;
+        agent_id: number;
+        asin: string;
+        product_title: string;
+        image_url: string;
+        description: string | null;
+        features: string | null;
+        product_images: string | null;
+        aplus_images: string | null;
+        product_id: number;
+        tracking_tag: string;
+        marketplace: string;
+        custom_title: string | null;
+      }>();
+
+  let row = await loadBridgeRow();
 
   if (!row) {
-    throw new Response("Product not found", { status: 404 });
+    try {
+      await ensureDynamicLinkByAgentSlug({
+        db: workerEnv.DB,
+        kv: workerEnv.KV,
+        agentSlug,
+        asin,
+        apiKey: workerEnv.AMAZON_API_KEY,
+        fallbackApiKeys: workerEnv.AMAZON_API_KEY_FALLBACK
+          ? [workerEnv.AMAZON_API_KEY_FALLBACK]
+          : [],
+      });
+    } catch (error) {
+      if (error instanceof DynamicLinkResolutionError) {
+        throw redirect(storefrontPath);
+      }
+
+      throw error;
+    }
+
+    row = await loadBridgeRow();
+  }
+
+  if (!row) {
+    throw redirect(storefrontPath);
   }
 
   // Record page view asynchronously with waitUntil (zero impact on render)
@@ -154,6 +188,74 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
   const aplusImages = data.product.aplusImages ?? [];
   const features = data.product.features ?? [];
 
+  useEffect(() => {
+    const context = {
+      page_type: "bridge",
+      agent_slug: data.agent.slug,
+      agent_name: data.agent.name,
+      asin: data.product.asin,
+      marketplace: data.marketplace,
+    };
+
+    setZarazContext(context);
+    void trackZaraz("bridge_view", {
+      ...context,
+      ...getZarazAttributionPayload(),
+    });
+  }, [
+    data.agent.name,
+    data.agent.slug,
+    data.marketplace,
+    data.product.asin,
+  ]);
+
+  const handleAmazonClick =
+    (ctaPlacement: "mobile" | "primary" | "secondary") =>
+    (event: MouseEvent<HTMLAnchorElement>) => {
+      const isModifiedClick =
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey;
+
+      const eventPayload = {
+        page_type: "bridge",
+        cta_placement: ctaPlacement,
+        destination: "amazon",
+        agent_slug: data.agent.slug,
+        agent_name: data.agent.name,
+        asin: data.product.asin,
+        marketplace: data.marketplace,
+        ...getZarazAttributionPayload(),
+      };
+
+      if (isModifiedClick) {
+        void trackZaraz("amazon_click", eventPayload);
+        return;
+      }
+
+      event.preventDefault();
+
+      let hasNavigated = false;
+      const navigateToAmazon = () => {
+        if (hasNavigated) {
+          return;
+        }
+
+        hasNavigated = true;
+        window.location.assign(data.redirectUrl);
+      };
+
+      const fallbackTimer = window.setTimeout(navigateToAmazon, 150);
+
+      void trackZaraz("amazon_click", eventPayload).finally(() => {
+        window.clearTimeout(fallbackTimer);
+        navigateToAmazon();
+      });
+    };
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
       <div className="border-b border-gray-200 bg-white/70">
@@ -177,6 +279,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
               <a
                 href={data.redirectUrl}
                 rel="nofollow sponsored"
+                onClick={handleAmazonClick("mobile")}
                 className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
                 Continue to Amazon
@@ -193,9 +296,6 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 {data.marketplace}
-              </span>
-              <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-600">
-                Agent link
               </span>
             </div>
 
@@ -224,13 +324,15 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
               <a
                 href={data.redirectUrl}
                 rel="nofollow sponsored"
+                onClick={handleAmazonClick("primary")}
                 className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
-                Buy on Amazon
+                View on Amazon
               </a>
               <a
                 href={data.redirectUrl}
                 rel="nofollow sponsored"
+                onClick={handleAmazonClick("secondary")}
                 className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
               >
                 Continue securely

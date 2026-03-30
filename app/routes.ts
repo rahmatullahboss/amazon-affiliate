@@ -17,6 +17,7 @@ export default [
     route("deals/:asin", "routes/product-detail.tsx"),
     route("category/:slug", "routes/category.tsx"),
     route("t/:trackingTag/:asin", "routes/tracking-shortcut.tsx"),
+    route(":agent", "routes/agent-storefront.tsx"),
     route(":agent/:asin", "routes/bridge.tsx"),
   ]),
 

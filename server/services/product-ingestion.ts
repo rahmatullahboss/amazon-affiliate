@@ -1,3 +1,5 @@
+import { AMAZON_DOMAINS } from "../utils/types";
+
 interface AmazonProductData {
   title: string;
   imageUrl: string;
@@ -50,6 +52,37 @@ interface ParsedSheetProductRow {
   status: string;
 }
 
+export type AmazonProductFetchErrorCode =
+  | "api_not_configured"
+  | "not_found"
+  | "rate_limited"
+  | "unauthorized"
+  | "upstream_error"
+  | "invalid_response"
+  | "network_error";
+
+export class AmazonProductFetchError extends Error {
+  readonly code: AmazonProductFetchErrorCode;
+  readonly asin: string;
+  readonly marketplace: string;
+  readonly status: number | null;
+
+  constructor(input: {
+    code: AmazonProductFetchErrorCode;
+    asin: string;
+    marketplace: string;
+    message: string;
+    status?: number | null;
+  }) {
+    super(input.message);
+    this.name = "AmazonProductFetchError";
+    this.code = input.code;
+    this.asin = input.asin;
+    this.marketplace = input.marketplace;
+    this.status = input.status ?? null;
+  }
+}
+
 const VALID_ASIN_REGEX = /^B[0-9A-Z]{9}$/;
 const AMAZON_ASIN_PATTERNS = [
   /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i,
@@ -92,6 +125,126 @@ function toRapidApiCountryCode(marketplace: string): string {
   }
 
   return marketplace;
+}
+
+function getMarketplaceDomain(marketplace: string): string {
+  return AMAZON_DOMAINS[marketplace] || AMAZON_DOMAINS.US;
+}
+
+function getFetchErrorPriority(code: AmazonProductFetchErrorCode): number {
+  switch (code) {
+    case "not_found":
+    case "invalid_response":
+      return 5;
+    case "rate_limited":
+      return 4;
+    case "upstream_error":
+    case "network_error":
+      return 3;
+    case "unauthorized":
+      return 2;
+    case "api_not_configured":
+      return 1;
+  }
+}
+
+function pickPreferredFetchError(
+  current: AmazonProductFetchError | null,
+  candidate: AmazonProductFetchError
+): AmazonProductFetchError {
+  if (!current) {
+    return candidate;
+  }
+
+  return getFetchErrorPriority(candidate.code) >= getFetchErrorPriority(current.code)
+    ? candidate
+    : current;
+}
+
+function createAmazonProductFetchError(input: {
+  asin: string;
+  marketplace: string;
+  code: AmazonProductFetchErrorCode;
+  status?: number | null;
+}): AmazonProductFetchError {
+  const domain = getMarketplaceDomain(input.marketplace);
+
+  switch (input.code) {
+    case "api_not_configured":
+      return new AmazonProductFetchError({
+        ...input,
+        message: "Amazon product API is not configured.",
+      });
+    case "not_found":
+      return new AmazonProductFetchError({
+        ...input,
+        message: `ASIN was detected, but no live product data was returned from ${domain}. Check whether the product is available in that marketplace.`,
+      });
+    case "rate_limited":
+      return new AmazonProductFetchError({
+        ...input,
+        message: "The Amazon data provider is temporarily rate limited. Please retry shortly.",
+      });
+    case "unauthorized":
+      return new AmazonProductFetchError({
+        ...input,
+        message: "Amazon product API credentials were rejected by the provider.",
+      });
+    case "upstream_error":
+      return new AmazonProductFetchError({
+        ...input,
+        message: "The Amazon data provider returned an unexpected server error.",
+      });
+    case "invalid_response":
+      return new AmazonProductFetchError({
+        ...input,
+        message: `Amazon returned an incomplete response for ${domain}. The product may be unavailable in that marketplace.`,
+      });
+    case "network_error":
+      return new AmazonProductFetchError({
+        ...input,
+        message: "Could not reach the Amazon data provider.",
+      });
+  }
+}
+
+function mapResponseStatusToFetchErrorCode(status: number): AmazonProductFetchErrorCode {
+  if (status === 401 || status === 403) {
+    return "unauthorized";
+  }
+
+  if (status === 404) {
+    return "not_found";
+  }
+
+  if (status === 429) {
+    return "rate_limited";
+  }
+
+  return "upstream_error";
+}
+
+export function getAmazonProductFetchErrorMessage(error: unknown): string {
+  if (!(error instanceof AmazonProductFetchError)) {
+    return "Could not fetch live product data for this ASIN. Try another ASIN or ask admin to review it.";
+  }
+
+  const marketplaceDomain = getMarketplaceDomain(error.marketplace);
+
+  switch (error.code) {
+    case "api_not_configured":
+      return "Amazon product API is not configured. Product link generation needs live product data.";
+    case "not_found":
+    case "invalid_response":
+      return `ASIN was detected, but no live product data came back from ${marketplaceDomain}. Check whether the product is live in that marketplace, then retry or choose the correct country.`;
+    case "rate_limited":
+      return "Amazon data provider is temporarily rate limited. Please wait a minute and retry.";
+    case "unauthorized":
+      return "Amazon product API credentials were rejected. Ask admin to review the API setup.";
+    case "upstream_error":
+    case "network_error":
+      return "Could not reach the live Amazon data service right now. Please retry shortly.";
+  }
 }
 
 function buildEditorialReviewContent(input: {
@@ -137,23 +290,38 @@ export async function fetchAmazonProductData(
   apiKey: string,
   asin: string,
   marketplace: string
-): Promise<AmazonProductData | null> {
+): Promise<AmazonProductData> {
   const apiCountryCode = toRapidApiCountryCode(marketplace);
-  const response = await fetch(
-    `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${apiCountryCode}`,
-    {
-      headers: {
-        "X-RapidAPI-Key": apiKey,
-        "X-RapidAPI-Host": "real-time-amazon-data.p.rapidapi.com",
-      },
-    }
-  );
+  let response: Response;
 
-  if (!response.ok) {
-    return null;
+  try {
+    response = await fetch(
+      `https://real-time-amazon-data.p.rapidapi.com/product-details?asin=${asin}&country=${apiCountryCode}`,
+      {
+        headers: {
+          "X-RapidAPI-Key": apiKey,
+          "X-RapidAPI-Host": "real-time-amazon-data.p.rapidapi.com",
+        },
+      }
+    );
+  } catch {
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: "network_error",
+    });
   }
 
-  const result = (await response.json()) as {
+  if (!response.ok) {
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: mapResponseStatusToFetchErrorCode(response.status),
+      status: response.status,
+    });
+  }
+
+  let result: {
     data?: {
       product_title?: string;
       product_photo?: string;
@@ -165,8 +333,34 @@ export async function fetchAmazonProductData(
     };
   };
 
+  try {
+    result = (await response.json()) as {
+      data?: {
+        product_title?: string;
+        product_photo?: string;
+        product_photos?: string[];
+        product_category?: string;
+        product_description?: string;
+        about_product?: string[];
+        aplus_images?: string[];
+      };
+    };
+  } catch {
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: "invalid_response",
+      status: response.status,
+    });
+  }
+
   if (!result.data?.product_title) {
-    return null;
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: "invalid_response",
+      status: response.status,
+    });
   }
 
   return {
@@ -194,17 +388,36 @@ export async function fetchAmazonProductDataWithFallback(input: {
   marketplace: string;
   primaryApiKey?: string;
   fallbackApiKeys?: string[];
-}): Promise<AmazonProductData | null> {
+}): Promise<AmazonProductData> {
   const apiKeys = resolveAmazonApiKeys(input);
+  if (apiKeys.length === 0) {
+    throw createAmazonProductFetchError({
+      asin: input.asin,
+      marketplace: input.marketplace,
+      code: "api_not_configured",
+    });
+  }
+
+  let preferredError: AmazonProductFetchError | null = null;
 
   for (const apiKey of apiKeys) {
-    const productData = await fetchAmazonProductData(apiKey, input.asin, input.marketplace);
-    if (productData) {
-      return productData;
+    try {
+      return await fetchAmazonProductData(apiKey, input.asin, input.marketplace);
+    } catch (error) {
+      if (error instanceof AmazonProductFetchError) {
+        preferredError = pickPreferredFetchError(preferredError, error);
+        continue;
+      }
+
+      throw error;
     }
   }
 
-  return null;
+  throw preferredError ?? createAmazonProductFetchError({
+    asin: input.asin,
+    marketplace: input.marketplace,
+    code: "upstream_error",
+  });
 }
 
 export async function ensureProductRecord(input: EnsureProductInput): Promise<ProductRecord> {
@@ -230,18 +443,23 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
   const explicitAplusImages = input.aplusImages?.length ? JSON.stringify(input.aplusImages) : null;
 
   if (!product) {
-    const fetched =
-      (!explicitTitle || !explicitImageUrl) && input.apiKey
-        ? await fetchAmazonProductDataWithFallback({
-            asin,
-            marketplace,
-            primaryApiKey: input.apiKey,
-            fallbackApiKeys: input.fallbackApiKeys,
-          })
-        : null;
+    let fetched: AmazonProductData | null = null;
 
-    if (!explicitTitle && !explicitImageUrl && input.requireRealProductData && !fetched) {
-      throw new Error("Real product data could not be fetched for this ASIN.");
+    if (!explicitTitle || !explicitImageUrl) {
+      if (input.apiKey) {
+        fetched = await fetchAmazonProductDataWithFallback({
+          asin,
+          marketplace,
+          primaryApiKey: input.apiKey,
+          fallbackApiKeys: input.fallbackApiKeys,
+        });
+      } else if (input.requireRealProductData) {
+        throw createAmazonProductFetchError({
+          asin,
+          marketplace,
+          code: "api_not_configured",
+        });
+      }
     }
 
     const title = explicitTitle || fetched?.title || `Product ${asin}`;
@@ -411,10 +629,6 @@ export async function refreshProductRecord(input: {
     primaryApiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
   });
-
-  if (!fetched) {
-    throw new Error("Fresh product data could not be fetched for this ASIN.");
-  }
 
   return ensureProductRecord({
     db: input.db,

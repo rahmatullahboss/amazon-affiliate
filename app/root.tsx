@@ -5,6 +5,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
   useNavigate,
 } from "react-router";
 import { useEffect } from "react";
@@ -16,6 +17,7 @@ import {
   isNativeCapacitorApp,
   parseNativeAuthCallbackUrl,
 } from "./utils/native-auth";
+import { captureZarazAttribution, flushQueuedZarazCalls, setZarazContext } from "./utils/zaraz";
 import "./app.css";
 
 export const meta: Route.MetaFunction = () => [
@@ -102,10 +104,42 @@ function NativeAuthListener() {
   return null;
 }
 
+function ZarazBootstrap() {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const attribution = captureZarazAttribution();
+    setZarazContext({
+      route_path: location.pathname,
+      route_search: location.search || "",
+      ...attribution,
+    });
+
+    if (flushQueuedZarazCalls()) {
+      return;
+    }
+
+    const timerId = window.setTimeout(() => {
+      flushQueuedZarazCalls();
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <>
       <NativeAuthListener />
+      <ZarazBootstrap />
       <Outlet />
     </>
   );

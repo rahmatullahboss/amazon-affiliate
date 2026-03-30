@@ -1,8 +1,10 @@
 import type { Route } from "./+types/product-detail";
 import { Link } from "react-router";
+import { useEffect } from "react";
 import { ProductCard } from "../components/home/ProductCard";
 import { ImageGallery } from "../components/product/ImageGallery";
-import { AMAZON_DOMAINS } from "../../server/utils/types";
+import { buildSeoMeta } from "../utils/seo";
+import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
 
 interface ProductRow {
   id: number;
@@ -30,7 +32,8 @@ interface RelatedProductRow {
 interface ProductDetailData {
   product: ProductRow;
   relatedProducts: RelatedProductRow[];
-  amazonUrl: string;
+  redirectUrl: string;
+  canonicalPath: string;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -38,17 +41,14 @@ export function meta({ data }: Route.MetaArgs) {
 
   const { product } = data as ProductDetailData;
 
-  return [
-    { title: `${product.title} | DealsRky` },
-    {
-      name: "description",
-      content:
-        product.description ||
-        `Review ${product.title} and continue to Amazon for the latest price and checkout.`,
-    },
-    { property: "og:title", content: product.title },
-    { property: "og:image", content: product.image_url },
-  ];
+  return buildSeoMeta({
+    title: `${product.title} | DealsRky`,
+    description:
+      product.description ||
+      `Review ${product.title} and continue to Amazon for the latest price and checkout.`,
+    path: (data as ProductDetailData).canonicalPath,
+    imageUrl: product.image_url,
+  });
 }
 
 export async function loader({ params, context }: Route.LoaderArgs) {
@@ -91,15 +91,14 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const { results: related } = await relatedQuery.all<RelatedProductRow>();
 
-  const marketplace = product.marketplace || "US";
-  const domain = AMAZON_DOMAINS[marketplace] || AMAZON_DOMAINS.US;
   const defaultTag = env.DEFAULT_AMAZON_TAG || "dealsrky-20";
-  const amazonUrl = `https://${domain}/dp/${asin}?tag=${defaultTag}`;
+  const redirectUrl = `/go/t/${defaultTag}/${asin}`;
 
   return {
     product,
     relatedProducts: related || [],
-    amazonUrl,
+    redirectUrl,
+    canonicalPath: `/deals/${asin}`,
   } satisfies ProductDetailData;
 }
 
@@ -117,10 +116,39 @@ function parseJsonArray(raw: string | null): string[] {
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
-  const { product, relatedProducts, amazonUrl } = loaderData as ProductDetailData;
+  const { product, relatedProducts, redirectUrl } = loaderData as ProductDetailData;
   const features = parseJsonArray(product.features);
   const galleryImages = parseJsonArray(product.product_images);
   const aplusImages = parseJsonArray(product.aplus_images);
+
+  useEffect(() => {
+    const context = {
+      page_type: "product_detail",
+      asin: product.asin,
+      marketplace: product.marketplace || "US",
+      category: product.category || "general",
+    };
+
+    setZarazContext(context);
+    void trackZaraz("product_detail_view", {
+      ...context,
+      ...getZarazAttributionPayload(),
+    });
+  }, [product.asin, product.category, product.marketplace]);
+
+  const handleAmazonClick =
+    (ctaPlacement: "mobile" | "primary" | "secondary") =>
+    () => {
+      void trackZaraz("amazon_click", {
+        page_type: "product_detail",
+        cta_placement: ctaPlacement,
+        destination: "amazon",
+        asin: product.asin,
+        marketplace: product.marketplace || "US",
+        category: product.category || "general",
+        ...getZarazAttributionPayload(),
+      });
+    };
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
@@ -147,9 +175,10 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
           <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
             <div className="mb-4 md:hidden">
               <a
-                href={amazonUrl}
+                href={redirectUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow sponsored"
+                onClick={handleAmazonClick("mobile")}
                 className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
                 Continue to Amazon
@@ -197,17 +226,19 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a
-                href={amazonUrl}
+                href={redirectUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow sponsored"
+                onClick={handleAmazonClick("primary")}
                 className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
                 View on Amazon
               </a>
               <a
-                href={amazonUrl}
+                href={redirectUrl}
                 target="_blank"
                 rel="noopener noreferrer nofollow sponsored"
+                onClick={handleAmazonClick("secondary")}
                 className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
               >
                 Read Amazon reviews

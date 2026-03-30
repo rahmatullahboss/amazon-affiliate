@@ -156,4 +156,51 @@ describe('Redirect Engine API', () => {
     expect(mapping).not.toBeNull();
     expect(mapping?.tracking_id).toBe(trackingId);
   });
+
+  it('P1-005: Falls back on old agent link and auto-creates the missing mapping', async () => {
+    const agentId = 11;
+    const productId = 25;
+    const trackingId = 31;
+
+    await DbFactory.seedAgent(env.DB, agentId, 'legacy-agent', 'Legacy Agent');
+    await DbFactory.seedProduct(env.DB, productId, 'B0LEGACY12');
+    await env.DB.prepare(
+      `UPDATE products SET marketplace = 'US', status = 'active' WHERE id = ?`
+    )
+      .bind(productId)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (?, ?, ?, 'US', 1, 1)`
+    )
+      .bind(trackingId, agentId, 'legacy-tag-20')
+      .run();
+
+    const req = new Request('http://localhost/go/legacy-agent/B0LEGACY12', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    const waitPromises: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+      passThroughOnException: () => {},
+    } as const;
+
+    const res = await apiApp.fetch(req, env as any, ctx as any);
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('tag=legacy-tag-20');
+
+    const mapping = await env.DB.prepare(
+      'SELECT agent_id, product_id, tracking_id FROM agent_products WHERE agent_id = ? AND product_id = ?'
+    )
+      .bind(agentId, productId)
+      .first<{ agent_id: number; product_id: number; tracking_id: number }>();
+
+    expect(mapping).not.toBeNull();
+    expect(mapping?.tracking_id).toBe(trackingId);
+  });
 });

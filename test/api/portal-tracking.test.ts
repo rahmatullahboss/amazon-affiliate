@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import { apiApp } from "../../server/api";
 import { DbFactory } from "../factories/db";
@@ -8,7 +8,12 @@ describe("Portal Tracking API", () => {
   beforeEach(async () => {
     await env.DB.prepare("DELETE FROM agent_products").run();
     await env.DB.prepare("DELETE FROM tracking_ids").run();
+    await env.DB.prepare("DELETE FROM products").run();
     await env.DB.prepare("DELETE FROM agents").run();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("allows the same agent to save multiple tags for the same marketplace", async () => {
@@ -108,5 +113,54 @@ describe("Portal Tracking API", () => {
       { id: 501, is_default: 0 },
       { id: 502, is_default: 1 },
     ]);
+  });
+
+  it("returns a marketplace-specific reason when live product data is unavailable", async () => {
+    await DbFactory.seedAgent(env.DB, 24, "es-agent", "ES Agent");
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (601, 24, 'es-agent-21', 'ES', 1, 1)`
+    ).run();
+
+    const token = await generateAgentToken(24, "es-agent", env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+    const previousApiKey = env.AMAZON_API_KEY;
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = "test-api-key";
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({}), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+    );
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/portal/products/submit", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          asin: "https://www.amazon.es/gp/product/B0ES123456",
+          marketplace: "ES",
+          custom_title: null,
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = previousApiKey;
+
+    expect(response.status).toBe(502);
+
+    const payload = (await response.json()) as { error?: string; message?: string };
+    const message = payload.error || payload.message || "";
+    expect(message).toContain("amazon.es");
+    expect(message).toContain("correct country");
   });
 });

@@ -5,9 +5,10 @@ import type { AppEnv } from '../utils/types';
 import { createProductSchema, fetchAsinSchema, bulkAsinImportSchema, updateProductSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import {
+  AmazonProductFetchError,
   ensureProductRecord,
-  fetchAmazonProductData,
   fetchAmazonProductDataWithFallback,
+  getAmazonProductFetchErrorMessage,
   refreshProductRecord,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
@@ -192,10 +193,6 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       primaryApiKey: apiKey,
       fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
     });
-    if (!productData) {
-      throw new HTTPException(404, { message: 'Product not found on Amazon' });
-    }
-
     const product = await ensureProductRecord({
       db: c.env.DB,
       asin,
@@ -217,7 +214,10 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
     if (error instanceof HTTPException) throw error;
     console.error('[Products] ASIN fetch error:', error);
     throw new HTTPException(502, {
-      message: 'Failed to fetch product data from API. Try adding manually.',
+      message:
+        error instanceof AmazonProductFetchError
+          ? getAmazonProductFetchErrorMessage(error)
+          : 'Failed to fetch product data from API. Try adding manually.',
     });
   }
 });
@@ -387,7 +387,10 @@ products.post('/:id/refresh', async (c) => {
   } catch (error) {
     console.error('[Products] Refresh error:', error);
     throw new HTTPException(502, {
-      message: 'Could not refresh live product data right now. Please retry later.',
+      message:
+        error instanceof AmazonProductFetchError
+          ? getAmazonProductFetchErrorMessage(error)
+          : 'Could not refresh live product data right now. Please retry later.',
     });
   }
 });
@@ -566,10 +569,6 @@ products.post('/enrich', async (c) => {
           fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
         });
 
-        if (!productData) {
-          results.push({ asin: product.asin, status: 'error' });
-          return;
-        }
         const features = JSON.stringify(productData.features.slice(0, 6));
 
         await c.env.DB.prepare(

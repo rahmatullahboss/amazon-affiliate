@@ -7,14 +7,19 @@ interface ProductItem {
   title: string;
   image_url: string;
   category: string | null;
-  price?: string;
-  original_price?: string;
-  rating?: number;
+  price?: string | null;
+  original_price?: string | null;
+  rating?: number | null;
   marketplace?: string | null;
 }
 
-export function ProductCard({ item }: { item: ProductItem }) {
-  const url = item.asin ? `/deals/${item.asin}` : `/deals`;
+interface ProductCardProps {
+  item: ProductItem;
+  href?: string;
+}
+
+export function ProductCard({ item, href }: ProductCardProps) {
+  const url = href || (item.asin ? `/deals/${item.asin}` : `/deals`);
 
   return (
     <Link 

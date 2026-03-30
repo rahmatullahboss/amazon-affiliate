@@ -6,7 +6,11 @@ import { recordClick, hashIp } from '../services/analytics';
 import { checkRedirectRateLimit, incrementRateLimitCounters } from '../middleware/rate-limit';
 import { isSuspiciousRequest, isDuplicateClick } from '../middleware/bot-guard';
 import { safeKvGetJson, safeKvPut } from '../services/kv-safe';
-import { DynamicLinkResolutionError, ensureDynamicLinkByTrackingTag } from '../services/dynamic-links';
+import {
+  DynamicLinkResolutionError,
+  ensureDynamicLinkByAgentSlug,
+  ensureDynamicLinkByTrackingTag,
+} from '../services/dynamic-links';
 
 const redirect = new Hono<AppEnv>();
 
@@ -16,6 +20,17 @@ interface RedirectContext {
   agentId: number;
   productId: number;
   trackingTag: string;
+}
+
+function createNoindexRedirect(targetUrl: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: targetUrl,
+      "X-Robots-Tag": "noindex, nofollow",
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+    },
+  });
 }
 
 /**
@@ -88,7 +103,7 @@ redirect.get('/t/:trackingTag/:asin', async (c) => {
     })
   );
 
-  return c.redirect(ctx.amazonUrl, 302);
+  return createNoindexRedirect(ctx.amazonUrl);
 });
 
 redirect.get('/:agentSlug/:asin', async (c) => {
@@ -125,7 +140,7 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   }
 
   if (!ctx) {
-    let row = await c.env.DB.prepare(
+    const row = await c.env.DB.prepare(
       `SELECT p.asin, t.tag, t.marketplace, a.id as agent_id, p.id as product_id
        FROM agent_products ap
        JOIN agents a ON a.id = ap.agent_id
@@ -139,27 +154,49 @@ redirect.get('/:agentSlug/:asin', async (c) => {
       .first<{ asin: string; tag: string; marketplace: string; agent_id: number; product_id: number }>();
 
     if (!row) {
-      throw new HTTPException(404, { message: 'Link not found' });
+      try {
+        const resolved = await ensureDynamicLinkByAgentSlug({
+          db: c.env.DB,
+          kv: c.env.KV,
+          agentSlug,
+          asin,
+          apiKey: c.env.AMAZON_API_KEY,
+          fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+        });
+
+        ctx = {
+          amazonUrl: resolved.amazonUrl,
+          agentId: resolved.agentId,
+          productId: resolved.productId,
+          trackingTag: resolved.trackingTag,
+        };
+      } catch (error) {
+        if (error instanceof DynamicLinkResolutionError) {
+          throw new HTTPException(error.status, { message: error.message });
+        }
+
+        throw error;
+      }
+    } else {
+      ctx = {
+        amazonUrl: buildAmazonUrl(row.asin, row.tag, row.marketplace),
+        agentId: row.agent_id,
+        productId: row.product_id,
+        trackingTag: row.tag,
+      };
+
+      // 3. Warm cache for next hit (cache the FULL context, not just URL)
+      c.executionCtx.waitUntil(
+        safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
+      );
     }
-
-    ctx = {
-      amazonUrl: buildAmazonUrl(row.asin, row.tag, row.marketplace),
-      agentId: row.agent_id,
-      productId: row.product_id,
-      trackingTag: row.tag,
-    };
-
-    // 3. Warm cache for next hit (cache the FULL context, not just URL)
-    c.executionCtx.waitUntil(
-      safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
-    );
   }
 
   // ─── Anti-Ban Layer 3: Click Analytics & Dedup ────────
   c.executionCtx.waitUntil(recordRedirectClickAsync(c, { agentSlug, asin, context: ctx }));
 
   // 5. 302 redirect — user goes to Amazon
-  return c.redirect(ctx.amazonUrl, 302);
+  return createNoindexRedirect(ctx.amazonUrl);
 });
 
 async function recordRedirectClickAsync(

@@ -1,6 +1,7 @@
 import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
+import { buildSeoMeta } from "../utils/seo";
 
 interface ProductRow {
   id: number;
@@ -17,14 +18,12 @@ interface HomeLoaderData {
 }
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "DealsRky | Curated Amazon Finds" },
-    {
-      name: "description",
-      content:
-        "Browse curated Amazon product picks, review pages, and quick-buy landing pages designed for fast, transparent shopping.",
-    },
-  ];
+  return buildSeoMeta({
+    title: "DealsRky | Curated Amazon Finds",
+    description:
+      "Browse curated Amazon product picks, review pages, and quick-buy landing pages designed for fast, transparent shopping.",
+    path: "/",
+  });
 }
 
 export async function loader({ context }: Route.LoaderArgs) {

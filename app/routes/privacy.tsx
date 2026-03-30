@@ -1,13 +1,12 @@
 import type { Route } from "./+types/privacy";
+import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Privacy Policy | DealsRky" },
-    {
-      name: "description",
-      content: "Privacy policy for DealsRky, including analytics and affiliate link handling.",
-    },
-  ];
+  return buildSeoMeta({
+    title: "Privacy Policy | DealsRky",
+    description: "Privacy policy for DealsRky, including analytics and affiliate link handling.",
+    path: "/privacy",
+  });
 }
 
 export default function PrivacyPolicy() {

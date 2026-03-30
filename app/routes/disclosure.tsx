@@ -1,14 +1,13 @@
 import type { Route } from "./+types/disclosure";
+import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Affiliate Disclosure | DealsRky" },
-    {
-      name: "description",
-      content:
-        "Learn how DealsRky uses affiliate links and how Amazon commissions work on this site.",
-    },
-  ];
+  return buildSeoMeta({
+    title: "Affiliate Disclosure | DealsRky",
+    description:
+      "Learn how DealsRky uses affiliate links and how Amazon commissions work on this site.",
+    path: "/disclosure",
+  });
 }
 
 export default function AffiliateDisclosure() {

@@ -1,13 +1,12 @@
 import type { Route } from "./+types/contact";
+import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
-  return [
-    { title: "Contact | DealsRky" },
-    {
-      name: "description",
-      content: "Contact information and support guidance for DealsRky visitors.",
-    },
-  ];
+  return buildSeoMeta({
+    title: "Contact | DealsRky",
+    description: "Contact information and support guidance for DealsRky visitors.",
+    path: "/contact",
+  });
 }
 
 export default function Contact() {
