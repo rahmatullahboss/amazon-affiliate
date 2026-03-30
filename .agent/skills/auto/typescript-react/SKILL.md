@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for amazon-affiliate. 28 gotchas, 23 conventions, 21 fixes, 1 error→fix pairs."
+description: "Typescript React for amazon-affiliate. 32 gotchas, 23 conventions, 21 fixes, 1 error→fix pairs."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,7 +12,7 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **138 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -20,6 +20,10 @@ Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | -     ordered_items: number; +     clicks: number; -     returned_items: number; +     ordered_items |
+| ⚠️ GOTCHA: Fixed null crash in Array — prevents nu | -     orderedItems: number; +     clicks: number; -     revenueAmount: number; +     orderedItems: n |
+| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | - } +   marketplaceOrderBreakdown: Array<{ -  +     marketplace: string; - export default function P |
+| ⚠️ GOTCHA: Fixed null crash in Link — prevents nul | - import { getAuthToken } from "../../utils/auth-session"; + import { Link } from "react-router"; -  |
 | ⚠️ GOTCHA: Fixed null crash in Route — adds runtim | - import { extractApiErrorMessage } from "../../utils/api-errors"; + import type { Route } from "./+ |
 | ⚠️ GOTCHA: Fixed null crash in Route — parallelize | - import { getAuthToken } from "../../utils/auth-session"; + import type { Route } from "./+types/da |
 | ⚠️ GOTCHA: Fixed null crash in Route — formalizes  | - import { copyTextToClipboard } from "../../utils/clipboard"; + import type { Route } from "./+type |
@@ -245,31 +249,6 @@ Auto-compiled from **132 real patterns** in **amazon-affiliate**. This skill is 
 + import { ImageGallery } from "../components/product/ImageGallery";
 - 
 + import { recordView } from "../../server/services/analytics";
-- // ─── Types ───────────────────────────────────────
-+ 
-- interface BridgeData {
-+ // ─── Types ──────────────────────────────────────
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Link
-3. identifier: ImageGallery
-4. identifier: Types
-5. identifier: BridgeData
-
-### Fixed null crash in PortalProduct — formalizes the data contract with explici...
-- 
-+ import { extractApiErrorMessage } from "../../utils/api-errors";
-- interface PortalProduct {
-+ 
--   id: number;
-+ interface PortalProduct {
--   custom_title: string | null;
-+   id: number;
--   product_id: number;
-+   custom_title: string | null;
--   asin: string;
-+   product_id: number;
--   marketplace: string;
+- // ─── Types ───────────────────────────────
 
 ... [Truncated — see individual observations for full content]

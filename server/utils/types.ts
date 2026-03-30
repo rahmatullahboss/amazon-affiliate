@@ -152,11 +152,18 @@ export interface AnalyticsOverview {
   totalOrderedItems: number;
   totalRevenue: number;
   totalCommission: number;
+  contentOverview: {
+    totalProducts: number;
+    activeProducts: number;
+    pendingReviewProducts: number;
+    rejectedProducts: number;
+  };
   topAgents: Array<{ name: string; slug: string; clicks: number }>;
   topProducts: Array<{ asin: string; title: string; clicks: number }>;
   topAgentsByCommission: Array<{
     name: string;
     slug: string;
+    clicks: number;
     orderedItems: number;
     revenueAmount: number;
     commissionAmount: number;

@@ -58,6 +58,17 @@ interface AgentAnalytics {
   totalCommission: number;
   recentClicks: Array<{ tracking_tag: string; country: string | null; clicked_at: string }>;
   productBreakdown: Array<{ asin: string; title: string; clicks: number }>;
+  marketplaceOrderBreakdown: Array<{
+    marketplace: string;
+    orderedItems: number;
+    returnedItems: number;
+  }>;
+  tagOrderBreakdown: Array<{
+    tag: string;
+    marketplace: string;
+    orderedItems: number;
+    returnedItems: number;
+  }>;
 }
 
 type CsvRecord = Record<string, string>;
@@ -129,6 +140,7 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
     viewsToday,
     clicksWeek,
     viewsWeek,
+    contentTotals,
     topAgents,
     topProducts,
     salesTotals,
@@ -141,6 +153,19 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
     db.prepare("SELECT COUNT(*) as count FROM page_views WHERE viewed_at >= date('now')").first<{ count: number }>(),
     db.prepare("SELECT COUNT(*) as count FROM clicks WHERE clicked_at >= date('now', '-7 days')").first<{ count: number }>(),
     db.prepare("SELECT COUNT(*) as count FROM page_views WHERE viewed_at >= date('now', '-7 days')").first<{ count: number }>(),
+    db.prepare(
+      `SELECT
+         COUNT(*) as totalProducts,
+         COALESCE(SUM(CASE WHEN status = 'active' AND is_active = 1 THEN 1 ELSE 0 END), 0) as activeProducts,
+         COALESCE(SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END), 0) as pendingReviewProducts,
+         COALESCE(SUM(CASE WHEN status = 'rejected' OR is_active = 0 THEN 1 ELSE 0 END), 0) as rejectedProducts
+       FROM products`
+    ).first<{
+      totalProducts: number;
+      activeProducts: number;
+      pendingReviewProducts: number;
+      rejectedProducts: number;
+    }>(),
     db.prepare(
       `SELECT a.name, a.slug, COUNT(c.id) as clicks
        FROM clicks c
@@ -165,9 +190,10 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
        FROM amazon_conversions`
     ).first<{ totalOrderedItems: number; totalRevenue: number; totalCommission: number }>(),
     db.prepare(
-      `SELECT
+       `SELECT
          a.name,
          a.slug,
+         (SELECT COUNT(*) FROM clicks c WHERE c.agent_id = a.id) as clicks,
          COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
          COALESCE(SUM(ac.revenue_amount), 0) as revenueAmount,
          COALESCE(SUM(ac.commission_amount), 0) as commissionAmount
@@ -180,6 +206,7 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
     ).all<{
       name: string;
       slug: string;
+      clicks: number;
       orderedItems: number;
       revenueAmount: number;
       commissionAmount: number;
@@ -218,6 +245,12 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
     totalOrderedItems: salesTotals?.totalOrderedItems ?? 0,
     totalRevenue: salesTotals?.totalRevenue ?? 0,
     totalCommission: salesTotals?.totalCommission ?? 0,
+    contentOverview: {
+      totalProducts: contentTotals?.totalProducts ?? 0,
+      activeProducts: contentTotals?.activeProducts ?? 0,
+      pendingReviewProducts: contentTotals?.pendingReviewProducts ?? 0,
+      rejectedProducts: contentTotals?.rejectedProducts ?? 0,
+    },
     topAgents: topAgents?.results ?? [],
     topProducts: topProducts?.results ?? [],
     topAgentsByCommission: topAgentsByCommission?.results ?? [],
@@ -229,7 +262,15 @@ export const getAgentAnalytics = async (
   db: D1Database,
   agentId: number
 ): Promise<AgentAnalytics> => {
-  const [totalClicks, totalViews, recentClicks, productBreakdown, salesTotals] = await Promise.all([
+  const [
+    totalClicks,
+    totalViews,
+    recentClicks,
+    productBreakdown,
+    salesTotals,
+    marketplaceOrderBreakdown,
+    tagOrderBreakdown,
+  ] = await Promise.all([
     db.prepare("SELECT COUNT(*) as count FROM clicks WHERE agent_id = ?")
       .bind(agentId)
       .first<{ count: number }>(),
@@ -266,6 +307,59 @@ export const getAgentAnalytics = async (
     )
       .bind(agentId)
       .first<{ totalOrderedItems: number; totalRevenue: number; totalCommission: number }>(),
+    db.prepare(
+      `SELECT
+         ac.marketplace as marketplace,
+         COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         ) as returnedItems
+       FROM amazon_conversions ac
+       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+       WHERE t.agent_id = ?
+       GROUP BY ac.marketplace
+       ORDER BY orderedItems DESC, ac.marketplace ASC`
+    )
+      .bind(agentId)
+      .all<{
+        marketplace: string;
+        orderedItems: number;
+        returnedItems: number;
+      }>(),
+    db.prepare(
+      `SELECT
+         t.tag as tag,
+         t.marketplace as marketplace,
+         COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         ) as returnedItems
+       FROM tracking_ids t
+       LEFT JOIN amazon_conversions ac
+         ON ac.tracking_tag = t.tag AND ac.marketplace = t.marketplace
+       WHERE t.agent_id = ?
+       GROUP BY t.id
+       ORDER BY orderedItems DESC, t.marketplace ASC, t.tag ASC`
+    )
+      .bind(agentId)
+      .all<{
+        tag: string;
+        marketplace: string;
+        orderedItems: number;
+        returnedItems: number;
+      }>(),
   ]);
 
   return {
@@ -280,6 +374,8 @@ export const getAgentAnalytics = async (
     totalCommission: salesTotals?.totalCommission ?? 0,
     recentClicks: recentClicks?.results ?? [],
     productBreakdown: productBreakdown?.results ?? [],
+    marketplaceOrderBreakdown: marketplaceOrderBreakdown?.results ?? [],
+    tagOrderBreakdown: tagOrderBreakdown?.results ?? [],
   };
 };
 

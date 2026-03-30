@@ -32,6 +32,19 @@ interface PortalPerformanceResponse {
   commissionAmount: number;
   topProducts: Array<{ asin: string; title: string; clicks: number }>;
   recentClicks: Array<{ tracking_tag: string; country: string | null; clicked_at: string }>;
+  marketplaceOrderBreakdown: Array<{
+    marketplace: string;
+    clicks: number;
+    ordered_items: number;
+    returned_items: number;
+  }>;
+  tagOrderBreakdown: Array<{
+    tag: string;
+    marketplace: string;
+    clicks: number;
+    ordered_items: number;
+    returned_items: number;
+  }>;
 }
 
 export default function PortalDashboardPage() {
@@ -176,6 +189,70 @@ export default function PortalDashboardPage() {
             <div className="mt-2 text-xs leading-relaxed text-[#6b7280]">{metric.accent}</div>
           </article>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Orders by Country</h2>
+          {performance?.marketplaceOrderBreakdown.length ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {performance.marketplaceOrderBreakdown.map((row) => (
+                <div
+                  key={row.marketplace}
+                  className="rounded-xl border border-white/5 bg-white/[0.03] p-4"
+                >
+                  <div className="text-xs uppercase tracking-wide text-[#8b8ba7]">
+                    {row.marketplace}
+                  </div>
+                  <div className="mt-2 text-2xl font-bold text-[#a78bfa]">
+                    {row.ordered_items}
+                  </div>
+                  <div className="mt-2 text-xs text-[#94a3b8]">
+                    {row.clicks} clicks · {row.returned_items} returned items
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="m-0 mb-2 text-[#cbd5e1]">No imported country-wise order data yet.</p>
+          )}
+        </article>
+
+        <article className="bg-[#111827] border border-white/10 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="m-0 mb-3 text-[#f9fafb] text-xl font-bold">Orders by Tag</h2>
+          {performance?.tagOrderBreakdown.length ? (
+            <div className="flex flex-col gap-3">
+              {performance.tagOrderBreakdown.map((row) => (
+                <div
+                  key={`${row.marketplace}-${row.tag}`}
+                  className="rounded-xl border border-white/5 bg-white/[0.03] p-4"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[#f8fafc] break-all">
+                        {row.tag}
+                      </div>
+                      <div className="mt-1 text-xs text-[#8b8ba7]">{row.marketplace}</div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-lg font-bold text-[#34d399]">
+                        {row.ordered_items}
+                      </div>
+                      <div className="text-[0.7rem] uppercase tracking-wide text-[#8b8ba7]">
+                        Orders
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs text-[#94a3b8]">
+                    {row.clicks} clicks · {row.returned_items} returned items
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="m-0 mb-2 text-[#cbd5e1]">No imported tag-wise order data yet.</p>
+          )}
+        </article>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

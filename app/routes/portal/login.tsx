@@ -1,9 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import type { Route } from "./+types/login";
 import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
 import { extractApiErrorMessage } from "../../utils/api-errors";
-import { persistAuthSession } from "../../utils/auth-session";
+import { persistAuthSession, restoreAuthSession } from "../../utils/auth-session";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string };
@@ -18,7 +18,18 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [sessionChecked, setSessionChecked] = useState(false);
   const { googleClientId } = loaderData;
+
+  useEffect(() => {
+    const existingSession = restoreAuthSession();
+    if (existingSession) {
+      navigate("/portal/products", { replace: true });
+      return;
+    }
+
+    setSessionChecked(true);
+  }, [navigate]);
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -43,7 +54,7 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
       };
 
       persistAuthSession(data.token, data.user);
-      navigate("/portal");
+      navigate("/portal/products", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -89,7 +100,7 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
 
         if (data.token && data.user) {
           persistAuthSession(data.token, data.user);
-          navigate("/portal");
+          navigate("/portal/products", { replace: true });
           return;
         }
 
@@ -102,6 +113,10 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
     },
     [navigate]
   );
+
+  if (!sessionChecked) {
+    return null;
+  }
 
   return (
     <main className="min-h-screen flex text-left items-center justify-center p-8 bg-slate-900">

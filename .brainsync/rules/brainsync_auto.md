@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 708 notes | Score threshold: >40
+> 778 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,31 +20,35 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in Route — adds runtime type validation before use** — - import { extractApiErrorMessage } from "../../utils/api-errors";
-+ i
-- **⚠️ GOTCHA: Fixed null crash in Route — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
-+ import ty
-- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { copyTextToClipboard } from "../../utils/clipboard";
-+ impor
-- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { extractApiErrorMessage } from "../../utils/api-errors";
-+ i
-- **⚠️ GOTCHA: Fixed null crash in AdminUser — parallelizes async operations for speed** — - 
-+ import { getAuthToken } from "../../utils/auth-session";
-- interf
-- **⚠️ GOTCHA: Fixed null crash in PortalMeResponse — parallelizes async operations for speed** — - 
-+ import { getAuthToken } from "../../utils/auth-session";
-- interf
+- **⚠️ GOTCHA: Fixed null crash in SELECT — prevents null/undefined runtime crashes** — -          COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
++     
+- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — -     ordered_items: number;
++     clicks: number;
+-     returned_item
+- **⚠️ GOTCHA: Fixed null crash in Array — prevents null/undefined runtime crashes** — -     orderedItems: number;
++     clicks: number;
+-     revenueAmount:
+- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — - }
++   marketplaceOrderBreakdown: Array<{
+- 
++     marketplace: strin
+- **⚠️ GOTCHA: Fixed null crash in Link — prevents null/undefined runtime crashes** — - import { getAuthToken } from "../../utils/auth-session";
++ import { 
+- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — - }
++   marketplaceOrderBreakdown: Array<{
+- 
++     marketplace: strin
 
 ## Project Standards
 
-- Fixed null crash in Date — prevents null/undefined runtime crashes — confirmed 3x
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x
-- Fixed null crash in Array — prevents null/undefined runtime crashes — confirmed 3x
-- Updated schema MARKETPLACES — confirmed 3x
-- what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x
-- what-changed in config.json — confirmed 3x
-- what-changed in mappings.ts — confirmed 3x
-- what-changed in privacy.ts — confirmed 3x
+- what-changed in reset-password.ts — confirmed 3x
+- what-changed in register.ts — confirmed 3x
+- what-changed in links.ts — confirmed 3x
+- what-changed in layout.ts — confirmed 4x
+- what-changed in forgot-password.ts — confirmed 3x
+- what-changed in complete-signup.ts — confirmed 3x
+- what-changed in asin-new.ts — confirmed 3x
+- what-changed in users.ts — confirmed 3x
 
 ## Known Fixes
 
@@ -56,10 +60,10 @@
 
 ## Recent Decisions
 
+- decision in build.gradle
 - Optimized impliedFormat — offloads heavy computation off the main thread
+- Optimized HEAD — improves module reusability
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized Cache — extracts logic into a dedicated service for separation of c...
 
 ## Learned Patterns
 

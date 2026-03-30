@@ -92,9 +92,10 @@ app.route('/api', admin);
 
 // ─── Global Error Handler ─────────────────────────────────
 app.onError(async (err, c) => {
-  console.error(`[ERROR] ${err.message}`, err.stack);
-
   if (err instanceof HTTPException) {
+    if (err.status >= 500) {
+      console.error(`[ERROR] ${err.message}`, err.stack);
+    }
     return c.json(
       {
         error: err.message,
@@ -103,6 +104,8 @@ app.onError(async (err, c) => {
       err.status
     );
   }
+
+  console.error(`[ERROR] ${err.message}`, err.stack);
 
   return c.json(
     {

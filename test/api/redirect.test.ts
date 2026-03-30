@@ -119,4 +119,41 @@ describe('Redirect Engine API', () => {
     expect((clickResults[0] as any).product_id).toBe(productId);
     expect((clickResults[0] as any).tracking_tag).toContain('track-20');
   });
+
+  it('P1-004: Creates an agent-product mapping from tracking tag shortcut redirect', async () => {
+    const agentId = 8;
+    const productId = 19;
+    const trackingId = 27;
+
+    await DbFactory.seedAgent(env.DB, agentId, 'shortcut-agent', 'Shortcut Agent');
+    await DbFactory.seedProduct(env.DB, productId, 'B0C1234567');
+    await DbFactory.seedTrackingId(env.DB, trackingId, agentId, 'shortcut-tag-20');
+
+    const req = new Request('http://localhost/go/t/shortcut-tag-20/B0C1234567', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+    });
+
+    const waitPromises: Promise<unknown>[] = [];
+    const ctx = {
+      waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+      passThroughOnException: () => {},
+    } as const;
+
+    const res = await apiApp.fetch(req, env as any, ctx as any);
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('tag=shortcut-tag-20');
+
+    const mapping = await env.DB.prepare(
+      'SELECT agent_id, product_id, tracking_id FROM agent_products WHERE agent_id = ? AND product_id = ?'
+    )
+      .bind(agentId, productId)
+      .first<{ agent_id: number; product_id: number; tracking_id: number }>();
+
+    expect(mapping).not.toBeNull();
+    expect(mapping?.tracking_id).toBe(trackingId);
+  });
 });

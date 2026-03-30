@@ -71,31 +71,68 @@ export default function PortalTrackingPage() {
 
     try {
       const token = getAuthToken();
-      const response = await fetch("/api/portal/tracking", {
+      const response = await fetch(
+        editingId ? `/api/portal/tracking/${editingId}` : "/api/portal/tracking",
+        {
+          method: editingId ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            tag: form.tag,
+            label: form.label || null,
+            marketplace: form.marketplace,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(extractApiErrorMessage(data, editingId ? "Failed to update tag" : "Failed to save tag"));
+      }
+
+      setSuccess(editingId ? "Tag updated successfully" : "Tag saved successfully");
+      setEditingId(null);
+      setForm({ tag: "", label: "", marketplace: "US" });
+      await loadTracking();
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : editingId
+            ? "Failed to update tag"
+            : "Failed to save tag"
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetDefault = async (trackingId: TrackingIdRow) => {
+    setError("");
+    setSuccess("");
+
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`/api/portal/tracking/${trackingId.id}/default`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          tag: form.tag,
-          label: form.label || null,
-          marketplace: form.marketplace,
-        }),
       });
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(extractApiErrorMessage(data, "Failed to save tag"));
+        throw new Error(extractApiErrorMessage(data, "Failed to update default tag"));
       }
 
-      setSuccess("Tag saved successfully");
-      setForm({ tag: "", label: "", marketplace: "US" });
+      setSuccess(`Default tag updated for ${trackingId.marketplace}`);
       await loadTracking();
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Failed to save tag");
-    } finally {
-      setSaving(false);
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to update default tag"
+      );
     }
   };
 
@@ -125,6 +162,7 @@ export default function PortalTrackingPage() {
             className="w-full px-4 py-3 bg-gray-800 border border-white/10 rounded-xl text-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-auto"
             value={form.marketplace}
             onChange={(e) => setForm({ ...form, marketplace: e.target.value })}
+            disabled={editingId !== null}
           >
             {MARKETPLACES.map((marketplace) => (
               <option className="bg-gray-800" key={marketplace} value={marketplace}>
@@ -166,6 +204,12 @@ export default function PortalTrackingPage() {
             </button>
           ) : null}
         </form>
+
+        {editingId ? (
+          <p className="m-0 mt-3 text-xs text-slate-400">
+            Marketplace cannot be changed while editing an existing tag.
+          </p>
+        ) : null}
 
         {error ? <p className="mt-3 mb-0 p-3.5 bg-red-500/10 border border-red-500/25 rounded-xl text-red-300">{error}</p> : null}
         {success ? <p className="mt-3 mb-0 p-3.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-emerald-300">{success}</p> : null}
@@ -210,6 +254,15 @@ export default function PortalTrackingPage() {
                 >
                   Edit
                 </button>
+                {!trackingId.is_default ? (
+                  <button
+                    type="button"
+                    className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-full text-amber-300 text-xs font-semibold cursor-pointer hover:bg-amber-500/20 transition-colors"
+                    onClick={() => void handleSetDefault(trackingId)}
+                  >
+                    Set Default
+                  </button>
+                ) : null}
                 {trackingId.usage_count === 0 ? (
                   <button
                     type="button"

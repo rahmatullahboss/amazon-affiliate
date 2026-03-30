@@ -9,6 +9,53 @@ import { getPublicAppOrigin } from '../utils/url';
 
 const portal = new Hono<AppEnv>();
 
+async function ensureMarketplaceDefaultTag(
+  db: D1Database,
+  agentId: number,
+  marketplace: string,
+  preferredTrackingId?: number
+): Promise<void> {
+  if (preferredTrackingId) {
+    await db.prepare('UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?')
+      .bind(agentId, marketplace)
+      .run();
+
+    await db.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ? AND agent_id = ?')
+      .bind(preferredTrackingId, agentId)
+      .run();
+    return;
+  }
+
+  const existingDefault = await db.prepare(
+    `SELECT id
+     FROM tracking_ids
+     WHERE agent_id = ? AND marketplace = ? AND is_active = 1 AND is_default = 1
+     LIMIT 1`
+  )
+    .bind(agentId, marketplace)
+    .first<{ id: number }>();
+
+  if (existingDefault) {
+    return;
+  }
+
+  const fallbackTag = await db.prepare(
+    `SELECT id
+     FROM tracking_ids
+     WHERE agent_id = ? AND marketplace = ? AND is_active = 1
+     ORDER BY created_at ASC
+     LIMIT 1`
+  )
+    .bind(agentId, marketplace)
+    .first<{ id: number }>();
+
+  if (fallbackTag) {
+    await db.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ?')
+      .bind(fallbackTag.id)
+      .run();
+  }
+}
+
 portal.get('/me', async (c) => {
   const userId = c.get('userId');
   const role = c.get('userRole');
@@ -121,7 +168,33 @@ portal.get('/links', async (c) => {
     redirectUrl: `${origin}/go/${row.agent_slug}/${row.asin}`,
   }));
 
-  return c.json({ links });
+  const { results: shortcutResults } = await c.env.DB.prepare(
+    `SELECT a.slug as agent_slug, a.name as agent_name, t.tag as tracking_tag, t.marketplace
+     FROM tracking_ids t
+     JOIN agents a ON a.id = t.agent_id
+     ${role === 'agent' ? 'WHERE a.id = ?' : 'WHERE 1 = 1'}
+       AND t.is_active = 1
+       AND a.is_active = 1
+     ORDER BY a.name ASC, t.is_default DESC, t.created_at ASC`
+  )
+    .bind(...bindings)
+    .all<{
+      agent_slug: string;
+      agent_name: string;
+      tracking_tag: string;
+      marketplace: string;
+    }>();
+
+  const shortcutTemplates = (shortcutResults ?? []).map((row) => ({
+    agentSlug: row.agent_slug,
+    agentName: row.agent_name,
+    trackingTag: row.tracking_tag,
+    marketplace: row.marketplace,
+    bridgeTemplateUrl: `${origin}/t/${row.tracking_tag}/{ASIN}`,
+    redirectTemplateUrl: `${origin}/go/t/${row.tracking_tag}/{ASIN}`,
+  }));
+
+  return c.json({ links, shortcutTemplates });
 });
 
 portal.get('/performance', async (c) => {
@@ -132,7 +205,7 @@ portal.get('/performance', async (c) => {
     throw new HTTPException(403, { message: 'Only linked agent accounts can view performance' });
   }
 
-  const [clicks, views, topProducts, salesTotals, recentClicks] = await Promise.all([
+  const [clicks, views, topProducts, salesTotals, recentClicks, marketplaceBreakdown, tagBreakdown] = await Promise.all([
     c.env.DB.prepare('SELECT COUNT(*) as count FROM clicks WHERE agent_id = ?')
       .bind(agentId)
       .first<{ count: number }>(),
@@ -184,6 +257,64 @@ portal.get('/performance', async (c) => {
     )
       .bind(agentId)
       .all<{ tracking_tag: string; country: string | null; clicked_at: string }>(),
+    c.env.DB.prepare(
+      `SELECT
+         ac.marketplace as marketplace,
+         (
+           SELECT COUNT(*)
+           FROM clicks c
+           JOIN tracking_ids tc ON tc.tag = c.tracking_tag
+           WHERE tc.agent_id = ?
+             AND tc.marketplace = ac.marketplace
+             AND c.agent_id = ?
+         ) as clicks,
+         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         ) as returned_items
+       FROM amazon_conversions ac
+       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+       WHERE t.agent_id = ?
+       GROUP BY ac.marketplace
+       ORDER BY ordered_items DESC, ac.marketplace ASC`
+    )
+      .bind(agentId, agentId, agentId)
+      .all<{ marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
+    c.env.DB.prepare(
+      `SELECT
+         t.tag as tag,
+         t.marketplace as marketplace,
+         (
+           SELECT COUNT(*)
+           FROM clicks c
+           WHERE c.agent_id = ?
+             AND c.tracking_tag = t.tag
+         ) as clicks,
+         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+         COALESCE(
+           SUM(
+             CASE
+               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+               ELSE 0
+             END
+           ),
+           0
+         ) as returned_items
+       FROM tracking_ids t
+       LEFT JOIN amazon_conversions ac
+         ON ac.tracking_tag = t.tag AND ac.marketplace = t.marketplace
+       WHERE t.agent_id = ?
+       GROUP BY t.id
+       ORDER BY ordered_items DESC, t.marketplace ASC, t.tag ASC`
+    )
+      .bind(agentId, agentId)
+      .all<{ tag: string; marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
   ]);
 
   const totalClicks = clicks?.count ?? 0;
@@ -199,6 +330,8 @@ portal.get('/performance', async (c) => {
     commissionAmount: salesTotals?.commission_amount ?? 0,
     topProducts: topProducts.results ?? [],
     recentClicks: recentClicks.results ?? [],
+    marketplaceOrderBreakdown: marketplaceBreakdown.results ?? [],
+    tagOrderBreakdown: tagBreakdown.results ?? [],
   });
 });
 
@@ -247,50 +380,45 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
   const body = c.req.valid('json');
 
   try {
-    const existing = await c.env.DB.prepare(
+    const marketplaceTagCount = await c.env.DB.prepare(
       `SELECT id
        FROM tracking_ids
-       WHERE agent_id = ? AND marketplace = ?
-       ORDER BY is_default DESC, created_at ASC
-       LIMIT 1`
+       WHERE agent_id = ? AND marketplace = ? AND is_active = 1`
     )
       .bind(agentId, body.marketplace)
-      .first<{ id: number }>();
+      .all<{ id: number }>();
 
-    await c.env.DB.prepare(
-      'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
+    const shouldBeDefault = (marketplaceTagCount.results?.length ?? 0) === 0;
+
+    const insertResult = await c.env.DB.prepare(
+      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
+       VALUES (?, ?, ?, ?, ?, 1)`
     )
-      .bind(agentId, body.marketplace)
+      .bind(agentId, body.tag, body.label || null, body.marketplace, shouldBeDefault ? 1 : 0)
       .run();
 
-    if (existing) {
-      await c.env.DB.prepare(
-        `UPDATE tracking_ids
-         SET tag = ?, label = ?, is_default = 1, is_active = 1
-         WHERE id = ?`
-      )
-        .bind(body.tag, body.label || null, existing.id)
-        .run();
-    } else {
-      await c.env.DB.prepare(
-        `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
-         VALUES (?, ?, ?, ?, 1, 1)`
-      )
-        .bind(agentId, body.tag, body.label || null, body.marketplace)
-        .run();
+    const trackingIdValue = Number(insertResult.meta.last_row_id);
+    if (shouldBeDefault && Number.isFinite(trackingIdValue)) {
+      await ensureMarketplaceDefaultTag(c.env.DB, agentId, body.marketplace, trackingIdValue);
     }
 
     const trackingId = await c.env.DB.prepare(
       `SELECT id, tag, label, marketplace, is_default, is_active, created_at
        FROM tracking_ids
-       WHERE agent_id = ? AND marketplace = ?
-       ORDER BY is_default DESC, created_at ASC
-       LIMIT 1`
+       WHERE id = ? AND agent_id = ?`
     )
-      .bind(agentId, body.marketplace)
+      .bind(trackingIdValue, agentId)
       .first();
 
-    return c.json({ trackingId, message: 'Tag saved successfully' }, existing ? 200 : 201);
+    return c.json(
+      {
+        trackingId,
+        message: shouldBeDefault
+          ? 'Tag saved successfully and set as default for this marketplace.'
+          : 'Tag saved successfully',
+      },
+      201
+    );
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new HTTPException(409, {
@@ -301,6 +429,103 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
 
     throw error;
   }
+});
+
+portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+  const id = Number.parseInt(c.req.param('id'), 10);
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
+  }
+
+  if (Number.isNaN(id)) {
+    throw new HTTPException(400, { message: 'Invalid tag ID' });
+  }
+
+  const body = c.req.valid('json');
+
+  const current = await c.env.DB.prepare(
+    `SELECT id, marketplace
+     FROM tracking_ids
+     WHERE id = ? AND agent_id = ?`
+  )
+    .bind(id, agentId)
+    .first<{ id: number; marketplace: string }>();
+
+  if (!current) {
+    throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  try {
+    await c.env.DB.prepare(
+      `UPDATE tracking_ids
+       SET tag = ?, label = ?, is_active = 1
+       WHERE id = ? AND agent_id = ?`
+    )
+      .bind(body.tag, body.label || null, id, agentId)
+      .run();
+
+    const trackingId = await c.env.DB.prepare(
+      `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+       FROM tracking_ids
+       WHERE id = ? AND agent_id = ?`
+    )
+      .bind(id, agentId)
+      .first();
+
+    await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace);
+
+    return c.json({ trackingId, message: 'Tag updated successfully' });
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, {
+        message:
+          'This tag is already assigned to another account. Use a different tag or ask admin to move it to this agent.',
+      });
+    }
+
+    throw error;
+  }
+});
+
+portal.post('/tracking/:id/default', async (c) => {
+  const role = c.get('userRole');
+  const agentId = c.get('agentId');
+  const id = Number.parseInt(c.req.param('id'), 10);
+
+  if (role !== 'agent' || !agentId) {
+    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
+  }
+
+  if (Number.isNaN(id)) {
+    throw new HTTPException(400, { message: 'Invalid tag ID' });
+  }
+
+  const current = await c.env.DB.prepare(
+    `SELECT id, marketplace
+     FROM tracking_ids
+     WHERE id = ? AND agent_id = ? AND is_active = 1`
+  )
+    .bind(id, agentId)
+    .first<{ id: number; marketplace: string }>();
+
+  if (!current) {
+    throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace, current.id);
+
+  const trackingId = await c.env.DB.prepare(
+    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+     FROM tracking_ids
+     WHERE id = ? AND agent_id = ?`
+  )
+    .bind(id, agentId)
+    .first();
+
+  return c.json({ trackingId, message: 'Default tag updated successfully' });
 });
 
 portal.delete('/tracking/:id', async (c) => {
@@ -317,12 +542,12 @@ portal.delete('/tracking/:id', async (c) => {
   }
 
   const current = await c.env.DB.prepare(
-    `SELECT id
+    `SELECT id, marketplace, is_default
      FROM tracking_ids
      WHERE id = ? AND agent_id = ?`
   )
     .bind(id, agentId)
-    .first<{ id: number }>();
+    .first<{ id: number; marketplace?: string; is_default?: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
@@ -348,6 +573,10 @@ portal.delete('/tracking/:id', async (c) => {
   }
 
   await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
+
+  if (current.marketplace) {
+    await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace);
+  }
 
   return c.json({
     message:

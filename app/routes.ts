@@ -16,6 +16,7 @@ export default [
     route("deals", "routes/deals.tsx"),
     route("deals/:asin", "routes/product-detail.tsx"),
     route("category/:slug", "routes/category.tsx"),
+    route("t/:trackingTag/:asin", "routes/tracking-shortcut.tsx"),
     route(":agent/:asin", "routes/bridge.tsx"),
   ]),
 
@@ -40,7 +41,8 @@ export default [
   route("portal/reset-password", "routes/portal/reset-password.tsx"),
   route("portal/complete-signup", "routes/portal/complete-signup.tsx"),
   route("portal", "routes/portal/layout.tsx", [
-    index("routes/portal/dashboard.tsx"),
+    index("routes/portal/home.tsx"),
+    route("dashboard", "routes/portal/dashboard.tsx"),
     route("asins/new", "routes/portal/asin-new.tsx"),
     route("products", "routes/portal/products.tsx"),
     route("links", "routes/portal/links.tsx"),

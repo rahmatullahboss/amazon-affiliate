@@ -1,0 +1,61 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    branches:
+      - main # Or whichever branch you want to trigger this
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Release APK
+        working-directory: android
+        run: ./gradlew assembleRelease
+
+      - name: Generate Keystore
+        run: |
+          keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000 -storepass "android" -keypass "android" -dname "cn=Agent, ou=Agent, o=Agent, c=US"
+
+      - name: Sign APK
+        run: |
+          # Find the apksigner tool
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          
+          # Sign the unsigned APK we built
+          $BUILD_TOOLS_DIR/apksigner sign --ks my-release-key.keystore --ks-pass pass:android --ks-key-alias alias_name --key-pass pass:android --out app-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          tag: "latest"
+          name: "Latest Agent Build"
+          body: "Automated Release APK for the Agent App Panel. Download \`app-release.apk\` to install."
+          artifacts: "app-release.apk"
+          makeLatest: true

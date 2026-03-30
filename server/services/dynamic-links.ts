@@ -1,0 +1,179 @@
+import { buildAmazonUrl } from "../utils/types";
+import { CacheService } from "./cache";
+import { ensureProductRecord, extractAsinFromInput } from "./product-ingestion";
+
+interface TrackingRouteContext {
+  trackingId: number;
+  trackingTag: string;
+  marketplace: string;
+  agentId: number;
+  agentSlug: string;
+  agentName: string;
+}
+
+interface ProductRouteContext {
+  id: number;
+  title: string;
+  image_url: string;
+  status: string;
+}
+
+export interface DynamicLinkResolution {
+  agentId: number;
+  agentSlug: string;
+  agentName: string;
+  trackingId: number;
+  trackingTag: string;
+  marketplace: string;
+  productId: number;
+  asin: string;
+  title: string;
+  imageUrl: string;
+  amazonUrl: string;
+}
+
+interface EnsureDynamicLinkInput {
+  db: D1Database;
+  kv?: KVNamespace;
+  trackingTag: string;
+  asin: string;
+  apiKey?: string;
+  fallbackApiKeys?: string[];
+}
+
+export class DynamicLinkResolutionError extends Error {
+  readonly status: 400 | 404 | 409 | 502 | 503;
+
+  constructor(status: 400 | 404 | 409 | 502 | 503, message: string) {
+    super(message);
+    this.name = "DynamicLinkResolutionError";
+    this.status = status;
+  }
+}
+
+export async function ensureDynamicLinkByTrackingTag(
+  input: EnsureDynamicLinkInput
+): Promise<DynamicLinkResolution> {
+  const resolvedAsin = extractAsinFromInput(input.asin);
+  if (!resolvedAsin) {
+    throw new DynamicLinkResolutionError(400, "Provide a valid ASIN or Amazon product link.");
+  }
+
+  const normalizedTrackingTag = input.trackingTag.trim();
+  if (!normalizedTrackingTag) {
+    throw new DynamicLinkResolutionError(400, "Tracking tag is required.");
+  }
+
+  const tracking = await input.db
+    .prepare(
+      `SELECT
+         t.id as trackingId,
+         t.tag as trackingTag,
+         t.marketplace,
+         a.id as agentId,
+         a.slug as agentSlug,
+         a.name as agentName
+       FROM tracking_ids t
+       JOIN agents a ON a.id = t.agent_id
+       WHERE t.tag = ?
+         AND t.is_active = 1
+         AND a.is_active = 1
+       LIMIT 1`
+    )
+    .bind(normalizedTrackingTag)
+    .first<TrackingRouteContext>();
+
+  if (!tracking) {
+    throw new DynamicLinkResolutionError(404, "Tracking tag not found.");
+  }
+
+  let product = await input.db
+    .prepare(
+      `SELECT id, title, image_url, status
+       FROM products
+       WHERE asin = ? AND marketplace = ?`
+    )
+    .bind(resolvedAsin, tracking.marketplace)
+    .first<ProductRouteContext>();
+
+  if (!product) {
+    if (!input.apiKey && !(input.fallbackApiKeys ?? []).length) {
+      throw new DynamicLinkResolutionError(
+        503,
+        "Amazon product API is not configured. Dynamic ASIN links need live product data."
+      );
+    }
+
+    try {
+      const ensuredProduct = await ensureProductRecord({
+        db: input.db,
+        asin: resolvedAsin,
+        marketplace: tracking.marketplace,
+        apiKey: input.apiKey,
+        fallbackApiKeys: input.fallbackApiKeys,
+        status: "active",
+        requireRealProductData: true,
+      });
+
+      product = {
+        id: ensuredProduct.id,
+        title: ensuredProduct.title,
+        image_url: ensuredProduct.image_url,
+        status: ensuredProduct.status || "active",
+      };
+    } catch {
+      throw new DynamicLinkResolutionError(
+        502,
+        "Could not fetch live product data for this ASIN. Try another ASIN or ask admin to review it."
+      );
+    }
+  }
+
+  if (product.status === "rejected") {
+    throw new DynamicLinkResolutionError(
+      409,
+      "This product is currently blocked and must be reviewed by admin before it can be used again."
+    );
+  }
+
+  if (product.status !== "active") {
+    throw new DynamicLinkResolutionError(
+      409,
+      "This product is not active yet. Ask admin to review it before sharing the link."
+    );
+  }
+
+  await input.db
+    .prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id)
+       VALUES (?, ?, ?)
+       ON CONFLICT(agent_id, product_id) DO UPDATE SET
+         tracking_id = excluded.tracking_id,
+         is_active = 1,
+         updated_at = CURRENT_TIMESTAMP`
+    )
+    .bind(tracking.agentId, product.id, tracking.trackingId)
+    .run();
+
+  if (input.kv) {
+    const cache = new CacheService(input.kv);
+    await Promise.all([
+      cache.deletePageData(tracking.agentSlug, resolvedAsin),
+      cache.deleteRedirectUrl(tracking.agentSlug, resolvedAsin),
+    ]);
+  }
+
+  return {
+    agentId: tracking.agentId,
+    agentSlug: tracking.agentSlug,
+    agentName: tracking.agentName,
+    trackingId: tracking.trackingId,
+    trackingTag: tracking.trackingTag,
+    marketplace: tracking.marketplace,
+    productId: product.id,
+    asin: resolvedAsin,
+    title: product.title,
+    imageUrl: product.image_url,
+    amazonUrl: buildAmazonUrl(resolvedAsin, tracking.trackingTag, tracking.marketplace),
+  };
+}

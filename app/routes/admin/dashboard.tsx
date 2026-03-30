@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router";
 import { getAuthToken } from "../../utils/auth-session";
 
 interface OverviewData {
@@ -11,11 +12,18 @@ interface OverviewData {
   totalOrderedItems: number;
   totalRevenue: number;
   totalCommission: number;
+  contentOverview: {
+    totalProducts: number;
+    activeProducts: number;
+    pendingReviewProducts: number;
+    rejectedProducts: number;
+  };
   topAgents: Array<{ name: string; slug: string; clicks: number }>;
   topProducts: Array<{ asin: string; title: string; clicks: number }>;
   topAgentsByCommission: Array<{
     name: string;
     slug: string;
+    clicks: number;
     orderedItems: number;
     revenueAmount: number;
     commissionAmount: number;
@@ -108,14 +116,14 @@ export default function Dashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
         {stats.map((stat) => (
-          <div key={stat.label} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
+          <div key={stat.label} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 sm:p-5 min-w-0">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xl">{stat.icon}</span>
-              <span className="text-sm text-[#6b6b85] font-medium">{stat.label}</span>
+              <span className="text-lg sm:text-xl shrink-0">{stat.icon}</span>
+              <span className="text-xs sm:text-sm text-[#6b6b85] font-medium leading-snug">{stat.label}</span>
             </div>
-            <div className="text-2xl font-bold" style={{ color: stat.color }}>
+            <div className="text-xl sm:text-2xl font-bold break-words" style={{ color: stat.color }}>
               {typeof stat.value === "number" ? stat.value.toLocaleString() : stat.value}
             </div>
           </div>
@@ -123,6 +131,60 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 overflow-x-auto">
+          <h2 className="text-base font-semibold text-[#f0f0f5] mb-2">Site Content Overview</h2>
+          <p className="mt-0 mb-4 text-sm text-[#8b8ba7]">
+            Use this to track how many products are live on the site and jump into content management.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              {
+                label: "Total Products",
+                value: data?.contentOverview.totalProducts ?? 0,
+                color: "#f0f0f5",
+              },
+              {
+                label: "Active",
+                value: data?.contentOverview.activeProducts ?? 0,
+                color: "#34d399",
+              },
+              {
+                label: "Pending Review",
+                value: data?.contentOverview.pendingReviewProducts ?? 0,
+                color: "#f59e0b",
+              },
+              {
+                label: "Rejected/Inactive",
+                value: data?.contentOverview.rejectedProducts ?? 0,
+                color: "#f87171",
+              },
+            ].map((item) => (
+              <div key={item.label} className="rounded-xl border border-white/5 bg-white/[0.03] p-4">
+                <div className="text-xs uppercase tracking-wide text-[#8b8ba7]">{item.label}</div>
+                <div className="mt-2 text-2xl font-bold" style={{ color: item.color }}>
+                  {item.value.toLocaleString()}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link
+              to="/admin/products"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-[#ff9900] text-[#111111] font-semibold no-underline hover:brightness-105 transition"
+            >
+              Open Products
+            </Link>
+            <Link
+              to="/admin/product-submissions"
+              className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-[#d4d4e4] font-semibold no-underline hover:bg-white/10 transition"
+            >
+              Review Submissions
+            </Link>
+          </div>
+        </div>
+
         <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 overflow-x-auto">
           <h2 className="text-base font-semibold text-[#f0f0f5] mb-4">Top Agents</h2>
           {(data?.topAgents ?? []).length === 0 ? (
@@ -165,7 +227,7 @@ export default function Dashboard() {
                     <div className="text-right">
                       <div className="text-sm font-semibold text-[#14b8a6]">{agent.orderedItems} orders</div>
                       <div className="mt-1 text-xs text-[#8b8ba7]">
-                        ${agent.revenueAmount.toFixed(2)} revenue · ${agent.commissionAmount.toFixed(2)} commission
+                        {agent.clicks} clicks · ${agent.revenueAmount.toFixed(2)} revenue · ${agent.commissionAmount.toFixed(2)} commission
                       </div>
                     </div>
                   </div>

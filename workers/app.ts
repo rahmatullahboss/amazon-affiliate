@@ -16,6 +16,18 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE,
 );
 
+function isCommonBotProbe(pathname: string): boolean {
+  return (
+    pathname === "/.env" ||
+    pathname === "/xmlrpc.php" ||
+    pathname === "/wordpress" ||
+    pathname.endsWith("/wlwmanifest.xml") ||
+    pathname.includes("/wp-admin/") ||
+    pathname.includes("/wp-includes/") ||
+    pathname.startsWith("/wordpress/")
+  );
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -23,6 +35,30 @@ export default {
 
     if (canonicalUrl && (request.method === "GET" || request.method === "HEAD")) {
       return Response.redirect(canonicalUrl, 301);
+    }
+
+    if (url.pathname === "/favicon.ico") {
+      return Response.redirect(`${url.origin}/favicon.svg`, 302);
+    }
+
+    if (url.pathname === "/robots.txt") {
+      return new Response(["User-agent: *", "Allow: /"].join("\n"), {
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "public, max-age=3600",
+        },
+      });
+    }
+
+    if (isCommonBotProbe(url.pathname)) {
+      return new Response("Not Found", {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "public, max-age=300",
+        },
+      });
     }
 
     // Fast-path: Redirect engine (/go/:agentSlug/:asin) — sub-ms with KV

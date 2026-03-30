@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 13 gotchas, 44 conventions, 37 fixes."
+description: "Typescript for amazon-affiliate. 15 gotchas, 60 conventions, 39 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **258 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **307 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -19,6 +19,8 @@ Auto-compiled from **258 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in SELECT — prevents n | -          COALESCE(SUM(ac.ordered_items), 0) as ordered_items, +          ( -          COALESCE( +  |
+| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | - } +   marketplaceOrderBreakdown: Array<{ -  +     marketplace: string; - type CsvRecord = Record<s |
 | ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvDelete, safeKvGetText, safeKvPut } from '../services/kv-safe'; - const auth = ne |
 | ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvGetJson, safeKvPut } from '../services/kv-safe'; - const redirect = new Hono<App |
 | ⚠️ GOTCHA: Fixed null crash in HTTPException — pre | -   let resolvedAgentId = body.agent_id ?? null; +   if (body.role === 'agent' && !body.agent_id) {  |
@@ -34,6 +36,47 @@ Auto-compiled from **258 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Strengthened types Failed — evolves the | -       .replace(/\/\*[\s\S]*?\*\//g, '') +       .replace(/\/\*[\s\S]*?\*\//g, ''); -       .trim() |
 
 ## 🔧 Problem Playbooks
+
+### Added error handling HTTPException
+-   console.error(`[ERROR] ${err.message}`, err.stack);
++   if (err instanceof HTTPException) {
+- 
++     if (err.status >= 500) {
+-   if (err instanceof HTTPException) {
++       console.error(`[ERROR] ${err.message}`, err.stack);
+-     return c.json(
++     }
+-       {
++     return c.json(
+-         error: err.message,
++       {
+-         status: err.status,
++         error: err.message,
+-       },
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: HTTPException
+3. identifier: ERROR
+4. identifier: Internal
+5. identifier: Server
+
+### Fixed null crash in SELECT — parallelizes async operations for speed
+-       `SELECT
++        `SELECT
+-          COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
++          (SELECT COUNT(*) FROM clicks c WHERE c.agent_id = a.id) as clicks,
+-          COALESCE(SUM(ac.revenue_amount), 0) as revenueAmount,
++          COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
+-          COALESCE(SUM(ac.commission_amount), 0) as commissionAmount
++          COALESCE(SUM(ac.r
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: SELECT
+3. identifier: COUNT
+4. identifier: FROM
+5. identifier: WHERE
 
 ### Fixed null crash in Rate — prevents brute-force and DoS attacks
 - /**
@@ -311,40 +354,6 @@ Auto-compiled from **258 real patterns** in **amazon-affiliate**. This skill is 
 2. identifier: RESEND_API_KEY
 3. identifier: RESEND_FROM_EMAIL
 
-### Fixed null crash in Hono — prevents brute-force and DoS attacks
-- import { agentRegistrationSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema, setupSchema } from '../schemas';
-+ import {
-- import { createJwt, hashPassword, verifyPassword } from '../services/auth';
-+   agentRegistrationSchema,
-- import { consumePasswordResetToken, generatePasswordResetToken, sendPasswordResetEmail, storePasswordResetToken } from '../services/password-reset';
-+   fo
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Hono
-3. identifier: AppEnv
-4. identifier: Rate
-5. identifier: Limiting
-
-### Fixed null crash in Number — prevents null/undefined runtime crashes
-- portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
-+ portal.delete('/tracking/:id', async (c) => {
--   const userId = c.get('userId');
-+   const id = Number.parseInt(c.req.param('id'), 10);
--     throw new HTTPException(403, { message: 'Only linked agent accounts can submit ASINs' });
-+     throw new HTTPException(403, { message: 'Only linked agent acc
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Number
-3. identifier: HTTPException
-4. identifier: Only
-5. identifier: Invalid
-
-### Fixed null crash in Hono — prevents brute-force and DoS attacks
-- import { agentRegistrationSchema, loginSchema, setupSchema } from '../schemas';
-+ import { agentRegistrationSchema, forgotPasswordSchema, loginSchema, resetPasswordSchema, setupSchema } from '../schemas';
-- 
-+ import { consumePasswordReset
+### Fixed null crash i
 
 ... [Truncated — see individual observations for full content]

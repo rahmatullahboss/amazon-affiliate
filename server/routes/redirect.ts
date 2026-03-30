@@ -6,6 +6,7 @@ import { recordClick, hashIp } from '../services/analytics';
 import { checkRedirectRateLimit, incrementRateLimitCounters } from '../middleware/rate-limit';
 import { isSuspiciousRequest, isDuplicateClick } from '../middleware/bot-guard';
 import { safeKvGetJson, safeKvPut } from '../services/kv-safe';
+import { DynamicLinkResolutionError, ensureDynamicLinkByTrackingTag } from '../services/dynamic-links';
 
 const redirect = new Hono<AppEnv>();
 
@@ -29,6 +30,67 @@ interface RedirectContext {
  * 2. Rate limiting — 60/min per IP, 10K/hr per agent
  * 3. Click deduplication — same IP+product within 30s = skip analytics
  */
+redirect.get('/t/:trackingTag/:asin', async (c) => {
+  const trackingTag = c.req.param('trackingTag');
+  const asin = c.req.param('asin');
+
+  if (!trackingTag || !asin) {
+    throw new HTTPException(400, { message: 'Missing tracking tag or ASIN' });
+  }
+
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '';
+  const userAgent = c.req.header('user-agent') || '';
+
+  if (isSuspiciousRequest(userAgent)) {
+    throw new HTTPException(403, { message: 'Access denied' });
+  }
+
+  const rateCheck = await checkRedirectRateLimit(c.env.KV, ip, trackingTag);
+  if (!rateCheck.allowed) {
+    throw new HTTPException(429, { message: 'Too many requests. Please try again later.' });
+  }
+
+  let ctx: RedirectContext;
+  let resolvedAgentSlug = trackingTag;
+  let resolvedAsin = asin;
+
+  try {
+    const resolved = await ensureDynamicLinkByTrackingTag({
+      db: c.env.DB,
+      kv: c.env.KV,
+      trackingTag,
+      asin,
+      apiKey: c.env.AMAZON_API_KEY,
+      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    });
+
+    ctx = {
+      amazonUrl: resolved.amazonUrl,
+      agentId: resolved.agentId,
+      productId: resolved.productId,
+      trackingTag: resolved.trackingTag,
+    };
+    resolvedAgentSlug = resolved.agentSlug;
+    resolvedAsin = resolved.asin;
+  } catch (error) {
+    if (error instanceof DynamicLinkResolutionError) {
+      throw new HTTPException(error.status, { message: error.message });
+    }
+
+    throw error;
+  }
+
+  c.executionCtx.waitUntil(
+    recordRedirectClickAsync(c, {
+      agentSlug: resolvedAgentSlug,
+      asin: resolvedAsin,
+      context: ctx,
+    })
+  );
+
+  return c.redirect(ctx.amazonUrl, 302);
+});
+
 redirect.get('/:agentSlug/:asin', async (c) => {
   const agentSlug = c.req.param('agentSlug');
   const asin = c.req.param('asin');
@@ -94,41 +156,44 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   }
 
   // ─── Anti-Ban Layer 3: Click Analytics & Dedup ────────
-  c.executionCtx.waitUntil(
-    (async () => {
-      try {
-        // Increment rate limit counters (non-blocking)
-        await incrementRateLimitCounters(c.env.KV, ip, agentSlug);
-
-        const ipHash = ip ? await hashIp(ip) : null;
-
-        // Check for duplicate click (same IP + same product within 30s)
-        if (ipHash) {
-          const isDupe = await isDuplicateClick(c.env.KV, ipHash, asin);
-          if (isDupe) {
-            // Still redirect, but skip recording to prevent inflated analytics
-            return;
-          }
-        }
-
-        // Record genuine click
-        await recordClick(c.env.DB, {
-          agentId: ctx!.agentId,
-          productId: ctx!.productId,
-          trackingTag: ctx!.trackingTag,
-          ipHash,
-          userAgent: c.req.header('user-agent') || null,
-          referer: c.req.header('referer') || null,
-          country: (c.req.raw as unknown as { cf?: { country?: string } }).cf?.country || null,
-        });
-      } catch (e) {
-        console.error('[Redirect] Analytics error:', e);
-      }
-    })()
-  );
+  c.executionCtx.waitUntil(recordRedirectClickAsync(c, { agentSlug, asin, context: ctx }));
 
   // 5. 302 redirect — user goes to Amazon
   return c.redirect(ctx.amazonUrl, 302);
 });
+
+async function recordRedirectClickAsync(
+  c: {
+    req: { header: (name: string) => string | undefined; raw: Request };
+    env: { DB: D1Database; KV: KVNamespace };
+  },
+  input: { agentSlug: string; asin: string; context: RedirectContext }
+): Promise<void> {
+  try {
+    const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '';
+
+    await incrementRateLimitCounters(c.env.KV, ip, input.agentSlug);
+
+    const ipHash = ip ? await hashIp(ip) : null;
+    if (ipHash) {
+      const isDupe = await isDuplicateClick(c.env.KV, ipHash, input.asin);
+      if (isDupe) {
+        return;
+      }
+    }
+
+    await recordClick(c.env.DB, {
+      agentId: input.context.agentId,
+      productId: input.context.productId,
+      trackingTag: input.context.trackingTag,
+      ipHash,
+      userAgent: c.req.header('user-agent') || null,
+      referer: c.req.header('referer') || null,
+      country: (c.req.raw as unknown as { cf?: { country?: string } }).cf?.country || null,
+    });
+  } catch (e) {
+    console.error('[Redirect] Analytics error:', e);
+  }
+}
 
 export default redirect;
