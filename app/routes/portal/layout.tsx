@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { Route } from "./+types/layout";
 import { clearAuthSession, getAuthToken, restoreAuthSession } from "../../utils/auth-session";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { isNativeCapacitorApp } from "../../utils/native-auth";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -27,6 +28,7 @@ interface PortalNavItem {
 
 export default function PortalLayout() {
   const navigate = useNavigate();
+  const isNativeApp = isNativeCapacitorApp();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -184,17 +186,19 @@ export default function PortalLayout() {
               </NavLink>
             ))}
             
-            <a
-              href="/api/public/downloads/agent-app.apk"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 no-underline border border-emerald-500/30 rounded-xl bg-emerald-500/10 text-emerald-400 py-3 px-4 font-semibold hover:bg-emerald-500/20 transition-all duration-200 flex items-center gap-2 justify-center"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Download App
-            </a>
+            {!isNativeApp ? (
+              <a
+                href="/api/public/downloads/agent-app.apk"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 no-underline border border-emerald-500/30 rounded-xl bg-emerald-500/10 text-emerald-400 py-3 px-4 font-semibold hover:bg-emerald-500/20 transition-all duration-200 flex items-center gap-2 justify-center"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download App
+              </a>
+            ) : null}
           </nav>
         </div>
 
