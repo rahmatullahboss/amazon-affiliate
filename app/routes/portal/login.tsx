@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Browser } from "@capacitor/browser";
 import type { Route } from "./+types/login";
 import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
+import {
+  buildGoogleCompleteSignupPath,
+  exchangeGoogleCredential,
+} from "../../utils/google-auth";
+import {
+  buildNativeGoogleAuthUrl,
+  isNativeCapacitorApp,
+} from "../../utils/native-auth";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import {
   clearAuthSession,
@@ -19,6 +28,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
+  const isNativeApp = isNativeCapacitorApp();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -93,33 +103,10 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
       setError("");
 
       try {
-        const response = await fetch("/api/auth/google", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential }),
-        });
-
-        const data = (await response.json()) as {
-          token?: string;
-          user?: { id: number; username: string; role: string; agentId: number | null };
-          requiresCompletion?: boolean;
-          signupToken?: string;
-          profile?: { email?: string; name?: string | null };
-          error?: unknown;
-          message?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(extractApiErrorMessage(data, "Google sign-in failed"));
-        }
+        const data = await exchangeGoogleCredential(credential, "Google sign-in failed");
 
         if (data.requiresCompletion && data.signupToken) {
-          const params = new URLSearchParams({
-            token: data.signupToken,
-            email: data.profile?.email || "",
-            name: data.profile?.name || "",
-          });
-          navigate(`/portal/complete-signup?${params.toString()}`);
+          navigate(buildGoogleCompleteSignupPath(data.signupToken, data.profile));
           return;
         }
 
@@ -139,6 +126,18 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
     [navigate]
   );
 
+  const handleNativeGoogleSignIn = useCallback(async () => {
+    setError("");
+
+    try {
+      await Browser.open({
+        url: buildNativeGoogleAuthUrl("login"),
+      });
+    } catch {
+      setError("Could not open Google sign-in in your browser.");
+    }
+  }, []);
+
   if (!sessionChecked) {
     return null;
   }
@@ -147,7 +146,7 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
     <main className="min-h-screen flex text-left items-center justify-center p-8 bg-slate-900">
       <form onSubmit={handleLogin} className="w-full max-w-[420px] bg-slate-900/90 border border-white/10 rounded-2xl p-8 grid gap-4 shadow-xl">
         <div className="text-center mb-2">
-          <h1 className="m-0 text-2xl font-bold text-gray-50">Agent Portal</h1>
+          <h1 className="m-0 text-2xl font-bold text-gray-50">RKY Tag House</h1>
           <p className="m-0 text-sm text-slate-400 mt-1 leading-relaxed">
             Log in to submit ASINs and manage your affiliate links.
           </p>
@@ -190,13 +189,31 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
           <span className="h-px flex-1 bg-white/10" />
         </div>
 
-        <GoogleSignInButton
-          clientId={googleClientId}
-          text="signin_with"
-          onCredential={(credential) => {
-            void handleGoogleCredential(credential);
-          }}
-        />
+        {isNativeApp ? (
+          <div className="grid gap-3">
+            <button
+              type="button"
+              className="w-full px-4 py-3.5 bg-white text-slate-900 text-base font-semibold border-none rounded-xl cursor-pointer transition-all hover:bg-slate-100 disabled:opacity-70 disabled:cursor-not-allowed"
+              onClick={() => {
+                void handleNativeGoogleSignIn();
+              }}
+              disabled={loading || !googleClientId}
+            >
+              Continue With Google In Browser
+            </button>
+            <p className="m-0 text-xs leading-relaxed text-center text-slate-500">
+              Google sign-in opens in Chrome, then returns you to the app automatically.
+            </p>
+          </div>
+        ) : (
+          <GoogleSignInButton
+            clientId={googleClientId}
+            text="signin_with"
+            onCredential={(credential) => {
+              void handleGoogleCredential(credential);
+            }}
+          />
+        )}
 
         <p className="m-0 text-sm text-slate-300 text-center mt-2">
           <Link className="text-amber-500 font-semibold no-underline hover:text-amber-400 transition-colors" to="/portal/forgot-password">Forgot password?</Link>

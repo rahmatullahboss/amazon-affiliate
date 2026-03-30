@@ -5,8 +5,17 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useNavigate,
 } from "react-router";
+import { useEffect } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
+import type { PluginListenerHandle } from "@capacitor/core";
 import type { Route } from "./+types/root";
+import { clearAuthSession, persistAuthSession } from "./utils/auth-session";
+import {
+  isNativeCapacitorApp,
+  parseNativeAuthCallbackUrl,
+} from "./utils/native-auth";
 import "./app.css";
 
 export const meta: Route.MetaFunction = () => [
@@ -39,8 +48,67 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function NativeAuthListener() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isNativeCapacitorApp()) {
+      return;
+    }
+
+    let listenerHandle: PluginListenerHandle | null = null;
+
+    const handleAuthUrl = async (value?: string | null) => {
+      if (!value) {
+        return;
+      }
+
+      const payload = parseNativeAuthCallbackUrl(value);
+
+      if (!payload) {
+        return;
+      }
+
+      if (payload.token && payload.user) {
+        persistAuthSession(payload.token, payload.user);
+      } else if (payload.token || payload.user) {
+        clearAuthSession();
+      }
+
+      navigate(payload.next || "/portal/products", { replace: true });
+    };
+
+    const bindListener = async () => {
+      const launchUrl = await CapacitorApp.getLaunchUrl();
+
+      if (launchUrl?.url) {
+        await handleAuthUrl(launchUrl.url);
+      }
+
+      listenerHandle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+        void handleAuthUrl(url);
+      });
+    };
+
+    void bindListener();
+
+    return () => {
+      if (listenerHandle) {
+        void listenerHandle.remove();
+      }
+    };
+  }, [navigate]);
+
+  return null;
+}
+
 export default function App() {
-  return <Outlet />;
+  return (
+    <>
+      <NativeAuthListener />
+      <Outlet />
+    </>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {

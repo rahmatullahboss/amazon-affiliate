@@ -37,6 +37,7 @@ export default [
 
   route("portal/login", "routes/portal/login.tsx"),
   route("portal/register", "routes/portal/register.tsx"),
+  route("portal/google-external", "routes/portal/google-external.tsx"),
   route("portal/forgot-password", "routes/portal/forgot-password.tsx"),
   route("portal/reset-password", "routes/portal/reset-password.tsx"),
   route("portal/complete-signup", "routes/portal/complete-signup.tsx"),

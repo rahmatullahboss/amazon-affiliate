@@ -162,7 +162,7 @@ export default function PortalLayout() {
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-[240px] bg-[#0b1220] border-r border-white/5 flex flex-col justify-between p-6 transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:h-screen ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div>
-          <h1 className="m-0 text-[#f9fafb] text-2xl font-bold md:block hidden">Agent Portal</h1>
+          <h1 className="m-0 text-[#f9fafb] text-2xl font-bold md:block hidden">RKY Tag House</h1>
           <p className="mt-2 mb-6 text-[#94a3b8] text-sm md:block hidden">{user.username} · {user.role}</p>
 
           <nav className="grid gap-3 mt-4 md:mt-0">

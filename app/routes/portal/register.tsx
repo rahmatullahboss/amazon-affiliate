@@ -1,7 +1,16 @@
 import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router";
+import { Browser } from "@capacitor/browser";
 import type { Route } from "./+types/register";
 import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
+import {
+  buildGoogleCompleteSignupPath,
+  exchangeGoogleCredential,
+} from "../../utils/google-auth";
+import {
+  buildNativeGoogleAuthUrl,
+  isNativeCapacitorApp,
+} from "../../utils/native-auth";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { persistAuthSession } from "../../utils/auth-session";
 
@@ -14,6 +23,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export default function PortalRegisterPage({ loaderData }: Route.ComponentProps) {
   const navigate = useNavigate();
+  const isNativeApp = isNativeCapacitorApp();
   const [form, setForm] = useState({
     agent_name: "",
     agent_slug: "",
@@ -67,33 +77,10 @@ export default function PortalRegisterPage({ loaderData }: Route.ComponentProps)
       setError("");
 
       try {
-        const response = await fetch("/api/auth/google", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ credential }),
-        });
-
-        const data = (await response.json()) as {
-          token?: string;
-          user?: { id: number; username: string; role: string; agentId: number | null };
-          requiresCompletion?: boolean;
-          signupToken?: string;
-          profile?: { email?: string; name?: string | null };
-          error?: unknown;
-          message?: string;
-        };
-
-        if (!response.ok) {
-          throw new Error(extractApiErrorMessage(data, "Google sign-up failed"));
-        }
+        const data = await exchangeGoogleCredential(credential, "Google sign-up failed");
 
         if (data.requiresCompletion && data.signupToken) {
-          const params = new URLSearchParams({
-            token: data.signupToken,
-            email: data.profile?.email || "",
-            name: data.profile?.name || "",
-          });
-          navigate(`/portal/complete-signup?${params.toString()}`);
+          navigate(buildGoogleCompleteSignupPath(data.signupToken, data.profile));
           return;
         }
 
@@ -113,6 +100,18 @@ export default function PortalRegisterPage({ loaderData }: Route.ComponentProps)
     [navigate]
   );
 
+  const handleNativeGoogleSignUp = useCallback(async () => {
+    setError("");
+
+    try {
+      await Browser.open({
+        url: buildNativeGoogleAuthUrl("signup"),
+      });
+    } catch {
+      setError("Could not open Google sign-up in your browser.");
+    }
+  }, []);
+
   return (
     <main style={styles.page}>
       <form onSubmit={handleSubmit} style={styles.card}>
@@ -123,13 +122,31 @@ export default function PortalRegisterPage({ loaderData }: Route.ComponentProps)
 
         {error ? <p style={styles.error}>{error}</p> : null}
 
-        <GoogleSignInButton
-          clientId={googleClientId}
-          text="signup_with"
-          onCredential={(credential) => {
-            void handleGoogleCredential(credential);
-          }}
-        />
+        {isNativeApp ? (
+          <div style={styles.externalGoogleWrap}>
+            <button
+              type="button"
+              style={styles.externalGoogleButton}
+              onClick={() => {
+                void handleNativeGoogleSignUp();
+              }}
+              disabled={loading || !googleClientId}
+            >
+              Continue With Google In Browser
+            </button>
+            <p style={styles.externalGoogleHint}>
+              Google sign-up opens in Chrome and returns you to the app automatically.
+            </p>
+          </div>
+        ) : (
+          <GoogleSignInButton
+            clientId={googleClientId}
+            text="signup_with"
+            onCredential={(credential) => {
+              void handleGoogleCredential(credential);
+            }}
+          />
+        )}
 
         <div style={styles.dividerWrap}>
           <span style={styles.divider} />
@@ -249,6 +266,26 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     padding: "0.9rem 1rem",
     cursor: "pointer",
+  },
+  externalGoogleWrap: {
+    display: "grid",
+    gap: "0.75rem",
+  },
+  externalGoogleButton: {
+    border: "none",
+    borderRadius: "999px",
+    background: "#f9fafb",
+    color: "#111827",
+    fontWeight: 700,
+    padding: "0.9rem 1rem",
+    cursor: "pointer",
+  },
+  externalGoogleHint: {
+    margin: 0,
+    color: "#94a3b8",
+    fontSize: "0.8rem",
+    lineHeight: 1.5,
+    textAlign: "center",
   },
   error: {
     margin: 0,
