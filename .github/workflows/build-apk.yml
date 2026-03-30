@@ -11,6 +11,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+      ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
 
     steps:
       - name: Checkout Repository
@@ -31,6 +34,21 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
+      - name: Prepare Release Metadata
+        run: |
+          echo "APK_VERSION_NAME=${ANDROID_VERSION_NAME}-${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Validate Android Signing Secrets
+        run: |
+          test -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}"
+          test -n "${{ secrets.ANDROID_KEY_ALIAS }}"
+          test -n "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          test -n "${{ secrets.ANDROID_KEY_PASSWORD }}"
+
+      - name: Restore Android Keystore
+        run: |
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/release.keystore
+
       - name: Sync Capacitor
         run: |
           mkdir -p dist
@@ -41,24 +59,29 @@ jobs:
         working-directory: android
         run: ./gradlew assembleRelease
 
-      - name: Generate Keystore
-        run: |
-          keytool -genkey -v -keystore my-release-key.keystore -alias alias_name -keyalg RSA -keysize 2048 -validity 10000 -storepass "android" -keypass "android" -dname "cn=Agent, ou=Agent, o=Agent, c=US"
-
       - name: Sign APK
         run: |
-          # Find the apksigner tool
           BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
-          
-          # Sign the unsigned APK we built
-          $BUILD_TOOLS_DIR/apksigner sign --ks my-release-key.keystore --ks-pass pass:android --ks-key-alias alias_name --key-pass pass:android --out app-release.apk android/app/build/outputs/apk/release/app-release-unsigned.apk
+          "$BUILD_TOOLS_DIR/apksigner" sign \
+            --ks android/release.keystore \
+            --ks-pass pass:${{ secrets.ANDROID_KEYSTORE_PASSWORD }} \
+            --ks-key-alias "${{ secrets.ANDROID_KEY_ALIAS }}" \
+            --key-pass pass:${{ secrets.ANDROID_KEY_PASSWORD }} \
+            --out app-release.apk \
+            android/app/build/outputs/apk/release/app-release-unsigned.apk
+
+      - name: Verify Signed APK
+        run: |
+          BUILD_TOOLS_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
+          "$BUILD_TOOLS_DIR/apksigner" verify app-release.apk
 
       - name: Create GitHub Release
         uses: ncipollo/release-action@v1
         with:
           allowUpdates: true
+          replacesArtifacts: true
           tag: "latest"
           name: "Latest Agent Build"
-          body: "Automated Release APK for the Agent App Panel. Download app-release.apk to install."
+          body: "Automated Release APK for the Agent App Panel. Download app-release.apk to install. Version: ${{ env.APK_VERSION_NAME }}"
           artifacts: "app-release.apk"
           makeLatest: true

@@ -23,6 +23,7 @@ import {
 import { getPublicAppOrigin } from '../utils/url';
 import { verifyGoogleCredential } from '../services/google-auth';
 import { safeKvDelete, safeKvGetText, safeKvPut } from '../services/kv-safe';
+import { authMiddleware } from '../middleware/auth';
 
 const auth = new Hono<AppEnv>();
 
@@ -145,6 +146,17 @@ auth.post('/login', zValidator('json', loginSchema), async (c) => {
       username: account.username,
       role: account.role,
       agentId: account.agent_id,
+    },
+  });
+});
+
+auth.get('/me', authMiddleware, async (c) => {
+  return c.json({
+    user: {
+      id: c.get('userId'),
+      username: c.get('username'),
+      role: c.get('userRole'),
+      agentId: c.get('agentId'),
     },
   });
 });

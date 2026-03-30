@@ -1,7 +1,8 @@
 import { Outlet, NavLink, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/layout";
-import { clearAuthSession, restoreAuthSession } from "../../utils/auth-session";
+import { clearAuthSession, getAuthToken, restoreAuthSession } from "../../utils/auth-session";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -15,6 +16,8 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [sessionError, setSessionError] = useState("");
 
   useEffect(() => {
     document.title = "Dealsrky | RKY Tag Store";
@@ -24,13 +27,91 @@ export default function AdminLayout() {
       navigate("/admin/login");
       return;
     }
-    setUser(restoredUser);
+
+    const verifySession = async () => {
+      setCheckingSession(true);
+      setSessionError("");
+
+      try {
+        const response = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+        });
+
+        if (response.status === 401) {
+          clearAuthSession();
+          navigate("/admin/login", { replace: true });
+          return;
+        }
+
+        const payload = (await response.json()) as unknown;
+
+        if (!response.ok) {
+          throw new Error(extractApiErrorMessage(payload, "Failed to verify admin session"));
+        }
+
+        const data = payload as {
+          user?: {
+            username: string;
+            role: string;
+          };
+        };
+
+        if (data.user?.role !== "admin" && data.user?.role !== "super_admin") {
+          clearAuthSession();
+          navigate("/admin/login", { replace: true });
+          return;
+        }
+
+        if (!data.user) {
+          throw new Error("Failed to verify admin session");
+        }
+
+        setUser(data.user);
+      } catch (error) {
+        setSessionError(
+          error instanceof Error ? error.message : "Failed to verify admin session"
+        );
+      } finally {
+        setCheckingSession(false);
+      }
+    };
+
+    void verifySession();
   }, [navigate]);
 
   const handleLogout = () => {
     clearAuthSession();
     navigate("/admin/login");
   };
+
+  if (checkingSession) {
+    return <div className="min-h-screen bg-[#0a0a0f] p-8 text-[#a0a0b8]">Checking admin session...</div>;
+  }
+
+  if (sessionError) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f] p-8 text-[#f0f0f5]">
+        <div className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
+          <h1 className="m-0 text-2xl font-bold">Admin Session Error</h1>
+          <p className="mt-3 text-sm text-red-200">{sessionError}</p>
+          <div className="mt-4 flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="rounded-lg border-none bg-red-400/20 px-4 py-2 font-semibold text-red-50 transition-colors hover:bg-red-400/30"
+            >
+              Retry
+            </button>
+            <button
+              onClick={handleLogout}
+              className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 font-semibold text-[#f0f0f5] transition-colors hover:bg-white/10"
+            >
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!user) return null;
 

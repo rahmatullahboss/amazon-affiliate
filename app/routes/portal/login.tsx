@@ -3,7 +3,12 @@ import { Link, useNavigate } from "react-router";
 import type { Route } from "./+types/login";
 import { GoogleSignInButton } from "../../components/auth/GoogleSignInButton";
 import { extractApiErrorMessage } from "../../utils/api-errors";
-import { persistAuthSession, restoreAuthSession } from "../../utils/auth-session";
+import {
+  clearAuthSession,
+  getAuthToken,
+  persistAuthSession,
+  restoreAuthSession,
+} from "../../utils/auth-session";
 
 export async function loader({ context }: Route.LoaderArgs) {
   const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string };
@@ -23,12 +28,32 @@ export default function PortalLoginPage({ loaderData }: Route.ComponentProps) {
 
   useEffect(() => {
     const existingSession = restoreAuthSession();
-    if (existingSession) {
-      navigate("/portal/products", { replace: true });
+
+    if (!existingSession) {
+      setSessionChecked(true);
       return;
     }
 
-    setSessionChecked(true);
+    const verifySession = async () => {
+      try {
+        const response = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${getAuthToken()}` },
+        });
+
+        if (response.ok) {
+          navigate("/portal/products", { replace: true });
+          return;
+        }
+
+        clearAuthSession();
+      } catch {
+        clearAuthSession();
+      } finally {
+        setSessionChecked(true);
+      }
+    };
+
+    void verifySession();
   }, [navigate]);
 
   const handleLogin = async (event: React.FormEvent) => {
