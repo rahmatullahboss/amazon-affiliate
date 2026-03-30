@@ -32,7 +32,10 @@ jobs:
           cache: 'gradle'
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          mkdir -p dist
+          mkdir -p android/app/src/main/assets/public
+          npx cap sync android
 
       - name: Build Release APK
         working-directory: android
