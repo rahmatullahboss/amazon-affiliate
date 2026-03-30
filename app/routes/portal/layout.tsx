@@ -185,9 +185,10 @@ export default function PortalLayout() {
             ))}
             
             <a
-              href="https://github.com/rahmatullahboss/amazon-affiliate/releases/latest/download/app-release.apk"
+              href="/api/public/downloads/agent-app.apk"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-2 no-underline border border-emerald-500/30 rounded-xl bg-emerald-500/10 text-emerald-400 py-3 px-4 font-semibold hover:bg-emerald-500/20 transition-all duration-200 flex items-center gap-2 justify-center"
-              download
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

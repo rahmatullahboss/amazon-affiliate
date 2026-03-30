@@ -1,8 +1,11 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../utils/types";
 import { safeKvGetJson, safeKvPut } from "../services/kv-safe";
 
 const router = new Hono<AppEnv>();
+const AGENT_APP_DOWNLOAD_URL =
+  "https://github.com/rahmatullahboss/amazon-affiliate/releases/latest/download/app-release.apk";
 
 // Get all active categories
 router.get("/categories", async (c) => {
@@ -84,6 +87,33 @@ router.get("/products", async (c) => {
       total: countResult?.total || 0,
       totalPages: Math.ceil((countResult?.total || 0) / limit),
     }
+  });
+});
+
+router.get("/downloads/agent-app.apk", async (c) => {
+  const downloadResponse = await fetch(AGENT_APP_DOWNLOAD_URL, {
+    redirect: "follow",
+    headers: {
+      "user-agent": "DealsRky-App-Download",
+      accept: "application/vnd.android.package-archive,application/octet-stream,*/*",
+    },
+  });
+
+  if (!downloadResponse.ok || !downloadResponse.body) {
+    throw new HTTPException(502, {
+      message: "Could not fetch the latest Android app package right now.",
+    });
+  }
+
+  const headers = new Headers(downloadResponse.headers);
+  headers.set("content-type", "application/vnd.android.package-archive");
+  headers.set("content-disposition", 'attachment; filename="app-release.apk"');
+  headers.set("cache-control", "no-store, no-cache, must-revalidate");
+  headers.set("x-robots-tag", "noindex, nofollow");
+
+  return new Response(downloadResponse.body, {
+    status: 200,
+    headers,
   });
 });
 
