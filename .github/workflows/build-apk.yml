@@ -3,7 +3,7 @@ name: Build and Release Android APK
 on:
   push:
     branches:
-      - main # Or whichever branch you want to trigger this
+      - master # Or whichever branch you want to trigger this
 
 permissions:
   contents: write
@@ -56,6 +56,6 @@ jobs:
           allowUpdates: true
           tag: "latest"
           name: "Latest Agent Build"
-          body: "Automated Release APK for the Agent App Panel. Download \`app-release.apk\` to install."
+          body: "Automated Release APK for the Agent App Panel. Download app-release.apk to install."
           artifacts: "app-release.apk"
           makeLatest: true
