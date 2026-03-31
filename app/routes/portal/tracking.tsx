@@ -18,6 +18,7 @@ interface TrackingIdRow {
   marketplace: string;
   is_default: number;
   is_active: number;
+  is_portal_editable: number;
   created_at: string;
   usage_count: number;
 }
@@ -231,6 +232,11 @@ export default function PortalTrackingPage() {
                 <p className="m-0 text-slate-300 text-sm leading-relaxed">
                   {trackingId.marketplace} · {trackingId.label || "Default tag"}
                 </p>
+                {trackingId.is_portal_editable !== 1 ? (
+                  <p className="m-0 mt-2 text-xs text-amber-300">
+                    Admin-managed extra tag. You can view it here, but only admin can edit it.
+                  </p>
+                ) : null}
                 {trackingId.usage_count > 0 ? (
                   <p className="m-0 mt-2 text-xs text-slate-400">
                     Linked to {trackingId.usage_count} product{trackingId.usage_count > 1 ? "s" : ""}
@@ -238,6 +244,8 @@ export default function PortalTrackingPage() {
                 ) : null}
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                {trackingId.is_portal_editable === 1 ? (
+                  <>
                 <button
                   type="button"
                   className="px-3 py-1.5 bg-transparent border border-white/20 rounded-full text-slate-50 text-xs font-semibold cursor-pointer hover:bg-white/5 transition-colors"
@@ -263,7 +271,9 @@ export default function PortalTrackingPage() {
                     Set Default
                   </button>
                 ) : null}
-                {trackingId.usage_count === 0 ? (
+                  </>
+                ) : null}
+                {trackingId.is_portal_editable === 1 && trackingId.usage_count === 0 ? (
                   <button
                     type="button"
                     className="px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-red-400 text-xs font-semibold cursor-pointer hover:bg-red-500/20 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
@@ -304,7 +314,7 @@ export default function PortalTrackingPage() {
                     {deletingId === trackingId.id ? "Deleting..." : "Delete"}
                   </button>
                 ) : null}
-                {trackingId.usage_count > 0 ? (
+                {trackingId.is_portal_editable === 1 && trackingId.usage_count > 0 ? (
                   <>
                     <button
                       type="button"
@@ -366,16 +376,21 @@ export default function PortalTrackingPage() {
                   </>
                 ) : null}
                 <span className="px-3 py-1 bg-amber-500/10 border border-amber-500/25 rounded-full text-amber-500 text-xs font-bold">
-                  {trackingId.is_default ? "Default" : "Saved"}
+                  {trackingId.is_portal_editable === 1 ? (trackingId.is_default ? "Default" : "Saved") : "Read Only"}
                 </span>
                 {trackingId.usage_count > 0 ? (
                   <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-slate-300 text-xs font-semibold">
                     In Use
                   </span>
                 ) : null}
+                {trackingId.is_portal_editable !== 1 ? (
+                  <span className="px-3 py-1 bg-sky-500/10 border border-sky-500/25 rounded-full text-sky-300 text-xs font-semibold">
+                    Admin Managed
+                  </span>
+                ) : null}
               </div>
             </div>
-              {replaceTargetId === trackingId.id ? (
+              {trackingId.is_portal_editable === 1 && replaceTargetId === trackingId.id ? (
                 <div className="mt-4 rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
                   <p className="m-0 mb-3 text-sm text-sky-100">
                     Move this tag's linked products to another {trackingId.marketplace} tag, then delete it.
@@ -461,7 +476,7 @@ export default function PortalTrackingPage() {
                   ) : null}
                 </div>
               ) : null}
-              {trackingId.usage_count > 0 && replaceTargetId !== trackingId.id ? (
+              {trackingId.is_portal_editable === 1 && trackingId.usage_count > 0 && replaceTargetId !== trackingId.id ? (
                 <p className="m-0 mt-3 text-xs text-slate-400">
                   This tag is linked to live product links. Use <span className="font-semibold text-sky-300">Replace &amp; Delete</span> to move those links to another {trackingId.marketplace} tag, or use <span className="font-semibold text-red-300">Delete with Links</span> to remove both the tag and its linked products.
                 </p>

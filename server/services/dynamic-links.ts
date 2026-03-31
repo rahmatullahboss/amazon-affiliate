@@ -1,3 +1,4 @@
+import { ASIN_IMPORT_ENABLED, ASIN_IMPORT_PAUSED_MESSAGE } from "../utils/asin-import";
 import { buildAmazonUrl } from "../utils/types";
 import { CacheService } from "./cache";
 import {
@@ -166,6 +167,10 @@ export async function ensureDynamicLinkByTrackingTag(
     .first<ProductRouteContext>();
 
   if (!product) {
+    if (!ASIN_IMPORT_ENABLED) {
+      throw new DynamicLinkResolutionError(503, ASIN_IMPORT_PAUSED_MESSAGE);
+    }
+
     if (!input.apiKey && !(input.fallbackApiKeys ?? []).length) {
       throw new DynamicLinkResolutionError(
         503,
@@ -287,6 +292,10 @@ export async function ensureDynamicLinkByAgentSlug(
       503,
       "Amazon product API is not configured. Dynamic ASIN links need live product data."
     );
+  }
+
+  if (!ASIN_IMPORT_ENABLED) {
+    throw deferredStatusError ?? new DynamicLinkResolutionError(503, ASIN_IMPORT_PAUSED_MESSAGE);
   }
 
   const attemptedMarketplaces = new Set<string>();

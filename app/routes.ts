@@ -11,6 +11,8 @@ export default [
     route("disclosure", "routes/disclosure.tsx"),
     route("about", "routes/about.tsx"),
     route("contact", "routes/contact.tsx"),
+    route("blog", "routes/blog.tsx"),
+    route("blog/:slug", "routes/blog-post.tsx"),
 
     // Dynamic Content Routes
     route("deals", "routes/deals.tsx"),
@@ -28,12 +30,14 @@ export default [
     route("users", "routes/admin/users.tsx"),
     route("agents", "routes/admin/agents.tsx"),
     route("products", "routes/admin/products.tsx"),
+    route("sheet-control", "routes/admin/sheet-control.tsx"),
     route("product-submissions", "routes/admin/product-submissions.tsx"),
     route("tracking", "routes/admin/tracking.tsx"),
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("reports", "routes/admin/reports.tsx"),
     route("audit-logs", "routes/admin/audit-logs.tsx"),
+    route("blogs", "routes/admin/blogs.tsx"),
   ]),
 
   route("portal/login", "routes/portal/login.tsx"),

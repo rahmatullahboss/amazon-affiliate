@@ -1,5 +1,8 @@
 import { createRequestHandler } from "react-router";
+import { ASIN_IMPORT_ENABLED } from "../server/utils/asin-import";
 import { apiApp } from "../server/api";
+import { syncAgentSheetSources } from "../server/services/sheet-control";
+import { getSheetSyncConfig, syncProductsFromSheet } from "../server/services/sheet-sync";
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
 
 declare module "react-router" {
@@ -87,6 +90,7 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
   const staticEntries: SitemapEntry[] = [
     { path: "/" },
     { path: "/deals" },
+    { path: "/blog" },
     { path: "/about" },
     { path: "/contact" },
     { path: "/disclosure" },
@@ -107,6 +111,13 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
      ORDER BY created_at DESC`
   ).all<{ asin: string; last_modified: string | null }>();
 
+  const { results: blogResults } = await env.DB.prepare(
+    `SELECT slug, COALESCE(updated_at, published_at, created_at) AS last_modified
+     FROM blog_posts
+     WHERE is_deleted = 0 AND status = 'published'
+     ORDER BY published_at DESC, created_at DESC`
+  ).all<{ slug: string; last_modified: string | null }>();
+
   const dynamicEntries: SitemapEntry[] = [
     ...(categoryResults ?? []).map((category) => ({
       path: `/category/${category.slug}`,
@@ -115,6 +126,10 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
     ...(productResults ?? []).map((product) => ({
       path: `/deals/${product.asin}`,
       lastModified: product.last_modified,
+    })),
+    ...(blogResults ?? []).map((post) => ({
+      path: `/blog/${post.slug}`,
+      lastModified: post.last_modified,
     })),
   ];
 
@@ -130,6 +145,7 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const acceptsHtml = (request.headers.get("accept") || "").includes("text/html");
     const canonicalUrl = shouldRedirectToPublicAppUrl(request.url, env);
 
     if (canonicalUrl && (request.method === "GET" || request.method === "HEAD")) {
@@ -191,6 +207,14 @@ export default {
       cloudflare: { env, ctx },
     });
 
+    if (
+      response.status === 404 &&
+      acceptsHtml &&
+      (request.method === "GET" || request.method === "HEAD")
+    ) {
+      return Response.redirect(`${url.origin}/`, 302);
+    }
+
     const contentType = response.headers.get("content-type") || "";
     if (contentType.includes("text/html")) {
       const headers = new Headers(response.headers);
@@ -211,5 +235,54 @@ export default {
     }
 
     return response;
+  },
+  async scheduled(_event, env, ctx) {
+    try {
+      if (!ASIN_IMPORT_ENABLED) {
+        return;
+      }
+
+      const runtimeEnv = env as Env & { AMAZON_API_KEY_FALLBACK?: string };
+
+      if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+        console.warn("[SHEET_SYNC] Skipping scheduled import because Google credentials are missing.");
+        return;
+      }
+
+      await syncAgentSheetSources({
+        db: env.DB,
+        kv: env.KV,
+        apiKey: env.AMAZON_API_KEY,
+        fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
+          ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
+          : [],
+        credentials: {
+          clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+        },
+      });
+
+      const config = await getSheetSyncConfig(env.DB);
+      if (!config.is_active || !config.sheet_url) {
+        return;
+      }
+
+      await syncProductsFromSheet({
+        db: env.DB,
+        kv: env.KV,
+        apiKey: env.AMAZON_API_KEY,
+        fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
+          ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
+          : [],
+        config,
+        credentials: {
+          clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown scheduled sheet sync error";
+      ctx.waitUntil(Promise.resolve(console.error(`[SHEET_SYNC] Scheduled import failed: ${message}`, error)));
+    }
   },
 } satisfies ExportedHandler<Env>;

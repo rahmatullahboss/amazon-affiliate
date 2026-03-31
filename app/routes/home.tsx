@@ -1,7 +1,10 @@
 import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
+import { BlogCard } from "../components/blog/BlogCard";
 import { buildSeoMeta } from "../utils/seo";
+import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import type { BlogPostSummary } from "../utils/blog";
 
 interface ProductRow {
   id: number;
@@ -15,6 +18,7 @@ interface ProductRow {
 
 interface HomeLoaderData {
   products: ProductRow[];
+  posts: BlogPostSummary[];
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -29,18 +33,39 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
 
-  const { results } = await env.DB.prepare(
-    `
-      SELECT id, asin, title, image_url, category, marketplace, created_at
-      FROM products
-      WHERE is_active = 1 AND status = 'active'
-      ORDER BY created_at DESC
-      LIMIT 36
-    `
-  ).all<ProductRow>();
+  const [productsResult, postsResult] = await Promise.all([
+    env.DB.prepare(
+      `
+        SELECT id, asin, title, image_url, category, marketplace, created_at
+        FROM products
+        WHERE is_active = 1 AND status = 'active'
+        ORDER BY created_at DESC
+        LIMIT 36
+      `
+    ).all<ProductRow>(),
+    env.DB.prepare(
+      `SELECT *
+       FROM blog_posts
+       WHERE is_deleted = 0 AND status = 'published'
+       ORDER BY is_featured DESC, published_at DESC, updated_at DESC
+       LIMIT 3`
+    ).all<
+      BlogPostSummary & {
+        cover_image_key: string | null;
+      }
+    >(),
+  ]);
+
+  const posts = (postsResult.results || []).map((row) => ({
+    ...row,
+    cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
+    excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
+    reading_minutes: estimateReadingMinutes(row.content),
+  }));
 
   return {
-    products: results || [],
+    products: productsResult.results || [],
+    posts,
   } satisfies HomeLoaderData;
 }
 
@@ -62,7 +87,7 @@ const editorialHighlights = [
 const marketplaceLabels = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products } = loaderData as HomeLoaderData;
+  const { products, posts } = loaderData as HomeLoaderData;
   const featuredProducts = products.slice(0, 6);
   const latestProducts = products.slice(6, 12);
 
@@ -244,6 +269,40 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-16 lg:px-6">
+        <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+              Fresh Articles
+            </p>
+            <h2 className="mt-2 text-3xl font-black text-gray-950">
+              Research-driven buying advice
+            </h2>
+          </div>
+          <Link
+            to="/blog"
+            className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
+          >
+            Visit the blog
+          </Link>
+        </div>
+
+        {posts.length > 0 ? (
+          <div className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {posts.map((post) => (
+              <BlogCard key={post.id} post={post} />
+            ))}
+          </div>
+        ) : (
+          <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
+            <h3 className="text-lg font-bold text-gray-900">Blog articles are coming soon</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              We are preparing comparison posts, buying guides, and deeper product research pieces.
+            </p>
+          </div>
+        )}
       </section>
     </div>
   );

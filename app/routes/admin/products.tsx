@@ -1,4 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_DETAIL,
+  BATCH_ASIN_IMPORT_ENABLED,
+  BATCH_ASIN_IMPORT_PAUSED_DETAIL,
+} from "../../utils/asin-import";
 import { getAuthToken } from "../../utils/auth-session";
 
 interface Product {
@@ -202,6 +208,11 @@ export default function ProductsPage() {
   }
 
   async function handleFetchAsin() {
+    if (!ASIN_IMPORT_ENABLED) {
+      setError(ASIN_IMPORT_PAUSED_DETAIL);
+      return;
+    }
+
     if (!form.asin || form.asin.length !== 10) {
       setError("ASIN must be 10 characters");
       return;
@@ -236,6 +247,11 @@ export default function ProductsPage() {
   }
 
   async function handleProductRefresh(productId: number) {
+    if (!ASIN_IMPORT_ENABLED) {
+      setError(ASIN_IMPORT_PAUSED_DETAIL);
+      return;
+    }
+
     setRefreshingProductId(productId);
     setError("");
 
@@ -340,6 +356,11 @@ export default function ProductsPage() {
   }
 
   async function handleBulkImport() {
+    if (!BATCH_ASIN_IMPORT_ENABLED) {
+      setError(BATCH_ASIN_IMPORT_PAUSED_DETAIL);
+      return;
+    }
+
     const asins = analyzeBulkAsins(bulkAsins).uniqueAsins;
     if (asins.length === 0) {
       setError("No valid ASINs found. ASINs start with 'B' and are 10 characters long.");
@@ -448,6 +469,11 @@ export default function ProductsPage() {
   }
 
   async function handleSheetImport() {
+    if (!BATCH_ASIN_IMPORT_ENABLED) {
+      setSheetMessage(BATCH_ASIN_IMPORT_PAUSED_DETAIL);
+      return;
+    }
+
     setSheetImporting(true);
     setSheetMessage("");
 
@@ -469,7 +495,7 @@ export default function ProductsPage() {
 
       const summary = data.summary;
       setSheetMessage(
-        `Sheet import complete. Created ${summary?.createdCount ?? 0}, updated ${summary?.updatedCount ?? 0}, skipped ${summary?.skippedCount ?? 0}.`
+        `Sheet import complete. Created ${summary?.createdCount ?? 0} rows, updated ${summary?.updatedCount ?? 0} rows, skipped ${summary?.skippedCount ?? 0}. Agent mappings and hidden rows are applied from the sheet automatically.`
       );
       await Promise.all([fetchProducts(1), fetchSheetConfig()]);
     } catch (requestError) {
@@ -502,7 +528,7 @@ export default function ProductsPage() {
       }
 
       setSheetMessage(
-        `Sheet export complete. Wrote ${data.summary?.totalRows ?? 0} products to the configured spreadsheet.`
+        `Sheet export complete. Wrote ${data.summary?.totalRows ?? 0} rows with product, agent, storefront, and link-management data.`
       );
       await fetchSheetConfig();
     } catch (requestError) {
@@ -550,10 +576,18 @@ export default function ProductsPage() {
               Google Sheet Sync
             </h2>
             <p className="text-[#8d8da6] text-sm max-w-[720px] leading-relaxed m-0">
-              Use Google Sheets as an optional product ingestion source. The database
-              remains the source of truth. Import and export both run through the
-              Google Sheets API using backend credentials.
+              Use Google Sheets as an optional bulk control panel. You can import
+              product rows, agent mappings, tags, and active/hidden status from the
+              sheet, then export ready storefront and bridge links back into the same
+              sheet. The database remains the source of truth. The auto-sync handler
+              is ready, and a Cloudflare cron slot can be attached later to run it
+              on a schedule.
             </p>
+            {!BATCH_ASIN_IMPORT_ENABLED ? (
+              <p className="mt-3 mb-0 text-sm max-w-[720px] leading-relaxed text-amber-200">
+                {BATCH_ASIN_IMPORT_PAUSED_DETAIL} Sheet export and existing product management still work.
+              </p>
+            ) : null}
           </div>
           <div
             className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap ${sheetForm.is_active ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-[#a0a0b8]"}`}
@@ -611,6 +645,7 @@ export default function ProductsPage() {
         <div className="text-[#6b6b85] text-sm leading-relaxed mb-6">
           Backend credentials must have access to the sheet. Share the spreadsheet with the
           configured Google service account email, then import/export will run server-side.
+          Recommended columns: <span className="text-[#a0a0b8]">asin</span>, <span className="text-[#a0a0b8]">marketplace</span>, <span className="text-[#a0a0b8]">agent_slug</span>, <span className="text-[#a0a0b8]">tracking_tag</span>, <span className="text-[#a0a0b8]">custom_title</span>, and <span className="text-[#a0a0b8]">status</span>. Use <span className="text-[#a0a0b8]">hidden</span> or <span className="text-[#a0a0b8]">off</span> in status to hide an agent-product row without deleting it.
         </div>
 
         <label
@@ -635,10 +670,14 @@ export default function ProductsPage() {
           </button>
           <button
             onClick={() => void handleSheetImport()}
-            disabled={sheetImporting || !sheetForm.is_active}
-            className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${sheetForm.is_active ? "border-emerald-500/40 bg-white/5 text-emerald-400 cursor-pointer hover:bg-emerald-500/10" : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"}`}
+            disabled={sheetImporting || !sheetForm.is_active || !BATCH_ASIN_IMPORT_ENABLED}
+            className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+              sheetForm.is_active && BATCH_ASIN_IMPORT_ENABLED
+                ? "border-emerald-500/40 bg-white/5 text-emerald-400 cursor-pointer hover:bg-emerald-500/10"
+                : "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+            }`}
           >
-            {sheetImporting ? "Importing..." : "Import From Sheet"}
+            {sheetImporting ? "Importing..." : BATCH_ASIN_IMPORT_ENABLED ? "Import From Sheet" : "Import Paused"}
           </button>
           <button
             onClick={() => void handleSheetExport()}
@@ -718,6 +757,12 @@ export default function ProductsPage() {
               ✏️ Manual Entry
             </button>
           </div>
+
+          {!BATCH_ASIN_IMPORT_ENABLED ? (
+            <div className="mb-4 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              {BATCH_ASIN_IMPORT_PAUSED_DETAIL} Existing products, exports, and manual entry are still available.
+            </div>
+          ) : null}
 
           {mode === "bulk" ? (
             <div>
@@ -807,10 +852,14 @@ export default function ProductsPage() {
 
               <button
                 onClick={() => void handleBulkImport()}
-                disabled={importing || parseAsins(bulkAsins).length === 0}
-                className={`w-full px-6 py-3 border-none rounded-lg font-bold text-sm transition-opacity ${importing ? "bg-white/20 text-white/50 cursor-not-allowed" : "bg-gradient-to-br from-emerald-500 to-emerald-400 text-black cursor-pointer hover:opacity-90"}`}
+                disabled={importing || parseAsins(bulkAsins).length === 0 || !BATCH_ASIN_IMPORT_ENABLED}
+                className={`w-full px-6 py-3 border-none rounded-lg font-bold text-sm transition-opacity ${
+                  importing || !BATCH_ASIN_IMPORT_ENABLED
+                    ? "bg-white/20 text-white/50 cursor-not-allowed"
+                    : "bg-gradient-to-br from-emerald-500 to-emerald-400 text-black cursor-pointer hover:opacity-90"
+                }`}
               >
-                {importing ? "⏳ Importing..." : `🚀 Import ${parseAsins(bulkAsins).length} ASINs`}
+                {importing ? "⏳ Importing..." : BATCH_ASIN_IMPORT_ENABLED ? `🚀 Import ${parseAsins(bulkAsins).length} ASINs` : "ASIN Import Paused"}
               </button>
 
               {importResults ? (
@@ -848,8 +897,8 @@ export default function ProductsPage() {
                   maxLength={10}
                 />
               </div>
-              <button onClick={() => void handleFetchAsin()} disabled={fetching} className={`px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm transition-opacity ${fetching ? "opacity-60" : "hover:opacity-90"}`}>
-                {fetching ? "Fetching..." : "Fetch"}
+              <button onClick={() => void handleFetchAsin()} disabled={fetching || !ASIN_IMPORT_ENABLED} className={`px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm transition-opacity ${fetching || !ASIN_IMPORT_ENABLED ? "opacity-60 cursor-not-allowed" : "hover:opacity-90"}`}>
+                {fetching ? "Fetching..." : ASIN_IMPORT_ENABLED ? "Fetch" : "Fetch Paused"}
               </button>
             </div>
           ) : null}
@@ -1025,14 +1074,14 @@ export default function ProductsPage() {
                 <div className="mt-auto grid grid-cols-1 gap-2">
                   <button
                     onClick={() => void handleProductRefresh(product.id)}
-                    disabled={refreshingProductId === product.id || deletingProductId === product.id}
+                    disabled={refreshingProductId === product.id || deletingProductId === product.id || !ASIN_IMPORT_ENABLED}
                     className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
-                      refreshingProductId === product.id
+                      refreshingProductId === product.id || !ASIN_IMPORT_ENABLED
                         ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
                         : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
                     }`}
                   >
-                    {refreshingProductId === product.id ? "Refreshing..." : "Refresh Data"}
+                    {refreshingProductId === product.id ? "Refreshing..." : ASIN_IMPORT_ENABLED ? "Refresh Data" : "Refresh Paused"}
                   </button>
                   <button
                     onClick={() => void handleProductDelete(product.id)}
@@ -1050,7 +1099,7 @@ export default function ProductsPage() {
             ))}
             {products.length === 0 ? (
               <p className="col-span-1 sm:col-span-2 lg:col-span-3 xl:col-span-4 text-center text-[#6b6b85] p-8 m-0">
-                No products yet. Use bulk import, portal submissions, or sheet sync to add ASINs.
+                No products yet. Use single ASIN import or manual entry now. Batch import and sheet sync can be re-enabled later.
               </p>
             ) : null}
           </div>

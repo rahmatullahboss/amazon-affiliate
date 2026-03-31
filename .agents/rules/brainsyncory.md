@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 781 notes | Score threshold: >40
+> 964 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,50 +20,47 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in SELECT — prevents null/undefined runtime crashes** — -          COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
-+     
-- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — -     ordered_items: number;
-+     clicks: number;
--     returned_item
-- **⚠️ GOTCHA: Fixed null crash in Array — prevents null/undefined runtime crashes** — -     orderedItems: number;
-+     clicks: number;
--     revenueAmount:
-- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — - }
-+   marketplaceOrderBreakdown: Array<{
-- 
-+     marketplace: strin
-- **⚠️ GOTCHA: Fixed null crash in Link — prevents null/undefined runtime crashes** — - import { getAuthToken } from "../../utils/auth-session";
-+ import { 
-- **⚠️ GOTCHA: Fixed null crash in Array — parallelizes async operations for speed** — - }
-+   marketplaceOrderBreakdown: Array<{
-- 
-+     marketplace: strin
+- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability** — - export default router;
++ router.get("/blog-images/:key", async (c) =
+- **⚠️ GOTCHA: Added JWT tokens authentication — hardens HTTP security headers** — - 
++ import blogs from './routes/blogs';
+- const app = new Hono<AppEnv
+- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { extractApiErrorMessage } from "../../utils/api-errors";
++ i
+- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
++ import {
+
+- **⚠️ GOTCHA: Fixed null crash in Response — prevents brute-force and DoS attacks** — - /**
++ function createNoindexRedirect(targetUrl: string): Response {
+
+- **⚠️ GOTCHA: Fixed null crash in SELECT — parallelizes async operations for speed** — -   const { results: shortcutResults } = await c.env.DB.prepare(
++   c
 
 ## Project Standards
 
-- what-changed in reset-password.ts — confirmed 3x
-- what-changed in register.ts — confirmed 3x
-- what-changed in links.ts — confirmed 3x
-- what-changed in layout.ts — confirmed 4x
-- what-changed in forgot-password.ts — confirmed 3x
-- what-changed in complete-signup.ts — confirmed 3x
-- what-changed in asin-new.ts — confirmed 3x
-- what-changed in users.ts — confirmed 3x
+- Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x
+- Replaced dependency asin-import — confirmed 13x
+- Added JWT tokens authentication — formalizes the data contract with explicit ... — confirmed 3x
+- Fixed null crash in ASIN — parallelizes async operations for speed — confirmed 4x
+- discovery in portal.ts — confirmed 3x
+- Fixed null crash in Skipping — externalizes configuration for environment fle... — confirmed 4x
+- Fixed null crash in Link — offloads heavy computation off the main thread — confirmed 3x
+- Replaced auth Admin — confirmed 3x
 
 ## Known Fixes
 
 - ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
+- ❌ -     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' }) → ✅ Fixed null crash in Hono — prevents brute-force and DoS attacks
 - ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
 - ❌ -     } catch (err) { console.error("Failed to fetch dashboard data:", err); } → ✅ Fixed null crash in Array — prevents null/undefined runtime crashes
-- ❌ +     throw new HTTPException(400, { message: 'Invalid status filter' }); → ✅ Fixed null crash in HTTPException — improves module reusability
 
 ## Recent Decisions
 
-- decision in build.gradle
-- Optimized impliedFormat — offloads heavy computation off the main thread
-- Optimized HEAD — improves module reusability
-- Optimized impliedFormat — offloads heavy computation off the main thread
+- decision in Footer.tsx
+- Optimized BlogCard — parallelizes async operations for speed
+- decision in ProductCard.tsx
+- Optimized Content — prevents null/undefined runtime crashes
 
 ## Learned Patterns
 

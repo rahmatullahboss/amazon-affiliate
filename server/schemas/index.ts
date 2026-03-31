@@ -5,6 +5,8 @@ export const MARKETPLACES = ['US', 'CA', 'UK', 'DE', 'IT', 'FR', 'ES'] as const;
 export type Marketplace = (typeof MARKETPLACES)[number];
 export const PRODUCT_STATUSES = ['active', 'pending_review', 'rejected'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
+export const BLOG_STATUSES = ['draft', 'published'] as const;
+export type BlogStatus = (typeof BLOG_STATUSES)[number];
 
 function normalizeTrackingTag(value: string): string {
   return value.trim().replace(/^\?/i, '').replace(/^tag=/i, '');
@@ -74,6 +76,7 @@ export const createTrackingIdSchema = z.object({
   label: z.string().max(100).optional().nullable(),
   marketplace: z.enum(MARKETPLACES).default('US'),
   is_default: z.boolean().default(false),
+  is_portal_editable: z.boolean().optional().default(false),
 });
 
 // ─── Mapping Schemas ───────────────────────────────────
@@ -184,4 +187,50 @@ export const updateSheetSyncConfigSchema = z.object({
   sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
   default_marketplace: z.enum(MARKETPLACES).default('US'),
   is_active: z.boolean().default(false),
+});
+
+export const createAgentSheetSourceSchema = z.object({
+  agent_id: z.number().int().positive(),
+  sheet_url: z.string().url('Valid Google Sheet URL required'),
+  sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  is_active: z.boolean().default(true),
+  auto_approve_clean_rows: z.boolean().default(true),
+});
+
+export const updateAgentSheetSourceSchema = z.object({
+  sheet_url: z.string().url('Valid Google Sheet URL required').optional(),
+  sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  is_active: z.boolean().optional(),
+  auto_approve_clean_rows: z.boolean().optional(),
+});
+
+export const triggerAgentSheetSyncSchema = z.object({
+  source_id: z.number().int().positive().optional(),
+});
+
+export const reviewSheetSubmissionSchema = z.object({
+  notes: z.string().max(500).optional().nullable(),
+});
+
+export const createBlogPostSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(180),
+  slug: z
+    .string()
+    .max(100)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase letters, numbers, and hyphens only')
+    .optional()
+    .nullable(),
+  excerpt: z.string().max(220).optional().nullable(),
+  content: z.string().min(50, 'Content must be at least 50 characters').max(50000),
+  cover_image_key: z.string().max(255).optional().nullable(),
+  cover_image_alt: z.string().max(180).optional().nullable(),
+  seo_title: z.string().max(180).optional().nullable(),
+  seo_description: z.string().max(180).optional().nullable(),
+  status: z.enum(BLOG_STATUSES).default('draft'),
+  is_featured: z.boolean().default(false),
+  published_at: z.string().optional().nullable(),
+});
+
+export const updateBlogPostSchema = createBlogPostSchema.partial().extend({
+  title: z.string().min(1).max(180).optional(),
 });

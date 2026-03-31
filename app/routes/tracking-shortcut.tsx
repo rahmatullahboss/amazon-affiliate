@@ -1,4 +1,8 @@
 import type { Route } from "./+types/tracking-shortcut";
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_DETAIL,
+} from "../utils/asin-import";
 import { DynamicLinkResolutionError, ensureDynamicLinkByTrackingTag } from "../../server/services/dynamic-links";
 
 export function meta({}: Route.MetaArgs) {
@@ -50,8 +54,9 @@ export default function TrackingShortcutPage() {
           Preparing your product page
         </h1>
         <p className="mt-3 text-sm leading-7 text-gray-600">
-          DealsRky is checking the ASIN, creating the product mapping if needed, and forwarding
-          you to the live bridge page.
+          {ASIN_IMPORT_ENABLED
+            ? "DealsRky is checking the ASIN, creating the product mapping if needed, and forwarding you to the live bridge page."
+            : `${ASIN_IMPORT_PAUSED_DETAIL} Saved ASIN links will continue to open normally.`}
         </p>
       </div>
     </main>

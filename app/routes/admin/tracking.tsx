@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 
 const getToken = () => getAuthToken();
 
 interface TrackingId {
   id: number; agent_id: number; tag: string; label: string | null;
-  marketplace: string; is_default: number; is_active: number;
+  marketplace: string; is_default: number; is_active: number; is_portal_editable: number;
+  created_at?: string;
   agent_name: string; agent_slug: string;
 }
 interface Agent { id: number; name: string; slug: string; }
@@ -15,8 +16,10 @@ export default function TrackingPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false });
+  const [form, setForm] = useState({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false, is_portal_editable: false });
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [marketplaceFilter, setMarketplaceFilter] = useState("ALL");
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -31,6 +34,85 @@ export default function TrackingPage() {
     setLoading(false);
   };
 
+  const filteredTrackingIds = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+
+    return trackingIds.filter((item) => {
+      const matchesMarketplace =
+        marketplaceFilter === "ALL" || item.marketplace === marketplaceFilter;
+
+      if (!matchesMarketplace) {
+        return false;
+      }
+
+      if (!normalizedQuery) {
+        return true;
+      }
+
+      const haystack = [
+        item.tag,
+        item.label || "",
+        item.agent_name,
+        item.agent_slug,
+        item.marketplace,
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(normalizedQuery);
+    });
+  }, [marketplaceFilter, searchQuery, trackingIds]);
+
+  const groupedTrackingIds = useMemo(() => {
+    const groups = new Map<number, { agent: Pick<TrackingId, "agent_id" | "agent_name" | "agent_slug">; tags: TrackingId[] }>();
+
+    for (const item of filteredTrackingIds) {
+      const existing = groups.get(item.agent_id);
+      if (existing) {
+        existing.tags.push(item);
+        continue;
+      }
+
+      groups.set(item.agent_id, {
+        agent: {
+          agent_id: item.agent_id,
+          agent_name: item.agent_name,
+          agent_slug: item.agent_slug,
+        },
+        tags: [item],
+      });
+    }
+
+    return Array.from(groups.values())
+      .map((group) => ({
+        ...group,
+        tags: group.tags.sort((left, right) => {
+          if (left.marketplace !== right.marketplace) {
+            return left.marketplace.localeCompare(right.marketplace);
+          }
+
+          if (left.is_default !== right.is_default) {
+            return right.is_default - left.is_default;
+          }
+
+          return left.tag.localeCompare(right.tag);
+        }),
+      }))
+      .sort((left, right) => left.agent.agent_name.localeCompare(right.agent.agent_name));
+  }, [filteredTrackingIds]);
+
+  const summary = useMemo(() => {
+    const adminOnly = filteredTrackingIds.filter((item) => item.is_portal_editable !== 1).length;
+    const portalEditable = filteredTrackingIds.filter((item) => item.is_portal_editable === 1).length;
+
+    return {
+      totalAgents: groupedTrackingIds.length,
+      totalTags: filteredTrackingIds.length,
+      adminOnly,
+      portalEditable,
+    };
+  }, [filteredTrackingIds, groupedTrackingIds.length]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     try {
@@ -40,7 +122,7 @@ export default function TrackingPage() {
         body: JSON.stringify({ ...form, agent_id: Number(form.agent_id) }),
       });
       if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error); }
-      setShowForm(false); setForm({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false });
+      setShowForm(false); setForm({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false, is_portal_editable: false });
       fetchAll();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
   };
@@ -56,6 +138,43 @@ export default function TrackingPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Tags</h1>
         <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap">{showForm ? "Cancel" : "+ Add Tag"}</button>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: "Agents", value: summary.totalAgents },
+          { label: "Visible Tags", value: summary.totalTags },
+          { label: "Portal Editable", value: summary.portalEditable },
+          { label: "Admin Only", value: summary.adminOnly },
+        ].map((item) => (
+          <div key={item.label} className="rounded-2xl border border-white/5 bg-[#1a1a28]/90 p-4">
+            <div className="text-[0.68rem] uppercase tracking-[0.18em] text-[#8b8ba7]">{item.label}</div>
+            <div className="mt-2 text-2xl font-bold text-[#f0f0f5]">{item.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-4">
+          <input
+            className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+            placeholder="Search by tag, label, agent, or slug"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+          />
+          <select
+            className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto"
+            value={marketplaceFilter}
+            onChange={(event) => setMarketplaceFilter(event.target.value)}
+          >
+            <option className="bg-gray-800" value="ALL">All Marketplaces</option>
+            {["US", "CA", "UK", "DE", "IT", "FR", "ES"].map((marketplace) => (
+              <option className="bg-gray-800" key={marketplace} value={marketplace}>
+                {marketplace}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {showForm && (
@@ -82,10 +201,16 @@ export default function TrackingPage() {
               </select>
             </div>
             <div className="flex items-end gap-3 h-full mb-[0.125rem]">
-              <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                <input className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]" type="checkbox" checked={form.is_default} onChange={e => setForm({...form, is_default: e.target.checked})} />
-                Set as default tag
-              </label>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
+                  <input className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]" type="checkbox" checked={form.is_default} onChange={e => setForm({...form, is_default: e.target.checked})} />
+                  Set as default tag
+                </label>
+                <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
+                  <input className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]" type="checkbox" checked={form.is_portal_editable} onChange={e => setForm({...form, is_portal_editable: e.target.checked})} />
+                  Agent can edit in portal
+                </label>
+              </div>
             </div>
             <div className="col-span-1 sm:col-span-2 mt-2">
               {error && <p className="text-red-500 text-sm m-0 mb-3">{error}</p>}
@@ -96,23 +221,49 @@ export default function TrackingPage() {
       )}
 
       {loading ? <p className="text-[#6b6b85] m-0">Loading...</p> : (
-        <div className="flex flex-col gap-3">
-          {trackingIds.map(t => (
-            <div key={t.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="min-w-0 w-full sm:w-auto">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <code className="text-sm text-[#ff9900] font-semibold bg-[#ff9900]/10 px-2.5 py-1 rounded-md">{t.tag}</code>
-                  {t.is_default ? <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 font-medium">DEFAULT</span> : null}
-                  <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-[#ff9900]/15 text-[#ffad33] font-medium">{t.marketplace}</span>
+        <div className="flex flex-col gap-4">
+          {groupedTrackingIds.map((group) => (
+            <section key={group.agent.agent_id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="m-0 text-lg font-bold text-[#f0f0f5]">{group.agent.agent_name}</h2>
+                  <p className="m-0 mt-1 text-sm text-[#8b8ba7]">/{group.agent.agent_slug}</p>
                 </div>
-                <div className="text-sm text-[#6b6b85] truncate mt-2">
-                  Agent: {t.agent_name} · {t.label || "No label"}
+                <div className="flex flex-wrap gap-2">
+                  <span className="text-[0.65rem] px-2.5 py-1 rounded-full bg-white/5 text-[#c9c9db] font-medium">
+                    {group.tags.length} tag{group.tags.length > 1 ? "s" : ""}
+                  </span>
+                  <span className="text-[0.65rem] px-2.5 py-1 rounded-full bg-sky-500/10 text-sky-300 font-medium">
+                    {group.tags.filter((item) => item.is_portal_editable !== 1).length} admin-only
+                  </span>
                 </div>
               </div>
-              <button onClick={() => void handleDelete(t.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors shrink-0">Delete</button>
-            </div>
+
+              <div className="flex flex-col gap-3">
+                {group.tags.map((t) => (
+                  <div key={t.id} className="rounded-2xl border border-white/5 bg-[#0f172a]/90 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="min-w-0 w-full sm:w-auto">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <code className="text-sm text-[#ff9900] font-semibold bg-[#ff9900]/10 px-2.5 py-1 rounded-md">{t.tag}</code>
+                        {t.is_default ? <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 font-medium">DEFAULT</span> : null}
+                        <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-[#ff9900]/15 text-[#ffad33] font-medium">{t.marketplace}</span>
+                        {t.is_portal_editable ? (
+                          <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">PORTAL</span>
+                        ) : (
+                          <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 font-medium">ADMIN ONLY</span>
+                        )}
+                      </div>
+                      <div className="text-sm text-[#d5d5e4] truncate mt-2">
+                        {t.label || "No label"}
+                      </div>
+                    </div>
+                    <button onClick={() => void handleDelete(t.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors shrink-0">Delete</button>
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
-          {trackingIds.length === 0 && <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No tags yet.</p>}
+          {groupedTrackingIds.length === 0 && <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No tags found for the current filter.</p>}
         </div>
       )}
     </div>

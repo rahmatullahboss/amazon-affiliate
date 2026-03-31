@@ -3,6 +3,12 @@ import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createProductSchema, fetchAsinSchema, bulkAsinImportSchema, updateProductSchema } from '../schemas';
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_MESSAGE,
+  BATCH_ASIN_IMPORT_ENABLED,
+  BATCH_ASIN_IMPORT_PAUSED_MESSAGE,
+} from '../utils/asin-import';
 import { CacheService } from '../services/cache';
 import {
   AmazonProductFetchError,
@@ -166,6 +172,10 @@ products.post('/', zValidator('json', createProductSchema), async (c) => {
  * POST /api/products/fetch-asin — Fetch product data from ASIN API
  */
 products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
+  if (!ASIN_IMPORT_ENABLED) {
+    throw new HTTPException(503, { message: ASIN_IMPORT_PAUSED_MESSAGE });
+  }
+
   const { asin, marketplace } = c.req.valid('json');
 
   // Check if product already exists
@@ -230,6 +240,10 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
  * Skips duplicates (ON CONFLICT IGNORE).
  */
 products.post('/bulk-import', zValidator('json', bulkAsinImportSchema), async (c) => {
+  if (!BATCH_ASIN_IMPORT_ENABLED) {
+    throw new HTTPException(503, { message: BATCH_ASIN_IMPORT_PAUSED_MESSAGE });
+  }
+
   const { asins, marketplace, default_title_prefix } = c.req.valid('json');
 
   // Deduplicate input
@@ -312,6 +326,10 @@ products.get('/export', async (c) => {
 });
 
 products.post('/:id/refresh', async (c) => {
+  if (!ASIN_IMPORT_ENABLED) {
+    throw new HTTPException(503, { message: ASIN_IMPORT_PAUSED_MESSAGE });
+  }
+
   const id = Number.parseInt(c.req.param('id'), 10);
   if (Number.isNaN(id)) {
     throw new HTTPException(400, { message: 'Invalid product ID' });

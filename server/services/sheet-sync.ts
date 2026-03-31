@@ -4,7 +4,13 @@ import {
   readSheetRows,
   writeSheetRows,
 } from "./google-sheets";
-import { ensureProductRecord, isValidAsin } from "./product-ingestion";
+import { ensureProductRecord, extractAsinFromInput, isValidAsin } from "./product-ingestion";
+import {
+  mapRows,
+  parseSheetSyncRow,
+  normalizeTrackingTag,
+  type SheetRowRecord,
+} from "./sheet-rows";
 
 interface SheetSyncConfig {
   id: number;
@@ -52,6 +58,7 @@ interface MirrorProductsToSheetInput {
   db: D1Database;
   config: SheetSyncConfig;
   credentials: GoogleCredentials;
+  publicAppUrl?: string;
   triggeredByUserId?: number;
 }
 
@@ -62,14 +69,45 @@ interface SyncSummary {
   skippedCount: number;
 }
 
-type SheetRowRecord = Record<string, string>;
+interface ParsedSheetSyncRow {
+  asin: string;
+  marketplace: string;
+  title: string | null;
+  category: string | null;
+  customTitle: string | null;
+  agentSlug: string | null;
+  trackingTag: string | null;
+  rowStatus: "active" | "inactive";
+  productStatus: string;
+}
+
+interface ProductLookupRow {
+  id: number;
+  is_active: number;
+}
+
+interface AgentLookupRow {
+  id: number;
+  slug: string;
+}
+
+interface TrackingLookupRow {
+  id: number;
+}
 
 const SHEET_HEADERS = [
   "asin",
-  "title",
   "marketplace",
-  "category",
+  "agent_slug",
+  "tracking_tag",
+  "custom_title",
   "status",
+  "product_status",
+  "bridge_page_url",
+  "storefront_url",
+  "redirect_url",
+  "title",
+  "category",
   "is_active",
   "created_at",
   "updated_at",
@@ -192,44 +230,88 @@ export async function syncProductsFromSheet(
     let skippedCount = 0;
 
     for (const row of rowRecords) {
-      const asin = normalizeCell(row.asin).toUpperCase();
-      if (!isValidAsin(asin)) {
+      const parsedRow = parseSheetSyncRow(row, input.config.default_marketplace);
+      if (!parsedRow) {
         skippedCount += 1;
         continue;
       }
 
-      const marketplace = normalizeCell(row.marketplace || input.config.default_marketplace).toUpperCase() || input.config.default_marketplace;
-      const status = normalizeCell(row.status) || "active";
       const existing = await input.db
-        .prepare("SELECT id FROM products WHERE asin = ? AND marketplace = ?")
-        .bind(asin, marketplace)
-        .first<{ id: number }>();
+        .prepare("SELECT id, is_active FROM products WHERE asin = ? AND marketplace = ?")
+        .bind(parsedRow.asin, parsedRow.marketplace)
+        .first<ProductLookupRow>();
 
       try {
-        await ensureProductRecord({
+        const product = await ensureProductRecord({
           db: input.db,
-          asin,
-          marketplace,
+          asin: parsedRow.asin,
+          marketplace: parsedRow.marketplace,
           apiKey: input.apiKey,
           fallbackApiKeys: input.fallbackApiKeys,
-          title: normalizeCell(row.title) || null,
-          category: normalizeCell(row.category) || null,
-          status,
+          title: parsedRow.title,
+          category: parsedRow.category,
+          status: parsedRow.productStatus,
           updateExistingFromInput: true,
           requireRealProductData: true,
         });
+
+        let rowCreated = !existing;
+        let rowUpdated = Boolean(existing);
+
+        if (!parsedRow.agentSlug) {
+          const targetIsActive = parsedRow.rowStatus === "active" ? 1 : 0;
+
+          if (!existing || existing.is_active !== targetIsActive) {
+            await input.db
+              .prepare(
+                `UPDATE products
+                 SET is_active = ?,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?`
+              )
+              .bind(targetIsActive, product.id)
+              .run();
+            rowUpdated = true;
+          }
+        } else {
+          const mappingResult = await syncAgentProductRow({
+            db: input.db,
+            cache,
+            productId: product.id,
+            asin: parsedRow.asin,
+            marketplace: parsedRow.marketplace,
+            agentSlug: parsedRow.agentSlug,
+            trackingTag: parsedRow.trackingTag,
+            customTitle: parsedRow.customTitle,
+            rowStatus: parsedRow.rowStatus,
+          });
+
+          if (mappingResult === "skipped") {
+            skippedCount += 1;
+            continue;
+          }
+
+          if (mappingResult === "created") {
+            rowCreated = true;
+            rowUpdated = false;
+          } else if (mappingResult === "updated") {
+            rowUpdated = true;
+          }
+        }
+
+        if (rowCreated) {
+          createdCount += 1;
+        } else if (rowUpdated) {
+          updatedCount += 1;
+        } else {
+          skippedCount += 1;
+        }
+
+        await cache.invalidateForProduct(parsedRow.asin);
       } catch {
         skippedCount += 1;
         continue;
       }
-
-      if (existing) {
-        updatedCount += 1;
-      } else {
-        createdCount += 1;
-      }
-
-      await cache.invalidateForProduct(asin);
     }
 
     const summary = {
@@ -288,38 +370,70 @@ export async function mirrorProductsToSheet(
     const { results } = await input.db
       .prepare(
         `SELECT
-           asin,
-           title,
-           marketplace,
-           category,
-           status,
-           is_active,
-           created_at,
-           updated_at
-         FROM products
-         ORDER BY updated_at DESC`
+           p.asin,
+           p.title,
+           p.marketplace,
+           p.category,
+           p.status as product_status,
+           p.is_active as product_is_active,
+           p.created_at,
+           p.updated_at,
+           a.slug as agent_slug,
+           t.tag as tracking_tag,
+           ap.custom_title,
+           ap.is_active as mapping_is_active
+         FROM products p
+         LEFT JOIN agent_products ap ON ap.product_id = p.id
+         LEFT JOIN agents a ON a.id = ap.agent_id
+         LEFT JOIN tracking_ids t ON t.id = ap.tracking_id
+         ORDER BY p.updated_at DESC, ap.updated_at DESC, ap.id DESC`
       )
       .all<{
         asin: string;
         title: string;
         marketplace: string;
         category: string | null;
-        status: string | null;
-        is_active: number;
+        product_status: string | null;
+        product_is_active: number;
         created_at: string;
         updated_at: string;
+        agent_slug: string | null;
+        tracking_tag: string | null;
+        custom_title: string | null;
+        mapping_is_active: number | null;
       }>();
+
+    const publicAppOrigin = (input.publicAppUrl || "https://dealsrky.com").replace(/\/+$/, "");
 
     const reference = parseSpreadsheetReference(input.config.sheet_url);
     const rows = [
       SHEET_HEADERS,
       ...(results ?? []).map((product) => [
         product.asin,
-        product.title,
         product.marketplace,
+        product.agent_slug || "",
+        product.tracking_tag || "",
+        product.custom_title || "",
+        product.agent_slug
+          ? product.mapping_is_active
+            ? "active"
+            : "hidden"
+          : product.product_is_active
+            ? "active"
+            : "hidden",
+        product.product_status || "active",
+        product.agent_slug ? `${publicAppOrigin}/${product.agent_slug}/${product.asin}` : "",
+        product.agent_slug ? `${publicAppOrigin}/${product.agent_slug}` : "",
+        product.agent_slug ? `${publicAppOrigin}/go/${product.agent_slug}/${product.asin}` : "",
+        product.title,
         product.category || "",
-        product.status || (product.is_active ? "active" : "inactive"),
-        product.is_active ? "1" : "0",
+        product.agent_slug
+          ? product.mapping_is_active
+            ? "1"
+            : "0"
+          : product.product_is_active
+            ? "1"
+            : "0",
         product.created_at,
         product.updated_at,
       ]),
@@ -373,78 +487,103 @@ export async function mirrorProductsToSheet(
   }
 }
 
-function mapRows(values: string[][]): SheetRowRecord[] {
-  if (values.length === 0) {
-    return [];
+async function syncAgentProductRow(input: {
+  db: D1Database;
+  cache: CacheService;
+  productId: number;
+  asin: string;
+  marketplace: string;
+  agentSlug: string;
+  trackingTag: string | null;
+  customTitle: string | null;
+  rowStatus: "active" | "inactive";
+}): Promise<"created" | "updated" | "skipped"> {
+  const agent = await input.db
+    .prepare(`SELECT id, slug FROM agents WHERE slug = ? AND is_active = 1 LIMIT 1`)
+    .bind(input.agentSlug)
+    .first<AgentLookupRow>();
+
+  if (!agent) {
+    return "skipped";
   }
 
-  const headers = values[0].map(normalizeHeader);
-  const hasAsinHeader = headers.includes("asin");
+  const tracking = input.trackingTag
+    ? await input.db
+        .prepare(
+          `SELECT id
+           FROM tracking_ids
+           WHERE agent_id = ? AND marketplace = ? AND tag = ? AND is_active = 1
+           LIMIT 1`
+        )
+        .bind(agent.id, input.marketplace, input.trackingTag)
+        .first<TrackingLookupRow>()
+    : await input.db
+        .prepare(
+          `SELECT id
+           FROM tracking_ids
+           WHERE agent_id = ? AND marketplace = ? AND is_active = 1
+           ORDER BY is_default DESC, created_at ASC
+           LIMIT 1`
+        )
+        .bind(agent.id, input.marketplace)
+        .first<TrackingLookupRow>();
 
-  if (!hasAsinHeader) {
-    return mapHeaderlessAsinGrid(values);
+  if (!tracking) {
+    return "skipped";
   }
 
-  if (values.length < 2) {
-    return [];
+  const existing = await input.db
+    .prepare(
+      `SELECT id, tracking_id, custom_title, is_active
+       FROM agent_products
+       WHERE agent_id = ? AND product_id = ?
+       LIMIT 1`
+    )
+    .bind(agent.id, input.productId)
+    .first<{ id: number; tracking_id: number; custom_title: string | null; is_active: number }>();
+
+  const nextIsActive = input.rowStatus === "active" ? 1 : 0;
+
+  if (!existing) {
+    await input.db
+      .prepare(
+        `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
+         VALUES (?, ?, ?, ?, ?)`
+      )
+      .bind(agent.id, input.productId, tracking.id, input.customTitle, nextIsActive)
+      .run();
+
+    await input.cache.deletePageData(agent.slug, input.asin);
+    await input.cache.deleteRedirectUrl(agent.slug, input.asin);
+
+    return "created";
   }
 
-  return values.slice(1).map((row) =>
-    headers.reduce<SheetRowRecord>((accumulator, header, index) => {
-      accumulator[header] = row[index] ?? "";
-      return accumulator;
-    }, {})
-  );
-}
+  const hasChanged =
+    existing.tracking_id !== tracking.id ||
+    (existing.custom_title || null) !== (input.customTitle || null) ||
+    existing.is_active !== nextIsActive;
 
-function mapHeaderlessAsinGrid(values: string[][]): SheetRowRecord[] {
-  const records: SheetRowRecord[] = [];
-
-  for (const row of values) {
-    for (const cell of row) {
-      const normalized = normalizeCell(cell).toUpperCase();
-
-      if (!isValidAsin(normalized)) {
-        continue;
-      }
-
-      records.push({ asin: normalized });
-    }
+  if (!hasChanged) {
+    return "skipped";
   }
 
-  return dedupeSheetRecords(records);
-}
+  await input.db
+    .prepare(
+      `UPDATE agent_products
+       SET tracking_id = ?,
+           custom_title = ?,
+           is_active = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(tracking.id, input.customTitle, nextIsActive, existing.id)
+    .run();
 
-function normalizeHeader(header: string): string {
-  return header
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-}
+  await input.cache.deletePageData(agent.slug, input.asin);
+  await input.cache.deleteRedirectUrl(agent.slug, input.asin);
 
-function normalizeCell(value?: string): string {
-  return (value || "").trim();
-}
-
-function dedupeSheetRecords(records: SheetRowRecord[]): SheetRowRecord[] {
-  const seen = new Set<string>();
-  const deduped: SheetRowRecord[] = [];
-
-  for (const record of records) {
-    const asin = normalizeCell(record.asin).toUpperCase();
-    const marketplace = normalizeCell(record.marketplace).toUpperCase();
-    const key = `${asin}:${marketplace}`;
-
-    if (!asin || seen.has(key)) {
-      continue;
-    }
-
-    seen.add(key);
-    deduped.push(record);
-  }
-
-  return deduped;
+  return "updated";
 }
 
 async function startLog(

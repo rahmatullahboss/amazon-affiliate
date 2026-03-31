@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
+import { ASIN_IMPORT_ENABLED, ASIN_IMPORT_PAUSED_MESSAGE } from '../utils/asin-import';
 import { portalAsinSubmissionSchema, portalTrackingReplaceDeleteSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import {
@@ -343,7 +344,7 @@ portal.get('/tracking', async (c) => {
   }
 
   const { results } = await c.env.DB.prepare(
-    `SELECT id, tag, label, marketplace, is_default, is_active, created_at,
+    `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at,
             (
               SELECT COUNT(*)
               FROM agent_products ap
@@ -361,6 +362,7 @@ portal.get('/tracking', async (c) => {
       marketplace: string;
       is_default: number;
       is_active: number;
+      is_portal_editable: number;
       created_at: string;
       usage_count: number;
     }>();
@@ -380,18 +382,18 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
 
   try {
     const marketplaceTagCount = await c.env.DB.prepare(
-      `SELECT id
+      `SELECT COUNT(*) AS count
        FROM tracking_ids
        WHERE agent_id = ? AND marketplace = ? AND is_active = 1`
     )
       .bind(agentId, body.marketplace)
-      .all<{ id: number }>();
+      .first<{ count: number }>();
 
-    const shouldBeDefault = (marketplaceTagCount.results?.length ?? 0) === 0;
+    const shouldBeDefault = (marketplaceTagCount?.count ?? 0) === 0;
 
     const insertResult = await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active)
-       VALUES (?, ?, ?, ?, ?, 1)`
+      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active, is_portal_editable)
+       VALUES (?, ?, ?, ?, ?, 1, 1)`
     )
       .bind(agentId, body.tag, body.label || null, body.marketplace, shouldBeDefault ? 1 : 0)
       .run();
@@ -402,7 +404,7 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
     }
 
     const trackingId = await c.env.DB.prepare(
-      `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+      `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at
        FROM tracking_ids
        WHERE id = ? AND agent_id = ?`
     )
@@ -446,15 +448,21 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
   const body = c.req.valid('json');
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace
+    `SELECT id, marketplace, is_portal_editable
      FROM tracking_ids
      WHERE id = ? AND agent_id = ?`
   )
     .bind(id, agentId)
-    .first<{ id: number; marketplace: string }>();
+    .first<{ id: number; marketplace: string; is_portal_editable: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  if (current.is_portal_editable !== 1) {
+    throw new HTTPException(403, {
+      message: 'This tag is admin-managed and read-only in the agent portal.',
+    });
   }
 
   try {
@@ -467,7 +475,7 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
       .run();
 
     const trackingId = await c.env.DB.prepare(
-      `SELECT id, tag, label, marketplace, is_default, is_active, created_at
+      `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at
        FROM tracking_ids
        WHERE id = ? AND agent_id = ?`
     )
@@ -503,15 +511,21 @@ portal.post('/tracking/:id/default', async (c) => {
   }
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace
+    `SELECT id, marketplace, is_portal_editable
      FROM tracking_ids
      WHERE id = ? AND agent_id = ? AND is_active = 1`
   )
     .bind(id, agentId)
-    .first<{ id: number; marketplace: string }>();
+    .first<{ id: number; marketplace: string; is_portal_editable: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  if (current.is_portal_editable !== 1) {
+    throw new HTTPException(403, {
+      message: 'This tag is admin-managed and read-only in the agent portal.',
+    });
   }
 
   await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace, current.id);
@@ -541,15 +555,21 @@ portal.delete('/tracking/:id', async (c) => {
   }
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace, is_default
+    `SELECT id, marketplace, is_default, is_portal_editable
      FROM tracking_ids
      WHERE id = ? AND agent_id = ?`
   )
     .bind(id, agentId)
-    .first<{ id: number; marketplace?: string; is_default?: number }>();
+    .first<{ id: number; marketplace?: string; is_default?: number; is_portal_editable?: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
+  if (current.is_portal_editable !== 1) {
+    throw new HTTPException(403, {
+      message: 'This tag is admin-managed and read-only in the agent portal.',
+    });
   }
 
   const usage = await c.env.DB.prepare(
@@ -604,15 +624,21 @@ portal.post(
     const body = c.req.valid('json');
 
     const current = await c.env.DB.prepare(
-      `SELECT id, marketplace, is_default
+      `SELECT id, marketplace, is_default, is_portal_editable
        FROM tracking_ids
        WHERE id = ? AND agent_id = ?`
     )
       .bind(id, agentId)
-      .first<{ id: number; marketplace: string; is_default: number }>();
+      .first<{ id: number; marketplace: string; is_default: number; is_portal_editable: number }>();
 
     if (!current) {
       throw new HTTPException(404, { message: 'Tag not found' });
+    }
+
+    if (current.is_portal_editable !== 1) {
+      throw new HTTPException(403, {
+        message: 'This tag is admin-managed and read-only in the agent portal.',
+      });
     }
 
     const replacement = await c.env.DB.prepare(
@@ -718,6 +744,12 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
     .first<{ id: number; title: string; image_url: string; status: string }>();
 
   if (!product) {
+    if (!ASIN_IMPORT_ENABLED) {
+      throw new HTTPException(503, {
+        message: `${ASIN_IMPORT_PAUSED_MESSAGE} Only ASINs already saved in the system can be linked right now.`,
+      });
+    }
+
     const apiKey = c.env.AMAZON_API_KEY;
     if (!apiKey) {
       throw new HTTPException(503, {

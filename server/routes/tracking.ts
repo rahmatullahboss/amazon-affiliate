@@ -43,10 +43,17 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_portal_editable)
+       VALUES (?, ?, ?, ?, ?, ?)`
     )
-      .bind(data.agent_id, data.tag, data.label || null, data.marketplace, data.is_default ? 1 : 0)
+      .bind(
+        data.agent_id,
+        data.tag,
+        data.label || null,
+        data.marketplace,
+        data.is_default ? 1 : 0,
+        data.is_portal_editable ? 1 : 0
+      )
       .run();
 
     const trackingId = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE tag = ?')

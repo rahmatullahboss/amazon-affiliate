@@ -2,10 +2,12 @@
 export type Bindings = {
   DB: D1Database;
   KV: KVNamespace;
+  BLOG_IMAGES: R2Bucket;
   ENVIRONMENT: string;
   SUPPORTED_MARKETPLACES: string;
   PUBLIC_APP_URL?: string;
   DEFAULT_AMAZON_TAG?: string;
+  BLOG_IMAGES_PUBLIC_BASE_URL?: string;
   JWT_SECRET: string;
   ADMIN_USERNAME?: string;
   ADMIN_PASSWORD?: string;
@@ -65,6 +67,7 @@ export interface TrackingIdRow {
   marketplace: string;
   is_default: number;
   is_active: number;
+  is_portal_editable: number;
   created_at: string;
 }
 
@@ -107,6 +110,25 @@ export interface AdminUserRow {
   password_hash: string;
   role: string;
   created_at: string;
+}
+
+export interface BlogPostRow {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  cover_image_key: string | null;
+  cover_image_alt: string | null;
+  seo_title: string | null;
+  seo_description: string | null;
+  status: 'draft' | 'published';
+  is_featured: number;
+  is_deleted: number;
+  published_at: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
 }
 
 export interface UserRow {

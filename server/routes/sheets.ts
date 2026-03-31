@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
+import { BATCH_ASIN_IMPORT_ENABLED, BATCH_ASIN_IMPORT_PAUSED_MESSAGE } from '../utils/asin-import';
 import { updateSheetSyncConfigSchema } from '../schemas';
 import {
   getSheetSyncConfig,
@@ -51,6 +52,10 @@ sheets.put('/config', zValidator('json', updateSheetSyncConfigSchema), async (c)
 });
 
 sheets.post('/sync/import', async (c) => {
+  if (!BATCH_ASIN_IMPORT_ENABLED) {
+    throw new HTTPException(503, { message: BATCH_ASIN_IMPORT_PAUSED_MESSAGE });
+  }
+
   const config = await getSheetSyncConfig(c.env.DB);
   if (!config.is_active) {
     throw new HTTPException(409, { message: 'Sheet sync is disabled' });
@@ -86,7 +91,7 @@ sheets.post('/sync/import', async (c) => {
 
   return c.json({
     summary,
-    message: `Imported ${summary.createdCount} new products and updated ${summary.updatedCount} existing products.`,
+    message: `Sheet import complete. Created ${summary.createdCount} rows, updated ${summary.updatedCount} rows, skipped ${summary.skippedCount}.`,
   });
 });
 
@@ -104,6 +109,7 @@ sheets.post('/sync/export', async (c) => {
       clientEmail: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       privateKey: c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
     },
+    publicAppUrl: c.env.PUBLIC_APP_URL,
     triggeredByUserId: c.get('userId'),
   });
 
@@ -119,7 +125,7 @@ sheets.post('/sync/export', async (c) => {
 
   return c.json({
     summary,
-    message: `Mirrored ${summary.totalRows} products to Google Sheets.`,
+    message: `Sheet export complete. Wrote ${summary.totalRows} rows to Google Sheets.`,
   });
 });
 

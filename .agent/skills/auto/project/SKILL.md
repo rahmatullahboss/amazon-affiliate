@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 69 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 71 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **307 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **335 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -198,6 +198,10 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
+- 📐 **Fixed null crash in System — confirmed 3x** — - android {
++ def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
+- 
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
@@ -222,7 +226,6 @@ Content summary (1 lines):
 +   - `[x]` Complete walkthrough artifact
 
 📌 IDE AST Cont
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Git Commit: feat: implement product image gallery and A+ content renderi — confirmed 3x** —
+- 📐 **Optimized impliedForm
 
 ... [Truncated — see individual observations for full content]

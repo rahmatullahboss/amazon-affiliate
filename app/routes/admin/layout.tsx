@@ -120,11 +120,13 @@ export default function AdminLayout() {
     { to: "/admin/users", label: "Users", icon: "🧑‍💼" },
     { to: "/admin/agents", label: "Agents", icon: "👥" },
     { to: "/admin/products", label: "Products", icon: "📦" },
+    { to: "/admin/sheet-control", label: "Sheet Control", icon: "🗂️" },
     { to: "/admin/product-submissions", label: "Reviews", icon: "🛂" },
     { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
     { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
     { to: "/admin/analytics", label: "Analytics", icon: "📈" },
     { to: "/admin/reports", label: "Reports", icon: "🧾" },
+    { to: "/admin/blogs", label: "Blogs", icon: "📝" },
     { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
   ];
 

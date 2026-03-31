@@ -23,14 +23,21 @@
       "id": "bc7a677541964c47964f2bfefb50e319"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "BLOG_IMAGES",
+      "bucket_name": "dealsrky-blog-images"
+    }
+  ],
 
   // Environment Variables
   "vars": {
     "ENVIRONMENT": "production",
     "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES",
     "PUBLIC_APP_URL": "https://dealsrky.com",
-    "DEFAULT_AMAZON_TAG": "dealsrky-20"
-  }
+    "DEFAULT_AMAZON_TAG": "dealsrky-20",
+    "BLOG_IMAGES_PUBLIC_BASE_URL": ""
+  },
 
   // Secrets (set via `wrangler secret put`):
   // - JWT_SECRET

@@ -22,6 +22,14 @@ interface RedirectContext {
   trackingTag: string;
 }
 
+interface RedirectFallbackRow {
+  asin: string;
+  tag: string;
+  marketplace: string;
+  agent_id: number;
+  product_id: number;
+}
+
 function createNoindexRedirect(targetUrl: string): Response {
   return new Response(null, {
     status: 302,
@@ -31,6 +39,80 @@ function createNoindexRedirect(targetUrl: string): Response {
       "Cache-Control": "no-store, no-cache, must-revalidate",
     },
   });
+}
+
+async function resolveFallbackRedirectContext(
+  db: D1Database,
+  asin: string
+): Promise<RedirectContext | null> {
+  const row = await db
+    .prepare(
+      `SELECT
+         p.asin,
+         t.tag,
+         t.marketplace,
+         a.id AS agent_id,
+         p.id AS product_id
+       FROM products p
+       JOIN agent_products ap ON ap.product_id = p.id
+       JOIN agents a ON a.id = ap.agent_id
+       JOIN tracking_ids t ON t.id = ap.tracking_id
+       WHERE p.asin = ?
+         AND p.is_active = 1
+         AND p.status = 'active'
+         AND ap.is_active = 1
+         AND a.is_active = 1
+         AND t.is_active = 1
+       ORDER BY t.is_default DESC, ap.updated_at DESC, ap.id DESC
+       LIMIT 1`
+    )
+    .bind(asin)
+    .first<RedirectFallbackRow>();
+
+  if (row) {
+    return {
+      amazonUrl: buildAmazonUrl(row.asin, row.tag, row.marketplace),
+      agentId: row.agent_id,
+      productId: row.product_id,
+      trackingTag: row.tag,
+    };
+  }
+
+  const fallbackTag = await db
+    .prepare(
+      `SELECT
+         p.asin,
+         t.tag,
+         t.marketplace,
+         a.id AS agent_id,
+         p.id AS product_id
+       FROM products p
+       JOIN tracking_ids t ON t.marketplace = p.marketplace
+       JOIN agents a ON a.id = t.agent_id
+       WHERE p.asin = ?
+         AND p.is_active = 1
+         AND p.status = 'active'
+         AND t.is_active = 1
+         AND a.is_active = 1
+       ORDER BY
+         CASE WHEN a.id = 1 THEN 0 ELSE 1 END ASC,
+         t.is_default DESC,
+         t.created_at ASC
+       LIMIT 1`
+    )
+    .bind(asin)
+    .first<RedirectFallbackRow>();
+
+  if (!fallbackTag) {
+    return null;
+  }
+
+  return {
+    amazonUrl: buildAmazonUrl(fallbackTag.asin, fallbackTag.tag, fallbackTag.marketplace),
+    agentId: fallbackTag.agent_id,
+    productId: fallbackTag.product_id,
+    trackingTag: fallbackTag.tag,
+  };
 }
 
 /**
@@ -172,10 +254,21 @@ redirect.get('/:agentSlug/:asin', async (c) => {
         };
       } catch (error) {
         if (error instanceof DynamicLinkResolutionError) {
-          throw new HTTPException(error.status, { message: error.message });
+          if (error.status === 404 || error.status === 400) {
+            ctx = await resolveFallbackRedirectContext(c.env.DB, asin);
+            if (ctx) {
+              c.executionCtx.waitUntil(
+                safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
+              );
+            } else {
+              throw new HTTPException(error.status, { message: error.message });
+            }
+          } else {
+            throw new HTTPException(error.status, { message: error.message });
+          }
+        } else {
+          throw error;
         }
-
-        throw error;
       }
     } else {
       ctx = {

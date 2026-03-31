@@ -21,6 +21,8 @@ import { requireRole } from './middleware/auth';
 import users from './routes/users';
 import sheets from './routes/sheets';
 import auditLogs from './routes/audit-logs';
+import blogs from './routes/blogs';
+import sheetControl from './routes/sheet-control';
 
 const app = new Hono<AppEnv>();
 
@@ -44,6 +46,7 @@ app.get('/api/health', (c) => {
   // Validate required bindings
   if (!c.env.DB) warnings.push('D1 database not bound');
   if (!c.env.KV) warnings.push('KV namespace not bound');
+  if (!c.env.BLOG_IMAGES) warnings.push('BLOG_IMAGES R2 bucket not bound');
 
   return c.json({
     status: warnings.length > 0 ? 'degraded' : 'healthy',
@@ -86,7 +89,9 @@ admin.route('/tracking', tracking);
 admin.route('/mappings', mappings);
 admin.route('/analytics', analytics);
 admin.route('/sheets', sheets);
+admin.route('/sheet-control', sheetControl);
 admin.route('/audit-logs', auditLogs);
+admin.route('/blogs', blogs);
 
 app.route('/api', admin);
 

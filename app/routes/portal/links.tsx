@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/links";
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_DETAIL,
+} from "../../utils/asin-import";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { getAuthToken } from "../../utils/auth-session";
 
@@ -76,8 +80,9 @@ const COPY_BY_LANGUAGE: Record<PortalLanguage, CopyLabels> = {
       "Change only the last ASIN part of the bridge link. Do not change the rest of the link.",
     guideBridge:
       "If the ASIN already exists, the normal bridge page will open.",
-    guideAsin:
-      "If the ASIN is new, the system will call the API, fetch the product data, create the bridge page, and open that page on the fly.",
+    guideAsin: ASIN_IMPORT_ENABLED
+      ? "If the ASIN is new, the system will call the API, fetch the product data, create the bridge page, and open that page on the fly."
+      : "New ASIN import is currently paused. This format will work only for ASINs that are already saved in the system.",
     guideResult:
       "After the bridge page opens, the customer will go to Amazon only when they click the button there.",
     templateLabel: "Editable Bridge Format",
@@ -109,8 +114,9 @@ const COPY_BY_LANGUAGE: Record<PortalLanguage, CopyLabels> = {
       "Bridge link-এর একদম শেষের ASIN অংশটাই শুধু change করবেন। বাকি link change করবেন না।",
     guideBridge:
       "যদি ওই ASIN আগে থেকেই থাকে, তাহলে normal bridge page open হবে।",
-    guideAsin:
-      "যদি ASIN নতুন হয়, system API call করে product data আনবে, bridge page তৈরি করবে, এবং on-the-fly সেই page-টাই open করবে।",
+    guideAsin: ASIN_IMPORT_ENABLED
+      ? "যদি ASIN নতুন হয়, system API call করে product data আনবে, bridge page তৈরি করবে, এবং on-the-fly সেই page-টাই open করবে।"
+      : "নতুন ASIN import এখন pause করা আছে। তাই এই format শুধু system-এ আগে থেকে saved থাকা ASIN-এর জন্য কাজ করবে।",
     guideResult:
       "Bridge page open হওয়ার পরে customer ওই page-এর button এ click করলে তবেই Amazon-এ যাবে।",
     templateLabel: "এডিট করা যায় এমন ব্রিজ ফরম্যাট",
@@ -236,6 +242,9 @@ export default function PortalLinksPage() {
           <div className="flex flex-col gap-1">
             <h2 className="m-0 text-[#f9fafb] text-lg font-bold">{copy.dynamicTitle}</h2>
             <p className="m-0 text-sm leading-relaxed text-[#cbd5e1]">{copy.dynamicIntro}</p>
+            {!ASIN_IMPORT_ENABLED ? (
+              <p className="m-0 text-sm leading-relaxed text-amber-200">{ASIN_IMPORT_PAUSED_DETAIL}</p>
+            ) : null}
           </div>
 
           <div className="mt-4 rounded-xl border border-white/10 bg-[#0f172a] p-4">

@@ -117,4 +117,26 @@ router.get("/downloads/agent-app.apk", async (c) => {
   });
 });
 
+router.get("/blog-images/:key", async (c) => {
+  const key = c.req.param("key");
+  if (!key) {
+    throw new HTTPException(400, { message: "Missing image key" });
+  }
+
+  const object = await c.env.BLOG_IMAGES.get(key);
+  if (!object) {
+    throw new HTTPException(404, { message: "Image not found" });
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+
+  return new Response(object.body, {
+    status: 200,
+    headers,
+  });
+});
+
 export default router;

@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/products";
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_DETAIL,
+} from "../../utils/asin-import";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
@@ -168,6 +172,11 @@ export default function PortalProductsPage() {
         <p className="m-0 mb-3 text-blue-300 leading-relaxed text-sm">
           First time here? Add your marketplace tag in <Link className="text-amber-400 no-underline font-semibold hover:text-amber-300" to="/portal/tracking">Tags</Link>.
         </p>
+        {!ASIN_IMPORT_ENABLED ? (
+          <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+            {ASIN_IMPORT_PAUSED_DETAIL} Only ASINs already saved in the system can be submitted right now.
+          </div>
+        ) : null}
 
         <form onSubmit={(e) => void handleSubmit(e)} className="grid gap-3">
           <input
