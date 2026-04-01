@@ -452,6 +452,45 @@ describe("Portal Tracking API", () => {
     expect(updatedAlias?.slug).toBe("alias-admin-us-new");
   });
 
+  it("lets admin update portal edit access for an existing tag", async () => {
+    await DbFactory.seedAgent(env.DB, 34, "portal-access-agent", "Portal Access Agent");
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active, is_portal_editable)
+       VALUES (709, 34, 'portal-access-us-20', 'US', 1, 1, 0)`
+    ).run();
+
+    const adminToken = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/709", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          is_portal_editable: true,
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(response.status).toBe(200);
+
+    const updatedTracking = await env.DB.prepare(
+      `SELECT is_portal_editable
+       FROM tracking_ids
+       WHERE id = ?`
+    )
+      .bind(709)
+      .first<{ is_portal_editable: number }>();
+
+    expect(updatedTracking?.is_portal_editable).toBe(1);
+  });
+
   it("returns canonical country-coded links from the mappings links endpoint", async () => {
     await DbFactory.seedAgent(env.DB, 27, "mappings-agent", "Mappings Agent");
     await env.DB.prepare(
