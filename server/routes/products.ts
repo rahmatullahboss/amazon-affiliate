@@ -2,7 +2,13 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { createProductSchema, fetchAsinSchema, bulkAsinImportSchema, updateProductSchema } from '../schemas';
+import {
+  createProductSchema,
+  fetchAsinSchema,
+  bulkAsinImportSchema,
+  bulkRegenerateProductContentSchema,
+  updateProductSchema,
+} from '../schemas';
 import {
   ASIN_IMPORT_ENABLED,
   ASIN_IMPORT_PAUSED_MESSAGE,
@@ -15,6 +21,7 @@ import {
   ensureProductRecord,
   fetchAmazonProductDataWithFallback,
   getAmazonProductFetchErrorMessage,
+  regenerateProductEditorialContent,
   refreshProductRecord,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
@@ -27,12 +34,19 @@ const products = new Hono<AppEnv>();
 products.get('/', async (c) => {
   const requestedPage = Number.parseInt(c.req.query('page') ?? '1', 10);
   const requestedPageSize = Number.parseInt(c.req.query('pageSize') ?? '12', 10);
+  const marketplaceFilter = c.req.query('marketplace')?.toUpperCase() ?? 'ALL';
+  const hasMarketplaceFilter =
+    marketplaceFilter !== 'ALL' &&
+    ['US', 'CA', 'UK', 'DE', 'IT', 'FR', 'ES'].includes(marketplaceFilter);
   const page = Number.isNaN(requestedPage) ? 1 : Math.max(1, requestedPage);
   const pageSize = Number.isNaN(requestedPageSize)
     ? 12
     : Math.min(48, Math.max(8, requestedPageSize));
+  const whereClause = hasMarketplaceFilter ? 'WHERE marketplace = ?' : '';
+  const whereParams = hasMarketplaceFilter ? [marketplaceFilter] : [];
 
-  const totalResult = await c.env.DB.prepare('SELECT COUNT(*) as count FROM products')
+  const totalResult = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM products ${whereClause}`)
+    .bind(...whereParams)
     .first<{ count: number | string }>();
 
   const totalItems =
@@ -49,10 +63,11 @@ products.get('/', async (c) => {
          (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id AND is_active = 1) as agent_count,
          (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
        FROM products p
+       ${hasMarketplaceFilter ? 'WHERE p.marketplace = ?' : ''}
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`
     )
-      .bind(pageSize, offset)
+      .bind(...whereParams, pageSize, offset)
       .all(),
     c.env.DB.prepare(
       `SELECT
@@ -69,8 +84,11 @@ products.get('/', async (c) => {
              ELSE 0
            END
          ) as needs_refresh_products
-       FROM products`
-    ).first<{
+       FROM products
+       ${whereClause}`
+    )
+      .bind(...whereParams)
+      .first<{
       total_products: number;
       active_products: number;
       pending_review_products: number;
@@ -379,8 +397,8 @@ products.post('/:id/refresh', async (c) => {
     c.executionCtx.waitUntil(
       Promise.all(
         (relatedAgents.results ?? []).flatMap((agent) => [
-          cache.deletePageData(agent.slug, product.asin),
-          cache.deleteRedirectUrl(agent.slug, product.asin),
+          cache.deletePageData(agent.slug, product.asin, product.marketplace),
+          cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace),
         ])
       )
     );
@@ -413,6 +431,151 @@ products.post('/:id/refresh', async (c) => {
   }
 });
 
+products.post('/:id/regenerate-content', async (c) => {
+  const id = Number.parseInt(c.req.param('id'), 10);
+  if (Number.isNaN(id)) {
+    throw new HTTPException(400, { message: 'Invalid product ID' });
+  }
+
+  const product = await c.env.DB.prepare('SELECT asin, marketplace FROM products WHERE id = ?')
+    .bind(id)
+    .first<{ asin: string; marketplace: string }>();
+
+  if (!product) {
+    throw new HTTPException(404, { message: 'Product not found' });
+  }
+
+  const relatedAgents = await c.env.DB.prepare(
+    `SELECT a.slug
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     WHERE ap.product_id = ?`
+  )
+    .bind(id)
+    .all<{ slug: string }>();
+
+  const regenerated = await regenerateProductEditorialContent({
+    db: c.env.DB,
+    productId: id,
+  });
+
+  const cache = new CacheService(c.env.KV);
+  c.executionCtx.waitUntil(cache.invalidateForProduct(product.asin));
+  c.executionCtx.waitUntil(
+    Promise.all(
+      (relatedAgents.results ?? []).flatMap((agent) => [
+        cache.deletePageData(agent.slug, product.asin, product.marketplace),
+        cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace),
+      ])
+    )
+  );
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'product.content_regenerated',
+      entityType: 'product',
+      entityId: id,
+      details: {
+        asin: product.asin,
+        marketplace: product.marketplace,
+      },
+    })
+  );
+
+  return c.json({
+    product: regenerated,
+    message: 'Product content regenerated successfully',
+  });
+});
+
+products.post('/regenerate-content', zValidator('json', bulkRegenerateProductContentSchema), async (c) => {
+  const { productIds, marketplace } = c.req.valid('json');
+  const uniqueProductIds = [...new Set(productIds ?? [])];
+  const hasExplicitSelection = uniqueProductIds.length > 0;
+
+  const productsResult = hasExplicitSelection
+    ? await c.env.DB.prepare(
+        `SELECT id, asin, marketplace
+         FROM products
+         WHERE id IN (${uniqueProductIds.map(() => '?').join(',')})`
+      )
+        .bind(...uniqueProductIds)
+        .all<{ id: number; asin: string; marketplace: string }>()
+    : await c.env.DB.prepare(
+        `SELECT id, asin, marketplace
+         FROM products
+         ${marketplace && marketplace !== 'ALL' ? 'WHERE marketplace = ?' : ''}
+         ORDER BY created_at DESC`
+      )
+        .bind(...(marketplace && marketplace !== 'ALL' ? [marketplace] : []))
+        .all<{ id: number; asin: string; marketplace: string }>();
+
+  const productsToRegenerate = productsResult.results ?? [];
+  if (productsToRegenerate.length === 0) {
+    throw new HTTPException(404, { message: 'No products found for regeneration' });
+  }
+
+  const regeneratedProducts = await Promise.all(
+    productsToRegenerate.map((product) =>
+      regenerateProductEditorialContent({
+        db: c.env.DB,
+        productId: product.id,
+      })
+    )
+  );
+
+  const relatedAgentsResult = await c.env.DB.prepare(
+    `SELECT ap.product_id, a.slug
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     WHERE ap.product_id IN (${productsToRegenerate.map(() => '?').join(',')})`
+  )
+    .bind(...productsToRegenerate.map((product) => product.id))
+    .all<{ product_id: number; slug: string }>();
+
+  const agentsByProductId = new Map<number, string[]>();
+  for (const row of relatedAgentsResult.results ?? []) {
+    const current = agentsByProductId.get(row.product_id) ?? [];
+    current.push(row.slug);
+    agentsByProductId.set(row.product_id, current);
+  }
+
+  const cache = new CacheService(c.env.KV);
+  c.executionCtx.waitUntil(
+    Promise.all(
+      productsToRegenerate.flatMap((product) => [
+        cache.invalidateForProduct(product.asin),
+        ...(agentsByProductId.get(product.id) ?? []).flatMap((slug) => [
+          cache.deletePageData(slug, product.asin, product.marketplace),
+          cache.deleteRedirectUrl(slug, product.asin, product.marketplace),
+        ]),
+      ])
+    )
+  );
+
+  c.executionCtx.waitUntil(
+    writeAuditLog(c.env.DB, {
+      userId: c.get('userId'),
+      action: 'product.content_bulk_regenerated',
+      entityType: 'product',
+      entityId: String(productsToRegenerate.length),
+      details: {
+        productIds: productsToRegenerate.map((product) => product.id),
+      },
+    })
+  );
+
+  return c.json({
+    products: regeneratedProducts,
+    summary: {
+      requested: hasExplicitSelection ? uniqueProductIds.length : productsToRegenerate.length,
+      regenerated: regeneratedProducts.length,
+    },
+    message: `Regenerated content for ${regeneratedProducts.length} products.`,
+  });
+});
+
 /**
  * PUT /api/products/:id — Update a product
  */
@@ -422,8 +585,8 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
 
   const body = c.req.valid('json');
 
-  const product = await c.env.DB.prepare('SELECT asin FROM products WHERE id = ?')
-    .bind(id).first<{ asin: string }>();
+  const product = await c.env.DB.prepare('SELECT asin, marketplace FROM products WHERE id = ?')
+    .bind(id).first<{ asin: string; marketplace: string }>();
   if (!product) throw new HTTPException(404, { message: 'Product not found' });
 
   const relatedAgents = await c.env.DB.prepare(
@@ -460,8 +623,8 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
   c.executionCtx.waitUntil(
     Promise.all(
       (relatedAgents.results ?? []).flatMap((agent) => [
-        cache.deletePageData(agent.slug, product.asin),
-        cache.deleteRedirectUrl(agent.slug, product.asin),
+        cache.deletePageData(agent.slug, product.asin, product.marketplace),
+        cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace),
       ])
     )
   );
@@ -494,9 +657,9 @@ products.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid product ID' });
 
-  const product = await c.env.DB.prepare('SELECT asin FROM products WHERE id = ?')
+  const product = await c.env.DB.prepare('SELECT asin, marketplace FROM products WHERE id = ?')
     .bind(id)
-    .first<{ asin: string }>();
+    .first<{ asin: string; marketplace: string }>();
   if (!product) throw new HTTPException(404, { message: 'Product not found' });
 
   const relatedAgents = await c.env.DB.prepare(
@@ -516,8 +679,8 @@ products.delete('/:id', async (c) => {
   c.executionCtx.waitUntil(
     Promise.all(
       (relatedAgents.results ?? []).flatMap((agent) => [
-        cache.deletePageData(agent.slug, product.asin),
-        cache.deleteRedirectUrl(agent.slug, product.asin),
+        cache.deletePageData(agent.slug, product.asin, product.marketplace),
+        cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace),
       ])
     )
   );

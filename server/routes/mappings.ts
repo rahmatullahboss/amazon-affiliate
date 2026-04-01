@@ -4,7 +4,11 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createMappingSchema, bulkMappingSchema } from '../schemas';
 import { CacheService } from '../services/cache';
-import { getPublicAppOrigin } from '../utils/url';
+import {
+  buildCanonicalBridgeUrl,
+  buildCanonicalRedirectUrl,
+  getPublicAppOrigin,
+} from '../utils/url';
 
 const mappings = new Hono<AppEnv>();
 
@@ -36,8 +40,8 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
   const [agent, product, trackingId] = await Promise.all([
     c.env.DB.prepare('SELECT id, slug FROM agents WHERE id = ? AND is_active = 1')
       .bind(data.agent_id).first<{ id: number; slug: string }>(),
-    c.env.DB.prepare('SELECT id, asin FROM products WHERE id = ? AND is_active = 1')
-      .bind(data.product_id).first<{ id: number; asin: string }>(),
+    c.env.DB.prepare('SELECT id, asin, marketplace FROM products WHERE id = ? AND is_active = 1')
+      .bind(data.product_id).first<{ id: number; asin: string; marketplace: string }>(),
     c.env.DB.prepare('SELECT id FROM tracking_ids WHERE id = ? AND agent_id = ? AND is_active = 1')
       .bind(data.tracking_id, data.agent_id).first<{ id: number }>(),
   ]);
@@ -56,8 +60,8 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
 
     // Invalidate cache
     const cache = new CacheService(c.env.KV);
-    c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, product.asin));
-    c.executionCtx.waitUntil(cache.deletePageData(agent.slug, product.asin));
+    c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace));
+    c.executionCtx.waitUntil(cache.deletePageData(agent.slug, product.asin, product.marketplace));
 
     const mapping = await c.env.DB.prepare(
       `SELECT ap.*,
@@ -130,22 +134,22 @@ mappings.delete('/:id', async (c) => {
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid mapping ID' });
 
   const current = await c.env.DB.prepare(
-    `SELECT ap.*, a.slug as agent_slug, p.asin
+    `SELECT ap.*, a.slug as agent_slug, p.asin, p.marketplace
      FROM agent_products ap
      JOIN agents a ON a.id = ap.agent_id
      JOIN products p ON p.id = ap.product_id
      WHERE ap.id = ?`
   )
     .bind(id)
-    .first<{ agent_slug: string; asin: string }>();
+    .first<{ agent_slug: string; asin: string; marketplace: string }>();
 
   if (!current) throw new HTTPException(404, { message: 'Mapping not found' });
 
   await c.env.DB.prepare('DELETE FROM agent_products WHERE id = ?').bind(id).run();
 
   const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.deleteRedirectUrl(current.agent_slug, current.asin));
-  c.executionCtx.waitUntil(cache.deletePageData(current.agent_slug, current.asin));
+  c.executionCtx.waitUntil(cache.deleteRedirectUrl(current.agent_slug, current.asin, current.marketplace));
+  c.executionCtx.waitUntil(cache.deletePageData(current.agent_slug, current.asin, current.marketplace));
 
   return c.json({ message: 'Mapping removed successfully' });
 });
@@ -161,7 +165,7 @@ mappings.get('/links/:agentSlug', async (c) => {
   if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
 
   const { results } = await c.env.DB.prepare(
-    `SELECT p.asin, p.title, p.image_url, t.tag, t.marketplace, ap.custom_title
+    `SELECT p.asin, p.title, p.image_url, t.tag, p.marketplace as product_marketplace, ap.custom_title
      FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
@@ -169,7 +173,14 @@ mappings.get('/links/:agentSlug', async (c) => {
        AND ap.is_active = 1 AND p.is_active = 1`
   )
     .bind(agentSlug)
-    .all<{ asin: string; title: string; image_url: string; tag: string; marketplace: string; custom_title: string | null }>();
+    .all<{
+      asin: string;
+      title: string;
+      image_url: string;
+      tag: string;
+      product_marketplace: string;
+      custom_title: string | null;
+    }>();
 
   const host = getPublicAppOrigin(c.req.url, c.env);
   const links = (results || []).map((r) => ({
@@ -177,9 +188,9 @@ mappings.get('/links/:agentSlug', async (c) => {
     title: r.custom_title || r.title,
     imageUrl: r.image_url,
     trackingTag: r.tag,
-    marketplace: r.marketplace,
-    bridgePageUrl: `${host}/${agentSlug}/${r.asin}`,
-    directRedirectUrl: `${host}/go/${agentSlug}/${r.asin}`,
+    marketplace: r.product_marketplace,
+    bridgePageUrl: buildCanonicalBridgeUrl(host, agentSlug, r.asin, r.product_marketplace),
+    directRedirectUrl: buildCanonicalRedirectUrl(host, agentSlug, r.asin, r.product_marketplace),
   }));
 
   return c.json({ agent, links });

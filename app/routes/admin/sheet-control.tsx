@@ -25,6 +25,11 @@ interface AgentSheetSource {
   pending_rows: number;
 }
 
+interface DiscoveredTab {
+  gid: number;
+  title: string;
+}
+
 interface SubmissionRow {
   id: number;
   batch_id: number;
@@ -108,6 +113,7 @@ export default function SheetControlPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
+  const [discoveringTabs, setDiscoveringTabs] = useState(false);
   const [syncingAll, setSyncingAll] = useState(false);
   const [actingId, setActingId] = useState<number | null>(null);
   const [editingSourceId, setEditingSourceId] = useState<number | null>(null);
@@ -122,6 +128,8 @@ export default function SheetControlPage() {
     is_active: true,
     auto_approve_clean_rows: true,
   });
+  const [discoveredTabs, setDiscoveredTabs] = useState<DiscoveredTab[]>([]);
+  const [selectedTabTitles, setSelectedTabTitles] = useState<string[]>([]);
 
   useEffect(() => {
     void initialLoad();
@@ -221,6 +229,10 @@ export default function SheetControlPage() {
       setError("Agent and Google Sheet URL are required.");
       return;
     }
+    if (!editingSourceId && selectedTabTitles.length === 0) {
+      setError("Discover tabs and select at least one tab.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -235,6 +247,11 @@ export default function SheetControlPage() {
         agent_id: Number(form.agent_id),
         sheet_url: form.sheet_url.trim(),
         sheet_tab_name: form.sheet_tab_name.trim() || null,
+        selected_tabs: editingSourceId
+          ? undefined
+          : discoveredTabs
+              .filter((tab) => selectedTabTitles.includes(tab.title))
+              .map((tab) => ({ gid: tab.gid, title: tab.title })),
         is_active: form.is_active,
         auto_approve_clean_rows: form.auto_approve_clean_rows,
       };
@@ -260,6 +277,52 @@ export default function SheetControlPage() {
       setError(requestError instanceof Error ? requestError.message : "Failed to save source");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDiscoverTabs() {
+    if (!form.sheet_url.trim()) {
+      setError("Enter a Google Sheet URL first.");
+      return;
+    }
+
+    setDiscoveringTabs(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/sheet-control/discover-tabs", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          sheet_url: form.sheet_url.trim(),
+        }),
+      });
+
+      const payload = (await response.json()) as {
+        error?: string;
+        tabs?: DiscoveredTab[];
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Failed to discover tabs");
+      }
+
+      const tabs = payload.tabs ?? [];
+      setDiscoveredTabs(tabs);
+      setSelectedTabTitles(tabs.map((tab) => tab.title));
+      setMessage(
+        tabs.length > 0
+          ? `Discovered ${tabs.length} tab${tabs.length === 1 ? "" : "s"}.`
+          : "No tabs found in this spreadsheet."
+      );
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to discover tabs");
+    } finally {
+      setDiscoveringTabs(false);
     }
   }
 
@@ -387,6 +450,8 @@ export default function SheetControlPage() {
 
   function startEditing(source: AgentSheetSource) {
     setEditingSourceId(source.id);
+    setDiscoveredTabs([]);
+    setSelectedTabTitles([]);
     setForm({
       agent_id: String(source.agent_id),
       sheet_url: source.sheet_url,
@@ -400,6 +465,8 @@ export default function SheetControlPage() {
 
   function resetForm() {
     setEditingSourceId(null);
+    setDiscoveredTabs([]);
+    setSelectedTabTitles([]);
     setForm({
       agent_id: "",
       sheet_url: "",
@@ -417,6 +484,14 @@ export default function SheetControlPage() {
       return "border-amber-500/25 bg-amber-500/10 text-amber-200";
     }
     return "border-emerald-500/25 bg-emerald-500/10 text-emerald-300";
+  }
+
+  function toggleTabSelection(title: string) {
+    setSelectedTabTitles((current) =>
+      current.includes(title)
+        ? current.filter((item) => item !== title)
+        : [...current, title]
+    );
   }
 
   if (loading) {
@@ -532,15 +607,25 @@ export default function SheetControlPage() {
               </label>
 
               <label>
-                <span className="mb-1.5 block text-sm text-[#a0a0b8]">Sheet Tab Name</span>
-                <input
-                  value={form.sheet_tab_name}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, sheet_tab_name: event.target.value }))
-                  }
-                  placeholder="Products"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
-                />
+                <span className="mb-1.5 block text-sm text-[#a0a0b8]">
+                  {editingSourceId ? "Sheet Tab Name" : "Discovered Tabs"}
+                </span>
+                {editingSourceId ? (
+                  <input
+                    value={form.sheet_tab_name}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, sheet_tab_name: event.target.value }))
+                    }
+                    placeholder="Products"
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                  />
+                ) : (
+                  <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-[#d4d4e4]">
+                    {discoveredTabs.length === 0
+                      ? "Paste a sheet URL and discover tabs. You can then select the country tabs to save."
+                      : `${selectedTabTitles.length} of ${discoveredTabs.length} tab(s) selected`}
+                  </div>
+                )}
               </label>
             </div>
 
@@ -548,13 +633,62 @@ export default function SheetControlPage() {
               <span className="mb-1.5 block text-sm text-[#a0a0b8]">Google Sheet URL</span>
               <input
                 value={form.sheet_url}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, sheet_url: event.target.value }))
-                }
+                onChange={(event) => {
+                  setForm((current) => ({ ...current, sheet_url: event.target.value }));
+                  if (!editingSourceId) {
+                    setDiscoveredTabs([]);
+                    setSelectedTabTitles([]);
+                  }
+                }}
                 placeholder="https://docs.google.com/spreadsheets/d/.../edit?gid=0"
                 className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
               />
             </label>
+
+            {!editingSourceId ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled={discoveringTabs || !form.sheet_url.trim()}
+                  onClick={() => void handleDiscoverTabs()}
+                  className={`rounded-lg px-4 py-2 text-sm font-semibold transition-opacity ${
+                    discoveringTabs || !form.sheet_url.trim()
+                      ? "cursor-not-allowed bg-white/10 text-[#8d8da6]"
+                      : "bg-white/10 text-[#f0f0f5] hover:bg-white/15"
+                  }`}
+                >
+                  {discoveringTabs ? "Discovering..." : "Discover Tabs"}
+                </button>
+
+                {discoveredTabs.length > 0 ? (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {discoveredTabs.map((tab) => {
+                      const checked = selectedTabTitles.includes(tab.title);
+
+                      return (
+                        <label
+                          key={`${tab.gid}:${tab.title}`}
+                          className={`flex items-center gap-3 rounded-xl border px-3 py-3 text-sm transition-colors ${
+                            checked
+                              ? "border-[#ff9900]/50 bg-[#ff9900]/10 text-[#f0f0f5]"
+                              : "border-white/10 bg-white/[0.03] text-[#c4c4d4]"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleTabSelection(tab.title)}
+                            className="h-4 w-4 rounded border-white/10 bg-white/5 text-[#ff9900]"
+                          />
+                          <span className="font-semibold">{tab.title}</span>
+                          <span className="text-xs text-[#8d8da6]">gid: {tab.gid}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="flex flex-wrap gap-6">
               <label className="inline-flex items-center gap-2 text-sm text-[#d4d4e4]">

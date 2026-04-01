@@ -115,6 +115,7 @@ agents.put('/:id', zValidator('json', updateAgentSchema), async (c) => {
   const values: (string | number | boolean | null)[] = [];
 
   if (data.name !== undefined) { updates.push('name = ?'); values.push(data.name); }
+  if (data.slug !== undefined) { updates.push('slug = ?'); values.push(data.slug); }
   if (data.email !== undefined) { updates.push('email = ?'); values.push(data.email); }
   if (data.phone !== undefined) { updates.push('phone = ?'); values.push(data.phone); }
   if (data.is_active !== undefined) { updates.push('is_active = ?'); values.push(data.is_active ? 1 : 0); }
@@ -126,15 +127,27 @@ agents.put('/:id', zValidator('json', updateAgentSchema), async (c) => {
   updates.push('updated_at = CURRENT_TIMESTAMP');
   values.push(id);
 
-  await c.env.DB.prepare(
-    `UPDATE agents SET ${updates.join(', ')} WHERE id = ?`
-  )
-    .bind(...values)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      `UPDATE agents SET ${updates.join(', ')} WHERE id = ?`
+    )
+      .bind(...values)
+      .run();
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, { message: 'Agent slug already exists' });
+    }
+    throw error;
+  }
 
   // Invalidate cache
   const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.invalidateForAgent(agent.slug));
+  c.executionCtx.waitUntil(
+    Promise.all([
+      cache.invalidateForAgent(agent.slug),
+      data.slug && data.slug !== agent.slug ? cache.invalidateForAgent(data.slug) : Promise.resolve(),
+    ])
+  );
 
   const updated = await c.env.DB.prepare('SELECT * FROM agents WHERE id = ?').bind(id).first();
 
@@ -146,6 +159,7 @@ agents.put('/:id', zValidator('json', updateAgentSchema), async (c) => {
       entityId: id,
       details: {
         name: data.name,
+        slug: data.slug,
         email: data.email,
         phone: data.phone,
         isActive: data.is_active,

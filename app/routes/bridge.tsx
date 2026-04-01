@@ -6,7 +6,13 @@ import { recordView } from "../../server/services/analytics";
 import {
   DynamicLinkResolutionError,
   ensureDynamicLinkByAgentSlug,
+  hasAgentMarketplaceCandidate,
+  resolveAgentProductBySlug,
 } from "../../server/services/dynamic-links";
+import {
+  buildCanonicalRedirectPath,
+  normalizeMarketplaceHint,
+} from "../../server/utils/url";
 import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
 
 // ─── Types ───────────────────────────────────────
@@ -53,61 +59,52 @@ export function meta({ data }: Route.MetaArgs) {
 }
 
 // ─── Server Loader (ZERO-HOP D1 ACCESS) ─────────
-export async function loader({ params, context }: Route.LoaderArgs) {
-  const { agent: agentSlug, asin } = params;
+export async function loader({ request, params, context }: Route.LoaderArgs) {
+  const { agent: agentSlug, asin, country } = params;
 
   if (!agentSlug || !asin) {
     throw new Response("Invalid link", { status: 400 });
   }
 
   const storefrontPath = `/${agentSlug}`;
+  const countryMarketplace = country ? normalizeMarketplaceHint(country) : null;
+
+  if (country && !countryMarketplace) {
+    throw new Response("Product page not found", { status: 404 });
+  }
+
+  const preferredMarketplace =
+    countryMarketplace ?? normalizeMarketplaceHint(new URL(request.url).searchParams.get("m"));
 
   const { env, ctx } = context.cloudflare;
   const workerEnv = env as Env & { AMAZON_API_KEY_FALLBACK?: string };
 
-  const loadBridgeRow = async () =>
-    env.DB.prepare(
-      `SELECT
-         a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-         p.asin, p.title as product_title, p.image_url, p.description, p.features,
-         p.product_images, p.aplus_images, p.id as product_id,
-         t.tag as tracking_tag, t.marketplace,
-         ap.custom_title
-       FROM agent_products ap
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN products p ON p.id = ap.product_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE a.slug = ? AND p.asin = ?
-         AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
-       LIMIT 1`
-    )
-      .bind(agentSlug, asin)
-      .first<{
-        agent_slug: string;
-        agent_name: string;
-        agent_id: number;
-        asin: string;
-        product_title: string;
-        image_url: string;
-        description: string | null;
-        features: string | null;
-        product_images: string | null;
-        aplus_images: string | null;
-        product_id: number;
-        tracking_tag: string;
-        marketplace: string;
-        custom_title: string | null;
-      }>();
+const loadBridgeResolution = async () => {
+    const directResolution = await resolveAgentProductBySlug({
+      db: env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
 
-  let row = await loadBridgeRow();
+    if (directResolution) {
+      return directResolution;
+    }
 
-  if (!row) {
+    if (
+      preferredMarketplace &&
+      !(await hasAgentMarketplaceCandidate(env.DB, agentSlug, preferredMarketplace))
+    ) {
+      throw new Response("Product page not found", { status: 404 });
+    }
+
     try {
       await ensureDynamicLinkByAgentSlug({
         db: workerEnv.DB,
         kv: workerEnv.KV,
         agentSlug,
         asin,
+        preferredMarketplace,
         apiKey: workerEnv.AMAZON_API_KEY,
         fallbackApiKeys: workerEnv.AMAZON_API_KEY_FALLBACK
           ? [workerEnv.AMAZON_API_KEY_FALLBACK]
@@ -115,18 +112,40 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       });
     } catch (error) {
       if (error instanceof DynamicLinkResolutionError) {
+        if (error.status === 404) {
+          throw new Response("Product page not found", { status: 404 });
+        }
+
         throw redirect(storefrontPath);
       }
 
       throw error;
     }
 
-    row = await loadBridgeRow();
-  }
+    return await resolveAgentProductBySlug({
+      db: env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
+  };
 
-  if (!row) {
+  let resolution = await loadBridgeResolution();
+
+  if (!resolution) {
     throw redirect(storefrontPath);
   }
+
+  if (!country) {
+    const canonicalLocation = buildCanonicalBridgeRedirectLocation(
+      request.url,
+      `/${resolution.row.agent_slug}/${resolution.resolvedMarketplace.toLowerCase()}/${resolution.row.asin}`
+    );
+
+    throw redirect(canonicalLocation);
+  }
+
+  const { row } = resolution;
 
   // Record page view asynchronously with waitUntil (zero impact on render)
   ctx.waitUntil(
@@ -157,11 +176,18 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       productImages: parseJsonArray(row.product_images),
       aplusImages: parseJsonArray(row.aplus_images),
     },
-    redirectUrl: `/go/${row.agent_slug}/${row.asin}`,
+    redirectUrl: buildCanonicalRedirectPath(row.agent_slug, row.asin, row.marketplace),
     marketplace: row.marketplace,
   };
 
   return data;
+}
+
+function buildCanonicalBridgeRedirectLocation(requestUrl: string, pathname: string): string {
+  const url = new URL(requestUrl);
+  url.pathname = pathname;
+  url.searchParams.delete("m");
+  return `${url.pathname}${url.search}${url.hash}`;
 }
 
 function parseJsonArray(raw: string | null): string[] {

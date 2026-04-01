@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import type { Route } from "./+types/products";
-import {
-  ASIN_IMPORT_ENABLED,
-  ASIN_IMPORT_PAUSED_DETAIL,
-} from "../../utils/asin-import";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
@@ -26,7 +22,6 @@ interface PortalProduct {
   title: string;
   image_url: string;
   status: string;
-  tracking_tag: string;
   bridge_page_url: string;
   redirect_url: string;
 }
@@ -42,6 +37,11 @@ interface SubmissionResponse {
     title: string;
     imageUrl: string;
   };
+}
+
+interface ImportCapabilities {
+  newAsinImportEnabled: boolean;
+  batchAsinImportEnabled: boolean;
 }
 
 interface ProductSubmissionPayload {
@@ -62,6 +62,11 @@ export default function PortalProductsPage() {
   const [copied, setCopied] = useState(false);
   const [copiedProductKey, setCopiedProductKey] = useState("");
   const [lastPayload, setLastPayload] = useState<ProductSubmissionPayload | null>(null);
+  const [importCapabilities, setImportCapabilities] = useState<ImportCapabilities>({
+    newAsinImportEnabled: true,
+    batchAsinImportEnabled: false,
+  });
+  const [canSubmit, setCanSubmit] = useState(true);
 
   const loadProducts = async () => {
     const token = getAuthToken();
@@ -73,8 +78,16 @@ export default function PortalProductsPage() {
       throw new Error("Failed to load products");
     }
 
-    const data = (await response.json()) as { products: PortalProduct[] };
+    const data = (await response.json()) as {
+      products: PortalProduct[];
+      importCapabilities?: ImportCapabilities;
+      canSubmit?: boolean;
+    };
     setProducts(data.products);
+    if (data.importCapabilities) {
+      setImportCapabilities(data.importCapabilities);
+    }
+    setCanSubmit(data.canSubmit ?? true);
   };
 
   useEffect(() => {
@@ -167,17 +180,24 @@ export default function PortalProductsPage() {
   return (
     <section className="flex flex-col lg:grid lg:grid-cols-[minmax(320px,420px)_1fr] gap-4">
       <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
-        <h1 className="m-0 mb-3 text-gray-50 text-xl font-bold">Submit ASIN</h1>
-        <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">Paste an ASIN or full Amazon product link. If live product data is fetched successfully, your tracked link will be ready instantly.</p>
-        <p className="m-0 mb-3 text-blue-300 leading-relaxed text-sm">
-          First time here? Add your marketplace tag in <Link className="text-amber-400 no-underline font-semibold hover:text-amber-300" to="/portal/tracking">Tags</Link>.
+        <h1 className="m-0 mb-3 text-gray-50 text-xl font-bold">{canSubmit ? "Submit ASIN" : "Products Overview"}</h1>
+        <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">
+          {canSubmit
+            ? "Paste an ASIN or full Amazon product link. If live product data is fetched successfully, your tracked link will be ready instantly."
+            : "Admin accounts can review portal products here. ASIN submission stays restricted to linked agent accounts."}
         </p>
-        {!ASIN_IMPORT_ENABLED ? (
+        {canSubmit ? (
+          <p className="m-0 mb-3 text-blue-300 leading-relaxed text-sm">
+            First time here? Add your marketplace tag in <Link className="text-amber-400 no-underline font-semibold hover:text-amber-300" to="/portal/tracking">Tags</Link>.
+          </p>
+        ) : null}
+        {canSubmit && !importCapabilities.newAsinImportEnabled ? (
           <div className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-            {ASIN_IMPORT_PAUSED_DETAIL} Only ASINs already saved in the system can be submitted right now.
+            New ASIN import is temporarily paused. Only ASINs already saved in the system can be submitted right now.
           </div>
         ) : null}
 
+        {canSubmit ? (
         <form onSubmit={(e) => void handleSubmit(e)} className="grid gap-3">
           <input
             className="rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none focus:ring-2 focus:ring-amber-500"
@@ -202,6 +222,11 @@ export default function PortalProductsPage() {
             {submitting ? "Submitting..." : "Submit ASIN"}
           </button>
         </form>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+            Submission controls are hidden in admin view to avoid assigning products without a linked agent context.
+          </div>
+        )}
 
         {error ? (
           <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm">
@@ -267,7 +292,7 @@ export default function PortalProductsPage() {
               <div className="min-w-0">
                 <p className="m-0 mb-1.5 text-gray-50 font-semibold leading-tight truncate">{product.custom_title || product.title}</p>
                 <p className="m-0 mb-1.5 text-slate-300 leading-relaxed text-xs">
-                  {product.asin} · {product.marketplace} · {product.tracking_tag}
+                  {product.asin} · {product.marketplace}
                 </p>
                 <p
                   className={`m-0 text-xs font-bold capitalize ${

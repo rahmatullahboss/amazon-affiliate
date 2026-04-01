@@ -15,6 +15,11 @@ interface GoogleServiceAccountCredentials {
   privateKey: string;
 }
 
+export interface SpreadsheetTab {
+  sheetId: number;
+  title: string;
+}
+
 export async function readSheetRows(input: {
   credentials: GoogleServiceAccountCredentials;
   spreadsheetId: string;
@@ -125,6 +130,22 @@ export function parseSpreadsheetReference(sheetUrl: string): {
   };
 }
 
+export async function listSpreadsheetTabs(input: {
+  credentials: GoogleServiceAccountCredentials;
+  spreadsheetId: string;
+}): Promise<SpreadsheetTab[]> {
+  const accessToken = await getAccessToken(input.credentials);
+  const metadata = await fetchSpreadsheetMetadata(input.spreadsheetId, accessToken);
+
+  return (metadata.sheets ?? [])
+    .map((sheet) => sheet.properties)
+    .filter((sheet): sheet is SheetProperties => Boolean(sheet?.title) && typeof sheet?.sheetId === "number")
+    .map((sheet) => ({
+      sheetId: sheet.sheetId,
+      title: sheet.title.trim(),
+    }));
+}
+
 async function resolveSheetTitle(input: {
   accessToken: string;
   spreadsheetId: string;
@@ -135,21 +156,7 @@ async function resolveSheetTitle(input: {
     return input.sheetTabName.trim();
   }
 
-  const metadataResponse = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${input.spreadsheetId}?fields=sheets(properties(sheetId,title))`,
-    {
-      headers: {
-        Authorization: `Bearer ${input.accessToken}`,
-      },
-    }
-  );
-
-  if (!metadataResponse.ok) {
-    const errorText = await metadataResponse.text();
-    throw new Error(`Google Sheets metadata lookup failed with status ${metadataResponse.status}: ${errorText}`);
-  }
-
-  const metadata = (await metadataResponse.json()) as SpreadsheetMetadata;
+  const metadata = await fetchSpreadsheetMetadata(input.spreadsheetId, input.accessToken);
   const sheets = metadata.sheets ?? [];
 
   if (input.gid !== null && input.gid !== undefined) {
@@ -165,6 +172,29 @@ async function resolveSheetTitle(input: {
   }
 
   return fallbackTitle;
+}
+
+async function fetchSpreadsheetMetadata(
+  spreadsheetId: string,
+  accessToken: string
+): Promise<SpreadsheetMetadata> {
+  const metadataResponse = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets(properties(sheetId,title))`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!metadataResponse.ok) {
+    const errorText = await metadataResponse.text();
+    throw new Error(
+      `Google Sheets metadata lookup failed with status ${metadataResponse.status}: ${errorText}`
+    );
+  }
+
+  return (await metadataResponse.json()) as SpreadsheetMetadata;
 }
 
 async function getAccessToken(

@@ -1,7 +1,9 @@
 import { ASIN_IMPORT_ENABLED, ASIN_IMPORT_PAUSED_MESSAGE } from "../utils/asin-import";
 import { buildAmazonUrl } from "../utils/types";
 import { CacheService } from "./cache";
+import { resolvePublicSlug } from "./public-slugs";
 import {
+  AmazonProductFetchError,
   ensureProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
@@ -21,6 +23,7 @@ interface EnsureLegacyDynamicLinkInput {
   kv?: KVNamespace;
   agentSlug: string;
   asin: string;
+  preferredMarketplace?: string | null;
   apiKey?: string;
   fallbackApiKeys?: string[];
 }
@@ -30,6 +33,28 @@ interface ProductRouteContext {
   title: string;
   image_url: string;
   status: string;
+}
+
+export interface AgentProductResolutionRow {
+  agent_slug: string;
+  agent_name: string;
+  agent_id: number;
+  asin: string;
+  product_title: string;
+  image_url: string;
+  description: string | null;
+  features: string | null;
+  product_images: string | null;
+  aplus_images: string | null;
+  product_id: number;
+  tracking_tag: string;
+  marketplace: string;
+  custom_title: string | null;
+}
+
+export interface AgentProductResolution {
+  row: AgentProductResolutionRow;
+  resolvedMarketplace: string;
 }
 
 export interface DynamicLinkResolution {
@@ -63,6 +88,171 @@ export class DynamicLinkResolutionError extends Error {
     this.name = "DynamicLinkResolutionError";
     this.status = status;
   }
+}
+
+function isAmazonProductFetchError(
+  error: unknown
+): error is AmazonProductFetchError {
+  return (
+    error instanceof AmazonProductFetchError ||
+    (typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof (error as { code?: unknown }).code === "string")
+  );
+}
+
+const AGENT_PRODUCT_SELECT = `SELECT
+  a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
+  p.asin, p.title as product_title, p.image_url, p.description, p.features,
+  p.product_images, p.aplus_images, p.id as product_id,
+  t.tag as tracking_tag, t.marketplace,
+  ap.custom_title
+FROM agent_products ap
+JOIN agents a ON a.id = ap.agent_id
+JOIN products p ON p.id = ap.product_id
+JOIN tracking_ids t ON t.id = ap.tracking_id`;
+
+async function loadAgentProductRow(
+  db: D1Database,
+  agentSlug: string,
+  asin: string,
+  marketplace?: string | null
+): Promise<AgentProductResolutionRow | null> {
+  const statement = marketplace
+    ? db.prepare(
+        `${AGENT_PRODUCT_SELECT}
+         WHERE a.slug = ? AND p.asin = ? AND t.marketplace = ?
+           AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+         LIMIT 1`
+      ).bind(agentSlug, asin, marketplace)
+    : db.prepare(
+        `${AGENT_PRODUCT_SELECT}
+         WHERE a.slug = ? AND p.asin = ?
+           AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+         ORDER BY t.is_default DESC, t.created_at ASC
+         LIMIT 1`
+      ).bind(agentSlug, asin);
+
+  return statement.first<AgentProductResolutionRow>();
+}
+
+async function loadAgentProductRowForResolvedSlug(
+  db: D1Database,
+  input: {
+    publicSlug: string;
+    agentId: number;
+    trackingId: number | null;
+    fixedMarketplace: string | null;
+    asin: string;
+    preferredMarketplace: string | null;
+  }
+): Promise<AgentProductResolutionRow | null> {
+  if (input.trackingId) {
+    const effectiveMarketplace = input.fixedMarketplace;
+    if (!effectiveMarketplace) {
+      return null;
+    }
+
+    if (input.preferredMarketplace && input.preferredMarketplace !== effectiveMarketplace) {
+      return null;
+    }
+
+    const row = await db
+      .prepare(
+        `${AGENT_PRODUCT_SELECT}
+         WHERE ap.tracking_id = ? AND p.asin = ? AND t.marketplace = ?
+           AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+         LIMIT 1`
+      )
+      .bind(input.trackingId, input.asin, effectiveMarketplace)
+      .first<AgentProductResolutionRow>();
+
+    return row ? { ...row, agent_slug: input.publicSlug } : null;
+  }
+
+  const row = input.preferredMarketplace
+    ? await db
+        .prepare(
+          `${AGENT_PRODUCT_SELECT}
+           WHERE a.id = ? AND p.asin = ? AND t.marketplace = ?
+             AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+           LIMIT 1`
+        )
+        .bind(input.agentId, input.asin, input.preferredMarketplace)
+        .first<AgentProductResolutionRow>()
+    : await db
+        .prepare(
+          `${AGENT_PRODUCT_SELECT}
+           WHERE a.id = ? AND p.asin = ?
+             AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
+           ORDER BY t.is_default DESC, t.created_at ASC
+           LIMIT 1`
+        )
+        .bind(input.agentId, input.asin)
+        .first<AgentProductResolutionRow>();
+
+  return row ? { ...row, agent_slug: input.publicSlug } : null;
+}
+
+export async function hasAgentMarketplaceCandidate(
+  db: D1Database,
+  agentSlug: string,
+  marketplace: string
+): Promise<boolean> {
+  const resolvedSlug = await resolvePublicSlug(db, agentSlug);
+  if (!resolvedSlug) {
+    return false;
+  }
+
+  if (resolvedSlug.trackingId) {
+    return resolvedSlug.marketplace === marketplace;
+  }
+
+  const candidate = await db
+    .prepare(
+      `SELECT 1
+       FROM tracking_ids t
+       WHERE t.agent_id = ?
+         AND t.is_active = 1
+         AND t.marketplace = ?
+       LIMIT 1`
+    )
+    .bind(resolvedSlug.agentId, marketplace)
+    .first<{ 1: number }>();
+
+  return candidate !== null;
+}
+
+export async function resolveAgentProductBySlug(input: {
+  db: D1Database;
+  agentSlug: string;
+  asin: string;
+  preferredMarketplace?: string | null;
+}): Promise<AgentProductResolution | null> {
+  const preferredMarketplace = input.preferredMarketplace?.trim().toUpperCase() || null;
+  const resolvedSlug = await resolvePublicSlug(input.db, input.agentSlug);
+  if (!resolvedSlug) {
+    return null;
+  }
+
+  const row = await loadAgentProductRowForResolvedSlug(input.db, {
+    publicSlug: resolvedSlug.publicSlug,
+    agentId: resolvedSlug.agentId,
+    trackingId: resolvedSlug.trackingId,
+    fixedMarketplace: resolvedSlug.marketplace,
+    asin: input.asin,
+    preferredMarketplace,
+  });
+
+  if (!row) {
+    return null;
+  }
+
+  return {
+    row,
+    resolvedMarketplace: row.marketplace,
+  };
 }
 
 async function finalizeDynamicLinkResolution(input: {
@@ -101,8 +291,8 @@ async function finalizeDynamicLinkResolution(input: {
   if (input.kv) {
     const cache = new CacheService(input.kv);
     await Promise.all([
-      cache.deletePageData(input.tracking.agentSlug, input.asin),
-      cache.deleteRedirectUrl(input.tracking.agentSlug, input.asin),
+      cache.deletePageData(input.tracking.agentSlug, input.asin, input.tracking.marketplace),
+      cache.deleteRedirectUrl(input.tracking.agentSlug, input.asin, input.tracking.marketplace),
     ]);
   }
 
@@ -225,6 +415,16 @@ export async function ensureDynamicLinkByAgentSlug(
     throw new DynamicLinkResolutionError(400, "Agent slug is required.");
   }
 
+  const preferredMarketplace = input.preferredMarketplace?.trim().toUpperCase() || null;
+  const resolvedSlug = await resolvePublicSlug(input.db, normalizedAgentSlug);
+  if (!resolvedSlug) {
+    throw new DynamicLinkResolutionError(404, "No active tracking tag was found for this link. Ask admin to review the agent setup.");
+  }
+
+  if (resolvedSlug.marketplace && preferredMarketplace && resolvedSlug.marketplace !== preferredMarketplace) {
+    throw new DynamicLinkResolutionError(404, "This marketplace is not available for the selected agent.");
+  }
+
   const { results } = await input.db
     .prepare(
       `SELECT
@@ -236,15 +436,18 @@ export async function ensureDynamicLinkByAgentSlug(
          a.name as agentName
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
-       WHERE a.slug = ?
+       WHERE a.id = ?
          AND a.is_active = 1
          AND t.is_active = 1
        ORDER BY t.is_default DESC, t.created_at ASC`
     )
-    .bind(normalizedAgentSlug)
+    .bind(resolvedSlug.agentId)
     .all<TrackingRouteContext>();
 
-  const trackingCandidates = results ?? [];
+  const trackingCandidates = (results ?? []).map((tracking) => ({
+    ...tracking,
+    agentSlug: resolvedSlug.publicSlug,
+  }));
   if (trackingCandidates.length === 0) {
     throw new DynamicLinkResolutionError(
       404,
@@ -252,10 +455,25 @@ export async function ensureDynamicLinkByAgentSlug(
     );
   }
 
+  const baseCandidates = resolvedSlug.trackingId
+    ? trackingCandidates.filter((tracking) => tracking.trackingId === resolvedSlug.trackingId)
+    : trackingCandidates;
+
+  const preferredTrackingCandidates = preferredMarketplace
+    ? baseCandidates.filter((tracking) => tracking.marketplace === preferredMarketplace)
+    : baseCandidates;
+  if (preferredMarketplace && preferredTrackingCandidates.length === 0) {
+    throw new DynamicLinkResolutionError(
+      404,
+      "This marketplace is not available for the selected agent."
+    );
+  }
+
+  const resolutionCandidates = preferredMarketplace ? preferredTrackingCandidates : trackingCandidates;
   let deferredStatusError: DynamicLinkResolutionError | null = null;
   let deferredFetchError: unknown = null;
 
-  for (const tracking of trackingCandidates) {
+  for (const tracking of resolutionCandidates) {
     const product = await input.db
       .prepare(
         `SELECT id, title, image_url, status
@@ -288,6 +506,13 @@ export async function ensureDynamicLinkByAgentSlug(
   }
 
   if (!input.apiKey && !(input.fallbackApiKeys ?? []).length) {
+    if (preferredMarketplace && preferredTrackingCandidates.length > 0) {
+      throw new DynamicLinkResolutionError(
+        404,
+        "This ASIN is not available in the selected marketplace."
+      );
+    }
+
     throw deferredStatusError ?? new DynamicLinkResolutionError(
       503,
       "Amazon product API is not configured. Dynamic ASIN links need live product data."
@@ -295,12 +520,19 @@ export async function ensureDynamicLinkByAgentSlug(
   }
 
   if (!ASIN_IMPORT_ENABLED) {
+    if (preferredMarketplace && preferredTrackingCandidates.length > 0) {
+      throw new DynamicLinkResolutionError(
+        404,
+        "This ASIN is not available in the selected marketplace."
+      );
+    }
+
     throw deferredStatusError ?? new DynamicLinkResolutionError(503, ASIN_IMPORT_PAUSED_MESSAGE);
   }
 
   const attemptedMarketplaces = new Set<string>();
 
-  for (const tracking of trackingCandidates) {
+  for (const tracking of resolutionCandidates) {
     if (attemptedMarketplaces.has(tracking.marketplace)) {
       continue;
     }
@@ -331,7 +563,29 @@ export async function ensureDynamicLinkByAgentSlug(
         },
       });
     } catch (error) {
+      if (
+        isAmazonProductFetchError(error) &&
+        (error.code === "not_found" || error.code === "invalid_response")
+      ) {
+        if (preferredMarketplace && preferredTrackingCandidates.length > 0) {
+          throw new DynamicLinkResolutionError(
+            404,
+            "This ASIN is not available in the selected marketplace."
+          );
+        }
+
+        deferredFetchError = deferredFetchError ?? error;
+        continue;
+      }
+
       if (error instanceof DynamicLinkResolutionError) {
+        if (preferredMarketplace && preferredTrackingCandidates.length > 0 && error.status >= 500) {
+          throw new DynamicLinkResolutionError(
+            404,
+            "This ASIN is not available in the selected marketplace."
+          );
+        }
+
         deferredStatusError = deferredStatusError ?? error;
         continue;
       }
@@ -339,6 +593,13 @@ export async function ensureDynamicLinkByAgentSlug(
       deferredFetchError = deferredFetchError ?? error;
       continue;
     }
+  }
+
+  if (preferredMarketplace && preferredTrackingCandidates.length > 0) {
+    throw new DynamicLinkResolutionError(
+      404,
+      "This ASIN is not available in the selected marketplace."
+    );
   }
 
   throw deferredStatusError ??

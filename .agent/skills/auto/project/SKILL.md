@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 71 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 73 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **335 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **338 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -198,6 +198,11 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
+- 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
+
+Content summary (1 lines):
+{"fileNames":["
 - 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
 - 📐 **Fixed null crash in System — confirmed 3x** — - android {
 + def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
@@ -221,11 +226,6 @@ Content summary (1 lines):
 +     "PUBLIC_APP_URL": "https://dealsrky.com",
 -   }
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 4x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **what-changed in task.md — confirmed 3x** — -   - `[ ]` Complete walkthrough artifact
-+   - `[x]` Complete walkthrough artifact
-
-📌 IDE AST Cont
-- 📐 **Optimized impliedForm
+- 📐
 
 ... [Truncated — see individual observations for full content]

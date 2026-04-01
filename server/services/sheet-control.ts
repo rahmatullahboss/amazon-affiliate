@@ -19,7 +19,9 @@ export interface AgentSheetSource {
   agent_name: string;
   agent_slug: string;
   sheet_url: string;
+  spreadsheet_id: string | null;
   sheet_tab_name: string | null;
+  sheet_gid: number | null;
   is_active: number;
   auto_approve_clean_rows: number;
   last_synced_at: string | null;
@@ -95,7 +97,9 @@ interface SourceRow {
   agent_name: string;
   agent_slug: string;
   sheet_url: string;
+  spreadsheet_id: string | null;
   sheet_tab_name: string | null;
+  sheet_gid: number | null;
   is_active: number;
   auto_approve_clean_rows: number;
 }
@@ -149,7 +153,9 @@ export async function listAgentSheetSources(db: D1Database): Promise<AgentSheetS
          a.name AS agent_name,
          a.slug AS agent_slug,
          ass.sheet_url,
+         ass.spreadsheet_id,
          ass.sheet_tab_name,
+         ass.sheet_gid,
          ass.is_active,
          ass.auto_approve_clean_rows,
          ass.last_synced_at,
@@ -164,7 +170,7 @@ export async function listAgentSheetSources(db: D1Database): Promise<AgentSheetS
          ) AS pending_rows
        FROM agent_sheet_sources ass
        JOIN agents a ON a.id = ass.agent_id
-       ORDER BY a.name ASC`
+       ORDER BY a.name ASC, ass.sheet_tab_name ASC`
     )
     .all<AgentSheetSource>();
 
@@ -181,7 +187,36 @@ export async function createAgentSheetSource(
     autoApproveCleanRows: boolean;
   }
 ): Promise<AgentSheetSource> {
-  parseSpreadsheetReference(input.sheetUrl);
+  const sources = await createAgentSheetSources(db, {
+    agentId: input.agentId,
+    sheetUrl: input.sheetUrl,
+    selections: [{ sheetTabName: input.sheetTabName, sheetGid: null }],
+    isActive: input.isActive,
+    autoApproveCleanRows: input.autoApproveCleanRows,
+  });
+
+  const source = sources[0];
+  if (!source) {
+    throw new Error("Sheet source creation failed unexpectedly.");
+  }
+
+  return source;
+}
+
+export async function createAgentSheetSources(
+  db: D1Database,
+  input: {
+    agentId: number;
+    sheetUrl: string;
+    selections: Array<{
+      sheetTabName: string | null;
+      sheetGid: number | null;
+    }>;
+    isActive: boolean;
+    autoApproveCleanRows: boolean;
+  }
+): Promise<AgentSheetSource[]> {
+  const reference = parseSpreadsheetReference(input.sheetUrl);
 
   const agent = await db
     .prepare(`SELECT id FROM agents WHERE id = ? LIMIT 1`)
@@ -192,47 +227,68 @@ export async function createAgentSheetSource(
     throw new Error("Agent not found.");
   }
 
+  const selections = input.selections
+    .map((selection) => ({
+      sheetTabName: selection.sheetTabName?.trim() || null,
+      sheetGid: selection.sheetGid ?? null,
+    }))
+    .filter((selection) => Boolean(selection.sheetTabName));
+
+  if (selections.length === 0) {
+    throw new Error("Select at least one sheet tab.");
+  }
+
   try {
-    await db
-      .prepare(
-        `INSERT INTO agent_sheet_sources (
-           agent_id,
-           sheet_url,
-           sheet_tab_name,
-           is_active,
-           auto_approve_clean_rows
-         ) VALUES (?, ?, ?, ?, ?)`
-      )
-      .bind(
-        input.agentId,
-        input.sheetUrl,
-        input.sheetTabName,
-        input.isActive ? 1 : 0,
-        input.autoApproveCleanRows ? 1 : 0
-      )
-      .run();
+    const statement = db.prepare(
+      `INSERT INTO agent_sheet_sources (
+         agent_id,
+         sheet_url,
+         spreadsheet_id,
+         sheet_tab_name,
+         sheet_gid,
+         is_active,
+         auto_approve_clean_rows
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    for (const selection of selections) {
+      await statement
+        .bind(
+          input.agentId,
+          input.sheetUrl,
+          reference.spreadsheetId,
+          selection.sheetTabName,
+          selection.sheetGid,
+          input.isActive ? 1 : 0,
+          input.autoApproveCleanRows ? 1 : 0
+        )
+        .run();
+    }
   } catch (error) {
     if (error instanceof Error && error.message.includes("UNIQUE")) {
-      throw new Error("This agent already has a sheet source configured.");
+      throw new Error("One or more selected tabs are already configured for this agent.");
     }
     throw error;
   }
 
-  const source = await db
+  const { results } = await db
     .prepare(
       `SELECT id
        FROM agent_sheet_sources
-       WHERE agent_id = ?
-       LIMIT 1`
+       WHERE agent_id = ? AND spreadsheet_id = ?
+       ORDER BY id DESC
+       LIMIT ?`
     )
-    .bind(input.agentId)
-    .first<{ id: number }>();
+    .bind(input.agentId, reference.spreadsheetId, selections.length)
+    .all<{ id: number }>();
 
-  if (!source) {
+  const ids = (results ?? []).map((row) => row.id).reverse();
+  if (ids.length !== selections.length) {
     throw new Error("Sheet source creation failed unexpectedly.");
   }
 
-  return getAgentSheetSourceById(db, source.id);
+  const created = await Promise.all(ids.map((id) => getAgentSheetSourceById(db, id)));
+  return created;
 }
 
 export async function updateAgentSheetSource(
@@ -251,13 +307,15 @@ export async function updateAgentSheetSource(
   }
 
   const nextSheetUrl = input.sheetUrl ?? current.sheet_url;
-  parseSpreadsheetReference(nextSheetUrl);
+  const reference = parseSpreadsheetReference(nextSheetUrl);
 
   await db
     .prepare(
       `UPDATE agent_sheet_sources
        SET sheet_url = ?,
+           spreadsheet_id = ?,
            sheet_tab_name = ?,
+           sheet_gid = ?,
            is_active = ?,
            auto_approve_clean_rows = ?,
            updated_at = CURRENT_TIMESTAMP
@@ -265,7 +323,9 @@ export async function updateAgentSheetSource(
     )
     .bind(
       nextSheetUrl,
+      reference.spreadsheetId,
       input.sheetTabName !== undefined ? input.sheetTabName : current.sheet_tab_name,
+      current.sheet_gid,
       input.isActive !== undefined ? (input.isActive ? 1 : 0) : current.is_active,
       input.autoApproveCleanRows !== undefined
         ? input.autoApproveCleanRows
@@ -277,6 +337,15 @@ export async function updateAgentSheetSource(
     .run();
 
   return getAgentSheetSourceById(db, input.id);
+}
+
+export function normalizeSheetTabSelections(
+  selectedTabs: Array<{ gid?: number | null; title: string }>
+): Array<{ sheetTabName: string | null; sheetGid: number | null }> {
+  return selectedTabs.map((tab) => ({
+    sheetTabName: tab.title.trim(),
+    sheetGid: tab.gid ?? null,
+  }));
 }
 
 export async function getSheetControlOverview(db: D1Database): Promise<SheetControlOverview> {
@@ -663,8 +732,8 @@ export async function approveSheetSubmissionRow(input: {
     .run();
 
   const cache = new CacheService(input.kv);
-  await cache.deletePageData(source.agent_slug, row.asin);
-  await cache.deleteRedirectUrl(source.agent_slug, row.asin);
+  await cache.deletePageData(source.agent_slug, row.asin, row.marketplace || undefined);
+  await cache.deleteRedirectUrl(source.agent_slug, row.asin, row.marketplace || undefined);
   await cache.invalidateForProduct(row.asin);
 
   const updated = await listSheetSubmissionRows(input.db, { status: "all" });
@@ -1047,7 +1116,9 @@ async function getAgentSheetSourceById(
          a.name AS agent_name,
          a.slug AS agent_slug,
          ass.sheet_url,
+         ass.spreadsheet_id,
          ass.sheet_tab_name,
+         ass.sheet_gid,
          ass.is_active,
          ass.auto_approve_clean_rows,
          ass.last_synced_at,
@@ -1083,7 +1154,9 @@ async function loadSourceRows(db: D1Database, sourceId?: number): Promise<Source
          a.name AS agent_name,
          a.slug AS agent_slug,
          ass.sheet_url,
+         ass.spreadsheet_id,
          ass.sheet_tab_name,
+         ass.sheet_gid,
          ass.is_active,
          ass.auto_approve_clean_rows
        FROM agent_sheet_sources ass
@@ -1095,7 +1168,9 @@ async function loadSourceRows(db: D1Database, sourceId?: number): Promise<Source
          a.name AS agent_name,
          a.slug AS agent_slug,
          ass.sheet_url,
+         ass.spreadsheet_id,
          ass.sheet_tab_name,
+         ass.sheet_gid,
          ass.is_active,
          ass.auto_approve_clean_rows
        FROM agent_sheet_sources ass

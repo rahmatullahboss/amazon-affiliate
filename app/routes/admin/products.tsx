@@ -84,6 +84,8 @@ interface SyncSummary {
 }
 
 const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
+const PRODUCT_MARKETPLACE_FILTERS = ["ALL", ...MARKETPLACES] as const;
+type ProductMarketplaceFilter = (typeof PRODUCT_MARKETPLACE_FILTERS)[number];
 const getToken = () => getAuthToken();
 const PRODUCT_PAGE_SIZE = 12;
 
@@ -133,7 +135,11 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [fetching, setFetching] = useState(false);
   const [refreshingProductId, setRefreshingProductId] = useState<number | null>(null);
+  const [regeneratingProductId, setRegeneratingProductId] = useState<number | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
+  const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
+  const [bulkRegenerating, setBulkRegenerating] = useState(false);
+  const [marketplaceFilter, setMarketplaceFilter] = useState<ProductMarketplaceFilter>("ALL");
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -162,12 +168,16 @@ export default function ProductsPage() {
     void Promise.all([fetchProducts(1), fetchSheetConfig()]);
   }, []);
 
-  async function fetchProducts(page = productPagination.page) {
+  async function fetchProducts(
+    page = productPagination.page,
+    selectedMarketplace: ProductMarketplaceFilter = marketplaceFilter
+  ) {
     setLoading(true);
     try {
       const query = new URLSearchParams({
         page: String(page),
         pageSize: String(PRODUCT_PAGE_SIZE),
+        marketplace: selectedMarketplace,
       });
       const response = await fetch(`/api/products?${query.toString()}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
@@ -177,6 +187,7 @@ export default function ProductsPage() {
         setProducts(data.products);
         setProductSummary(data.summary);
         setProductPagination(data.pagination);
+        setSelectedProductIds([]);
       }
     } catch (requestError) {
       console.error(requestError);
@@ -309,6 +320,108 @@ export default function ProductsPage() {
     } finally {
       setDeletingProductId(null);
     }
+  }
+
+  async function handleRegenerateContent(productId: number) {
+    setRegeneratingProductId(productId);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/products/${productId}/regenerate-content`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          Origin: window.location.origin,
+        },
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "Failed to regenerate content");
+      }
+
+      setSheetMessage(payload.message || "Product content regenerated.");
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to regenerate content"
+      );
+    } finally {
+      setRegeneratingProductId(null);
+    }
+  }
+
+  async function handleBulkRegenerateContent() {
+    setBulkRegenerating(true);
+    setError("");
+
+    try {
+      const isFilterScopeRun = selectedProductIds.length === 0;
+      if (isFilterScopeRun) {
+        const confirmMessage =
+          marketplaceFilter === "ALL"
+            ? "Regenerate content for all products?"
+            : `Regenerate content for all ${marketplaceFilter} products in the current filter?`;
+        if (!window.confirm(confirmMessage)) {
+          setBulkRegenerating(false);
+          return;
+        }
+      }
+
+      const response = await fetch("/api/products/regenerate-content", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+          Origin: window.location.origin,
+        },
+        body: JSON.stringify(
+          selectedProductIds.length > 0
+            ? { productIds: selectedProductIds }
+            : { marketplace: marketplaceFilter }
+        ),
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "Failed to regenerate selected products");
+      }
+
+      setSheetMessage(
+        payload.message ||
+          (selectedProductIds.length > 0
+            ? "Selected product content regenerated."
+            : "Filtered product content regenerated.")
+      );
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to regenerate selected products"
+      );
+    } finally {
+      setBulkRegenerating(false);
+    }
+  }
+
+  const allVisibleSelected =
+    products.length > 0 && products.every((product) => selectedProductIds.includes(product.id));
+  const canBulkRegenerate =
+    !bulkRegenerating && (selectedProductIds.length > 0 || productPagination.totalItems > 0);
+
+  function toggleVisibleSelection(checked: boolean) {
+    setSelectedProductIds(checked ? products.map((product) => product.id) : []);
+  }
+
+  function toggleProductSelection(productId: number, checked: boolean) {
+    setSelectedProductIds((current) =>
+      checked ? [...new Set([...current, productId])] : current.filter((id) => id !== productId)
+    );
   }
 
   async function handleManualSubmit(event: React.FormEvent) {
@@ -551,6 +664,23 @@ export default function ProductsPage() {
           Products
         </h1>
         <div className="flex flex-wrap gap-3">
+          <button
+            onClick={() => void handleBulkRegenerateContent()}
+            disabled={!canBulkRegenerate}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              !canBulkRegenerate
+                ? "bg-white/5 border border-white/10 text-[#6b6b85] cursor-not-allowed"
+                : "bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-500/20"
+            }`}
+          >
+            {bulkRegenerating
+              ? "Regenerating..."
+              : selectedProductIds.length > 0
+                ? `Bulk Regenerate (${selectedProductIds.length})`
+                : marketplaceFilter === "ALL"
+                  ? "Regenerate All Products"
+                  : `Regenerate All ${marketplaceFilter}`}
+          </button>
           <button onClick={() => void handleExport()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
             📥 Export CSV
           </button>
@@ -1028,9 +1158,43 @@ export default function ProductsPage() {
               </div>
             ))}
           </div>
-          <p className="text-[#6b6b85] text-sm mb-4 m-0">
-            Showing {products.length} of {productPagination.totalItems} products
-          </p>
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4 mb-4">
+            <div className="flex flex-col gap-3">
+              <p className="text-[#6b6b85] text-sm m-0">
+                Showing {products.length} of {productPagination.totalItems} products
+                {marketplaceFilter !== "ALL" ? ` in ${marketplaceFilter}` : ""}
+              </p>
+              <label className="inline-flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
+                  checked={allVisibleSelected}
+                  onChange={(event) => toggleVisibleSelection(event.target.checked)}
+                />
+                Select all visible
+              </label>
+            </div>
+            <div className="flex flex-col gap-2 min-w-[180px]">
+              <label className="text-xs uppercase tracking-[0.16em] text-[#8d8da6]">
+                Marketplace Filter
+              </label>
+              <select
+                value={marketplaceFilter}
+                onChange={(event) => {
+                  const nextFilter = event.target.value as ProductMarketplaceFilter;
+                  setMarketplaceFilter(nextFilter);
+                  void fetchProducts(1, nextFilter);
+                }}
+                className="px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+              >
+                {PRODUCT_MARKETPLACE_FILTERS.map((marketplace) => (
+                  <option key={marketplace} value={marketplace}>
+                    {marketplace === "ALL" ? "All marketplaces" : marketplace}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           >
@@ -1039,6 +1203,15 @@ export default function ProductsPage() {
                 key={product.id}
                 className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 flex flex-col gap-3"
               >
+                <label className="inline-flex items-center gap-2 text-xs text-[#a0a0b8]">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
+                    checked={selectedProductIds.includes(product.id)}
+                    onChange={(event) => toggleProductSelection(product.id, event.target.checked)}
+                  />
+                  Select
+                </label>
                 <div
                   className="w-full aspect-square bg-white rounded-xl flex items-center justify-center overflow-hidden"
                 >
@@ -1073,8 +1246,28 @@ export default function ProductsPage() {
                 </div>
                 <div className="mt-auto grid grid-cols-1 gap-2">
                   <button
+                    onClick={() => void handleRegenerateContent(product.id)}
+                    disabled={
+                      regeneratingProductId === product.id ||
+                      refreshingProductId === product.id ||
+                      deletingProductId === product.id
+                    }
+                    className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                      regeneratingProductId === product.id
+                        ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                        : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
+                    }`}
+                  >
+                    {regeneratingProductId === product.id ? "Regenerating..." : "Regenerate Content"}
+                  </button>
+                  <button
                     onClick={() => void handleProductRefresh(product.id)}
-                    disabled={refreshingProductId === product.id || deletingProductId === product.id || !ASIN_IMPORT_ENABLED}
+                    disabled={
+                      refreshingProductId === product.id ||
+                      deletingProductId === product.id ||
+                      regeneratingProductId === product.id ||
+                      !ASIN_IMPORT_ENABLED
+                    }
                     className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
                       refreshingProductId === product.id || !ASIN_IMPORT_ENABLED
                         ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
@@ -1085,7 +1278,11 @@ export default function ProductsPage() {
                   </button>
                   <button
                     onClick={() => void handleProductDelete(product.id)}
-                    disabled={deletingProductId === product.id || refreshingProductId === product.id}
+                    disabled={
+                      deletingProductId === product.id ||
+                      refreshingProductId === product.id ||
+                      regeneratingProductId === product.id
+                    }
                     className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
                       deletingProductId === product.id
                         ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"

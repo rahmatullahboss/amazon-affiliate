@@ -1,4 +1,8 @@
 import { AMAZON_DOMAINS } from "../utils/types";
+import {
+  buildProductEditorialReview,
+  EDITORIAL_VARIANT_COUNT,
+} from "./product-editorial";
 
 interface AmazonProductData {
   title: string;
@@ -10,7 +14,7 @@ interface AmazonProductData {
   aplusImages: string[];
 }
 
-interface ProductRecord {
+export interface ProductRecord {
   id: number;
   asin: string;
   title: string;
@@ -247,43 +251,56 @@ export function getAmazonProductFetchErrorMessage(error: unknown): string {
   }
 }
 
-function buildEditorialReviewContent(input: {
-  title: string;
-  category: string | null;
-  description: string | null;
-  features: string[];
-}): string | null {
-  const lines: string[] = [];
-  const cleanDescription = input.description?.trim() || "";
-  const primaryFeatures = input.features
-    .map((feature) => feature.trim())
-    .filter((feature) => feature.length > 0)
-    .slice(0, 4);
-
-  if (cleanDescription) {
-    lines.push(cleanDescription);
-  } else if (primaryFeatures.length > 0) {
-    lines.push(
-      `${input.title} is positioned as a practical ${input.category?.toLowerCase() || "Amazon"} pick with a focus on the features highlighted below.`
-    );
+function parseFeatureList(raw: string | null | undefined): string[] {
+  if (!raw) {
+    return [];
   }
 
-  if (primaryFeatures.length > 0) {
-    lines.push("What stands out:");
-    for (const feature of primaryFeatures) {
-      lines.push(`• ${feature}`);
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((item): item is string => typeof item === "string");
+  } catch {
+    return [];
+  }
+}
+
+function buildNextEditorialReviewContent(product: ProductRecord): string | null {
+  const features = parseFeatureList(product.features);
+  const currentReview = product.review_content?.trim() || null;
+
+  for (let variantOffset = 0; variantOffset < EDITORIAL_VARIANT_COUNT; variantOffset += 1) {
+    const nextReview = buildProductEditorialReview({
+      asin: product.asin,
+      marketplace: product.marketplace,
+      title: product.title,
+      category: product.category ?? null,
+      description: product.description ?? null,
+      features,
+      variantOffset,
+    });
+
+    if (variantOffset === 0 && !currentReview) {
+      return nextReview;
+    }
+
+    if (nextReview !== currentReview) {
+      return nextReview;
     }
   }
 
-  if (lines.length === 0) {
-    return null;
-  }
-
-  lines.push(
-    "Check Amazon for the latest pricing, delivery details, and customer review context before ordering."
-  );
-
-  return lines.join("\n");
+  return buildProductEditorialReview({
+    asin: product.asin,
+    marketplace: product.marketplace,
+    title: product.title,
+    category: product.category ?? null,
+    description: product.description ?? null,
+    features,
+    variantOffset: 0,
+  });
 }
 
 export async function fetchAmazonProductData(
@@ -472,7 +489,9 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       explicitFeatures ?? (resolvedFeatures.length ? JSON.stringify(resolvedFeatures) : null);
     const productImages = explicitProductImages ?? (fetched?.productImages?.length ? JSON.stringify(fetched.productImages) : null);
     const aplusImages = explicitAplusImages ?? (fetched?.aplusImages?.length ? JSON.stringify(fetched.aplusImages) : null);
-    const reviewContent = buildEditorialReviewContent({
+    const reviewContent = buildProductEditorialReview({
+      asin,
+      marketplace,
       title,
       category,
       description,
@@ -550,7 +569,9 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       input.title !== undefined ||
       input.category !== undefined
     ) {
-      const resolvedReviewContent = buildEditorialReviewContent({
+      const resolvedReviewContent = buildProductEditorialReview({
+        asin: product.asin,
+        marketplace: product.marketplace,
         title: explicitTitle || product.title,
         category:
           input.category !== undefined
@@ -563,16 +584,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
         features:
           input.features !== undefined
             ? input.features ?? []
-            : (() => {
-                try {
-                  const parsed = JSON.parse(product.features || "[]") as unknown;
-                  return Array.isArray(parsed)
-                    ? parsed.filter((item): item is string => typeof item === "string")
-                    : [];
-                } catch {
-                  return [];
-                }
-              })(),
+            : parseFeatureList(product.features),
       });
       updates.push("review_content = ?");
       values.push(resolvedReviewContent);
@@ -647,6 +659,51 @@ export async function refreshProductRecord(input: {
     updateExistingFromInput: true,
     requireRealProductData: true,
   });
+}
+
+export async function regenerateProductEditorialContent(input: {
+  db: D1Database;
+  productId: number;
+}): Promise<ProductRecord> {
+  const product = await input.db
+    .prepare(
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+       FROM products
+       WHERE id = ?`
+    )
+    .bind(input.productId)
+    .first<ProductRecord>();
+
+  if (!product) {
+    throw new Error("Product not found");
+  }
+
+  const reviewContent = buildNextEditorialReviewContent(product);
+
+  await input.db
+    .prepare(
+      `UPDATE products
+       SET review_content = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+    .bind(reviewContent, product.id)
+    .run();
+
+  const updated = await input.db
+    .prepare(
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+       FROM products
+       WHERE id = ?`
+    )
+    .bind(product.id)
+    .first<ProductRecord>();
+
+  if (!updated) {
+    throw new Error("Product regeneration failed unexpectedly");
+  }
+
+  return updated;
 }
 
 export function parseSheetProductRow(

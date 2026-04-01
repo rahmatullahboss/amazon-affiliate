@@ -2,7 +2,11 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { ASIN_IMPORT_ENABLED, ASIN_IMPORT_PAUSED_MESSAGE } from '../utils/asin-import';
+import {
+  ASIN_IMPORT_ENABLED,
+  ASIN_IMPORT_PAUSED_MESSAGE,
+  BATCH_ASIN_IMPORT_ENABLED,
+} from '../utils/asin-import';
 import { portalAsinSubmissionSchema, portalTrackingReplaceDeleteSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import {
@@ -10,7 +14,12 @@ import {
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
 } from '../services/product-ingestion';
-import { getPublicAppOrigin } from '../utils/url';
+import {
+  buildCanonicalBridgeUrl,
+  buildCanonicalRedirectUrl,
+  getPublicAppOrigin,
+} from '../utils/url';
+import { getPublicSlugForTracking } from '../services/public-slugs';
 
 const portal = new Hono<AppEnv>();
 
@@ -93,20 +102,21 @@ portal.get('/me', async (c) => {
 portal.get('/products', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAgentRole = role === 'agent';
 
-  if (role === 'agent' && !agentId) {
+  if (isAgentRole && !agentId) {
     throw new HTTPException(403, { message: 'Agent account is not linked to an agent profile' });
   }
 
-  const bindings = role === 'agent' ? [agentId] : [];
-  const whereClause = role === 'agent' ? 'WHERE ap.agent_id = ?' : '';
+  const bindings = isAgentRole ? [agentId] : [];
+  const whereClause = isAgentRole ? 'WHERE ap.agent_id = ?' : '';
   const origin = getPublicAppOrigin(c.req.url, c.env);
 
   const { results } = await c.env.DB.prepare(
     `SELECT ap.id, ap.custom_title, ap.created_at, ap.updated_at,
             p.id as product_id, p.asin, p.marketplace, p.title, p.image_url, p.status,
             a.id as agent_id, a.name as agent_name, a.slug as agent_slug,
-            t.tag as tracking_tag
+            t.id as tracking_id
      FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
      JOIN agents a ON a.id = ap.agent_id
@@ -118,30 +128,59 @@ portal.get('/products', async (c) => {
     .all();
 
   return c.json({
-    products: (results ?? []).map((product) => ({
-      ...product,
-      bridge_page_url: `${origin}/${product.agent_slug}/${product.asin}`,
-      redirect_url: `${origin}/go/${product.agent_slug}/${product.asin}`,
-    })),
+    products: await Promise.all(
+      (results ?? []).map(async (product) => {
+        const publicSlug = await getPublicSlugForTracking({
+          db: c.env.DB,
+          agentId: Number(product.agent_id),
+          trackingId: Number(product.tracking_id),
+          marketplace: String(product.marketplace),
+          fallbackSlug: String(product.agent_slug),
+        });
+
+        return {
+          ...product,
+          bridge_page_url: buildCanonicalBridgeUrl(
+            origin,
+            publicSlug,
+            String(product.asin),
+            String(product.marketplace)
+          ),
+          redirect_url: buildCanonicalRedirectUrl(
+            origin,
+            publicSlug,
+            String(product.asin),
+            String(product.marketplace)
+          ),
+        };
+      })
+    ),
+    importCapabilities: {
+      newAsinImportEnabled: ASIN_IMPORT_ENABLED,
+      batchAsinImportEnabled: BATCH_ASIN_IMPORT_ENABLED,
+    },
+    canSubmit: isAgentRole,
   });
 });
 
 portal.get('/links', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAgentRole = role === 'agent';
 
-  if (role === 'agent' && !agentId) {
+  if (isAgentRole && !agentId) {
     throw new HTTPException(403, { message: 'Agent account is not linked to an agent profile' });
   }
 
-  const bindings = role === 'agent' ? [agentId] : [];
-  const whereClause = role === 'agent' ? 'WHERE ap.agent_id = ?' : '';
+  const bindings = isAgentRole ? [agentId] : [];
+  const whereClause = isAgentRole ? 'WHERE ap.agent_id = ?' : '';
   const origin = getPublicAppOrigin(c.req.url, c.env);
 
   const { results } = await c.env.DB.prepare(
-    `SELECT a.slug as agent_slug, a.name as agent_name,
+    `SELECT a.slug as agent_slug, a.id as agent_id, a.name as agent_name,
+            t.id as tracking_id,
             p.asin, p.marketplace, p.title, p.image_url,
-            ap.custom_title, t.tag as tracking_tag
+            ap.custom_title
      FROM agent_products ap
      JOIN agents a ON a.id = ap.agent_id
      JOIN products p ON p.id = ap.product_id
@@ -152,170 +191,245 @@ portal.get('/links', async (c) => {
     .bind(...bindings)
     .all<{
       agent_slug: string;
+      agent_id: number;
       agent_name: string;
+      tracking_id: number;
       asin: string;
       marketplace: string;
       title: string;
       image_url: string;
       custom_title: string | null;
-      tracking_tag: string;
     }>();
 
-  const links = (results ?? []).map((row) => ({
-    agentSlug: row.agent_slug,
-    agentName: row.agent_name,
-    asin: row.asin,
-    marketplace: row.marketplace,
-    title: row.custom_title || row.title,
-    imageUrl: row.image_url,
-    trackingTag: row.tracking_tag,
-    bridgePageUrl: `${origin}/${row.agent_slug}/${row.asin}`,
-    redirectUrl: `${origin}/go/${row.agent_slug}/${row.asin}`,
-  }));
+  return c.json({
+    links: await Promise.all(
+      (results ?? []).map(async (row) => {
+        const publicSlug = await getPublicSlugForTracking({
+          db: c.env.DB,
+          agentId: row.agent_id,
+          trackingId: row.tracking_id,
+          marketplace: row.marketplace,
+          fallbackSlug: row.agent_slug,
+        });
 
-  const { results: dynamicBridgeResults } = await c.env.DB.prepare(
-    `SELECT DISTINCT a.slug as agent_slug, a.name as agent_name
-     FROM tracking_ids t
-     JOIN agents a ON a.id = t.agent_id
-     ${role === 'agent' ? 'WHERE a.id = ?' : 'WHERE 1 = 1'}
-       AND t.is_active = 1
-       AND a.is_active = 1
-     ORDER BY a.name ASC`
-  )
-    .bind(...bindings)
-    .all<{
-      agent_slug: string;
-      agent_name: string;
-    }>();
-
-  const dynamicBridgeTemplates = (dynamicBridgeResults ?? []).map((row) => ({
-    agentSlug: row.agent_slug,
-    agentName: row.agent_name,
-    bridgeTemplateUrl: `${origin}/${row.agent_slug}/{ASIN}`,
-  }));
-
-  return c.json({ links, dynamicBridgeTemplates });
+        return {
+          agentSlug: publicSlug,
+          agentName: row.agent_name,
+          asin: row.asin,
+          marketplace: row.marketplace,
+          title: row.custom_title || row.title,
+          imageUrl: row.image_url,
+          bridgePageUrl: buildCanonicalBridgeUrl(origin, publicSlug, row.asin, row.marketplace),
+          redirectUrl: buildCanonicalRedirectUrl(origin, publicSlug, row.asin, row.marketplace),
+        };
+      })
+    ),
+  });
 });
 
 portal.get('/performance', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAgentRole = role === 'agent';
 
-  if (role !== 'agent' || !agentId) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can view performance' });
+  if (isAgentRole && !agentId) {
+    throw new HTTPException(403, { message: 'Agent account is not linked to an agent profile' });
   }
 
-  const [clicks, views, topProducts, salesTotals, recentClicks, marketplaceBreakdown, tagBreakdown] = await Promise.all([
-    c.env.DB.prepare('SELECT COUNT(*) as count FROM clicks WHERE agent_id = ?')
-      .bind(agentId)
-      .first<{ count: number }>(),
-    c.env.DB.prepare('SELECT COUNT(*) as count FROM page_views WHERE agent_id = ?')
-      .bind(agentId)
-      .first<{ count: number }>(),
-    c.env.DB.prepare(
-      `SELECT p.asin, p.title, COUNT(c.id) as clicks
-       FROM clicks c
-       JOIN products p ON p.id = c.product_id
-       WHERE c.agent_id = ?
-       GROUP BY p.id
-       ORDER BY clicks DESC
-       LIMIT 8`
-    )
-      .bind(agentId)
-      .all<{ asin: string; title: string; clicks: number }>(),
-    c.env.DB.prepare(
-      `SELECT
-         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
-         COALESCE(
-           SUM(
-             CASE
-               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
-               ELSE 0
-             END
-           ),
-           0
-         ) as returned_items,
-         COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount,
-         COALESCE(SUM(ac.commission_amount), 0) as commission_amount
-       FROM amazon_conversions ac
-       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
-       WHERE t.agent_id = ?`
-    )
-      .bind(agentId)
-      .first<{
-        ordered_items: number;
-        returned_items: number;
-        revenue_amount: number;
-        commission_amount: number;
-      }>(),
-    c.env.DB.prepare(
-      `SELECT tracking_tag, country, clicked_at
-       FROM clicks
-       WHERE agent_id = ?
-       ORDER BY clicked_at DESC
-       LIMIT 20`
-    )
-      .bind(agentId)
-      .all<{ tracking_tag: string; country: string | null; clicked_at: string }>(),
-    c.env.DB.prepare(
-      `SELECT
-         ac.marketplace as marketplace,
-         (
-           SELECT COUNT(*)
+  const [clicks, views, topProducts, salesTotals, recentClicks, marketplaceBreakdown, tagBreakdown] = isAgentRole
+    ? await Promise.all([
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM clicks WHERE agent_id = ?')
+          .bind(agentId)
+          .first<{ count: number }>(),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM page_views WHERE agent_id = ?')
+          .bind(agentId)
+          .first<{ count: number }>(),
+        c.env.DB.prepare(
+          `SELECT p.asin, p.title, COUNT(c.id) as clicks
            FROM clicks c
-           JOIN tracking_ids tc ON tc.tag = c.tracking_tag
-           WHERE tc.agent_id = ?
-             AND tc.marketplace = ac.marketplace
-             AND c.agent_id = ?
-         ) as clicks,
-         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
-         COALESCE(
-           SUM(
-             CASE
-               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
-               ELSE 0
-             END
-           ),
-           0
-         ) as returned_items
-       FROM amazon_conversions ac
-       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
-       WHERE t.agent_id = ?
-       GROUP BY ac.marketplace
-       ORDER BY ordered_items DESC, ac.marketplace ASC`
-    )
-      .bind(agentId, agentId, agentId)
-      .all<{ marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
-    c.env.DB.prepare(
-      `SELECT
-         t.tag as tag,
-         t.marketplace as marketplace,
-         (
-           SELECT COUNT(*)
-           FROM clicks c
+           JOIN products p ON p.id = c.product_id
            WHERE c.agent_id = ?
-             AND c.tracking_tag = t.tag
-         ) as clicks,
-         COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
-         COALESCE(
-           SUM(
-             CASE
-               WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
-               ELSE 0
-             END
-           ),
-           0
-         ) as returned_items
-       FROM tracking_ids t
-       LEFT JOIN amazon_conversions ac
-         ON ac.tracking_tag = t.tag AND ac.marketplace = t.marketplace
-       WHERE t.agent_id = ?
-       GROUP BY t.id
-       ORDER BY ordered_items DESC, t.marketplace ASC, t.tag ASC`
-    )
-      .bind(agentId, agentId)
-      .all<{ tag: string; marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
-  ]);
+           GROUP BY p.id
+           ORDER BY clicks DESC
+           LIMIT 8`
+        )
+          .bind(agentId)
+          .all<{ asin: string; title: string; clicks: number }>(),
+        c.env.DB.prepare(
+          `SELECT
+             COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items,
+             COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount,
+             COALESCE(SUM(ac.commission_amount), 0) as commission_amount
+           FROM amazon_conversions ac
+           JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+           WHERE t.agent_id = ?`
+        )
+          .bind(agentId)
+          .first<{
+            ordered_items: number;
+            returned_items: number;
+            revenue_amount: number;
+            commission_amount: number;
+          }>(),
+        c.env.DB.prepare(
+          `SELECT tracking_tag, country, clicked_at
+           FROM clicks
+           WHERE agent_id = ?
+           ORDER BY clicked_at DESC
+           LIMIT 20`
+        )
+          .bind(agentId)
+          .all<{ tracking_tag: string; country: string | null; clicked_at: string }>(),
+        c.env.DB.prepare(
+          `SELECT
+             ac.marketplace as marketplace,
+             (
+               SELECT COUNT(*)
+               FROM clicks c
+               JOIN tracking_ids tc ON tc.tag = c.tracking_tag
+               WHERE tc.agent_id = ?
+                 AND tc.marketplace = ac.marketplace
+                 AND c.agent_id = ?
+             ) as clicks,
+             COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items
+           FROM amazon_conversions ac
+           JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+           WHERE t.agent_id = ?
+           GROUP BY ac.marketplace
+           ORDER BY ordered_items DESC, ac.marketplace ASC`
+        )
+          .bind(agentId, agentId, agentId)
+          .all<{ marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
+        c.env.DB.prepare(
+          `SELECT
+             t.tag as tag,
+             t.marketplace as marketplace,
+             (
+               SELECT COUNT(*)
+               FROM clicks c
+               WHERE c.agent_id = ?
+                 AND c.tracking_tag = t.tag
+             ) as clicks,
+             COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items
+           FROM tracking_ids t
+           LEFT JOIN amazon_conversions ac
+             ON ac.tracking_tag = t.tag AND ac.marketplace = t.marketplace
+           WHERE t.agent_id = ?
+           GROUP BY t.id
+           ORDER BY ordered_items DESC, t.marketplace ASC, t.tag ASC`
+        )
+          .bind(agentId, agentId)
+          .all<{ tag: string; marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
+      ])
+    : await Promise.all([
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM clicks').first<{ count: number }>(),
+        c.env.DB.prepare('SELECT COUNT(*) as count FROM page_views').first<{ count: number }>(),
+        c.env.DB.prepare(
+          `SELECT p.asin, p.title, COUNT(c.id) as clicks
+           FROM clicks c
+           JOIN products p ON p.id = c.product_id
+           GROUP BY p.id
+           ORDER BY clicks DESC
+           LIMIT 8`
+        ).all<{ asin: string; title: string; clicks: number }>(),
+        c.env.DB.prepare(
+          `SELECT
+             COALESCE(SUM(ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ordered_items > shipped_items THEN ordered_items - shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items,
+             COALESCE(SUM(revenue_amount), 0) as revenue_amount,
+             COALESCE(SUM(commission_amount), 0) as commission_amount
+           FROM amazon_conversions`
+        ).first<{
+          ordered_items: number;
+          returned_items: number;
+          revenue_amount: number;
+          commission_amount: number;
+        }>(),
+        c.env.DB.prepare(
+          `SELECT tracking_tag, country, clicked_at
+           FROM clicks
+           ORDER BY clicked_at DESC
+           LIMIT 20`
+        ).all<{ tracking_tag: string; country: string | null; clicked_at: string }>(),
+        c.env.DB.prepare(
+          `SELECT
+             ac.marketplace as marketplace,
+             0 as clicks,
+             COALESCE(SUM(ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ordered_items > shipped_items THEN ordered_items - shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items
+           FROM amazon_conversions ac
+           GROUP BY ac.marketplace
+           ORDER BY ordered_items DESC, ac.marketplace ASC`
+        ).all<{ marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
+        c.env.DB.prepare(
+          `SELECT
+             t.tag as tag,
+             t.marketplace as marketplace,
+             (
+               SELECT COUNT(*)
+               FROM clicks c
+               WHERE c.tracking_tag = t.tag
+             ) as clicks,
+             COALESCE(SUM(ac.ordered_items), 0) as ordered_items,
+             COALESCE(
+               SUM(
+                 CASE
+                   WHEN ac.ordered_items > ac.shipped_items THEN ac.ordered_items - ac.shipped_items
+                   ELSE 0
+                 END
+               ),
+               0
+             ) as returned_items
+           FROM tracking_ids t
+           LEFT JOIN amazon_conversions ac
+             ON ac.tracking_tag = t.tag AND ac.marketplace = t.marketplace
+           GROUP BY t.id
+           ORDER BY ordered_items DESC, t.marketplace ASC, t.tag ASC`
+        ).all<{ tag: string; marketplace: string; clicks: number; ordered_items: number; returned_items: number }>(),
+      ]);
 
   const totalClicks = clicks?.count ?? 0;
   const totalViews = views?.count ?? 0;
@@ -338,25 +452,31 @@ portal.get('/performance', async (c) => {
 portal.get('/tracking', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAdminRole = role === 'admin' || role === 'super_admin';
 
-  if (role !== 'agent' || !agentId) {
+  if (!isAdminRole && (role !== 'agent' || !agentId)) {
     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
   const { results } = await c.env.DB.prepare(
-    `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at,
+    `SELECT tracking_ids.id, tracking_ids.agent_id, tracking_ids.tag, tracking_ids.label,
+            tracking_ids.marketplace, tracking_ids.is_default, tracking_ids.is_active,
+            tracking_ids.is_portal_editable, tracking_ids.created_at,
+            a.name as agent_name, a.slug as agent_slug,
             (
               SELECT COUNT(*)
               FROM agent_products ap
               WHERE ap.tracking_id = tracking_ids.id
             ) as usage_count
      FROM tracking_ids
-     WHERE agent_id = ?
-     ORDER BY marketplace ASC, is_default DESC, created_at ASC`
+     JOIN agents a ON a.id = tracking_ids.agent_id
+     ${isAdminRole ? '' : 'WHERE agent_id = ?'}
+     ORDER BY ${isAdminRole ? 'a.name ASC,' : ''} tracking_ids.marketplace ASC, tracking_ids.is_default DESC, tracking_ids.created_at ASC`
   )
-    .bind(agentId)
+    .bind(...(isAdminRole ? [] : [agentId]))
     .all<{
       id: number;
+      agent_id: number;
       tag: string;
       label: string | null;
       marketplace: string;
@@ -364,10 +484,12 @@ portal.get('/tracking', async (c) => {
       is_active: number;
       is_portal_editable: number;
       created_at: string;
+      agent_name: string;
+      agent_slug: string;
       usage_count: number;
     }>();
 
-  return c.json({ trackingIds: results ?? [] });
+  return c.json({ trackingIds: results ?? [], canCreate: !isAdminRole });
 });
 
 portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c) => {
@@ -381,6 +503,25 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
   const body = c.req.valid('json');
 
   try {
+    const existingPortalTag = await c.env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE agent_id = ?
+         AND marketplace = ?
+         AND is_active = 1
+         AND is_portal_editable = 1
+       LIMIT 1`
+    )
+      .bind(agentId, body.marketplace)
+      .first<{ id: number }>();
+
+    if (existingPortalTag) {
+      throw new HTTPException(409, {
+        message:
+          'You already have a tag for this marketplace. Ask admin if you need extra same-country tags for sub-agents.',
+      });
+    }
+
     const marketplaceTagCount = await c.env.DB.prepare(
       `SELECT COUNT(*) AS count
        FROM tracking_ids
@@ -435,9 +576,10 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
 portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAdminRole = role === 'admin' || role === 'super_admin';
   const id = Number.parseInt(c.req.param('id'), 10);
 
-  if (role !== 'agent' || !agentId) {
+  if (!isAdminRole && (role !== 'agent' || !agentId)) {
     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
@@ -448,12 +590,12 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
   const body = c.req.valid('json');
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace, is_portal_editable
+    `SELECT id, agent_id, marketplace, is_portal_editable
      FROM tracking_ids
-     WHERE id = ? AND agent_id = ?`
+     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
   )
-    .bind(id, agentId)
-    .first<{ id: number; marketplace: string; is_portal_editable: number }>();
+    .bind(...(isAdminRole ? [id] : [id, agentId]))
+    .first<{ id: number; agent_id: number; marketplace: string; is_portal_editable: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
@@ -469,9 +611,9 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
     await c.env.DB.prepare(
       `UPDATE tracking_ids
        SET tag = ?, label = ?, is_active = 1
-       WHERE id = ? AND agent_id = ?`
+       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
     )
-      .bind(body.tag, body.label || null, id, agentId)
+      .bind(...(isAdminRole ? [body.tag, body.label || null, id] : [body.tag, body.label || null, id, agentId]))
       .run();
 
     const trackingId = await c.env.DB.prepare(
@@ -479,10 +621,10 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
        FROM tracking_ids
        WHERE id = ? AND agent_id = ?`
     )
-      .bind(id, agentId)
+      .bind(...(isAdminRole ? [id] : [id, agentId]))
       .first();
 
-    await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace);
+    await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace);
 
     return c.json({ trackingId, message: 'Tag updated successfully' });
   } catch (error: unknown) {
@@ -500,9 +642,10 @@ portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async
 portal.post('/tracking/:id/default', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAdminRole = role === 'admin' || role === 'super_admin';
   const id = Number.parseInt(c.req.param('id'), 10);
 
-  if (role !== 'agent' || !agentId) {
+  if (!isAdminRole && (role !== 'agent' || !agentId)) {
     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
@@ -511,12 +654,12 @@ portal.post('/tracking/:id/default', async (c) => {
   }
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace, is_portal_editable
+    `SELECT id, agent_id, marketplace, is_portal_editable
      FROM tracking_ids
-     WHERE id = ? AND agent_id = ? AND is_active = 1`
+     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'} AND is_active = 1`
   )
-    .bind(id, agentId)
-    .first<{ id: number; marketplace: string; is_portal_editable: number }>();
+    .bind(...(isAdminRole ? [id] : [id, agentId]))
+    .first<{ id: number; agent_id: number; marketplace: string; is_portal_editable: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
@@ -528,14 +671,14 @@ portal.post('/tracking/:id/default', async (c) => {
     });
   }
 
-  await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace, current.id);
+  await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace, current.id);
 
   const trackingId = await c.env.DB.prepare(
     `SELECT id, tag, label, marketplace, is_default, is_active, created_at
      FROM tracking_ids
      WHERE id = ? AND agent_id = ?`
   )
-    .bind(id, agentId)
+    .bind(...(isAdminRole ? [id] : [id, agentId]))
     .first();
 
   return c.json({ trackingId, message: 'Default tag updated successfully' });
@@ -544,9 +687,10 @@ portal.post('/tracking/:id/default', async (c) => {
 portal.delete('/tracking/:id', async (c) => {
   const role = c.get('userRole');
   const agentId = c.get('agentId');
+  const isAdminRole = role === 'admin' || role === 'super_admin';
   const id = Number.parseInt(c.req.param('id'), 10);
 
-  if (role !== 'agent' || !agentId) {
+  if (!isAdminRole && (role !== 'agent' || !agentId)) {
     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
   }
 
@@ -555,12 +699,12 @@ portal.delete('/tracking/:id', async (c) => {
   }
 
   const current = await c.env.DB.prepare(
-    `SELECT id, marketplace, is_default, is_portal_editable
+    `SELECT id, agent_id, marketplace, is_default, is_portal_editable
      FROM tracking_ids
-     WHERE id = ? AND agent_id = ?`
+     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
   )
-    .bind(id, agentId)
-    .first<{ id: number; marketplace?: string; is_default?: number; is_portal_editable?: number }>();
+    .bind(...(isAdminRole ? [id] : [id, agentId]))
+    .first<{ id: number; agent_id: number; marketplace?: string; is_default?: number; is_portal_editable?: number }>();
 
   if (!current) {
     throw new HTTPException(404, { message: 'Tag not found' });
@@ -594,7 +738,7 @@ portal.delete('/tracking/:id', async (c) => {
   await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
 
   if (current.marketplace) {
-    await ensureMarketplaceDefaultTag(c.env.DB, agentId, current.marketplace);
+    await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace);
   }
 
   return c.json({
@@ -611,9 +755,10 @@ portal.post(
   async (c) => {
     const role = c.get('userRole');
     const agentId = c.get('agentId');
+    const isAdminRole = role === 'admin' || role === 'super_admin';
     const id = Number.parseInt(c.req.param('id'), 10);
 
-    if (role !== 'agent' || !agentId) {
+    if (!isAdminRole && (role !== 'agent' || !agentId)) {
       throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
     }
 
@@ -624,12 +769,12 @@ portal.post(
     const body = c.req.valid('json');
 
     const current = await c.env.DB.prepare(
-      `SELECT id, marketplace, is_default, is_portal_editable
+      `SELECT id, agent_id, marketplace, is_default, is_portal_editable
        FROM tracking_ids
-       WHERE id = ? AND agent_id = ?`
+       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
     )
-      .bind(id, agentId)
-      .first<{ id: number; marketplace: string; is_default: number; is_portal_editable: number }>();
+      .bind(...(isAdminRole ? [id] : [id, agentId]))
+      .first<{ id: number; agent_id: number; marketplace: string; is_default: number; is_portal_editable: number }>();
 
     if (!current) {
       throw new HTTPException(404, { message: 'Tag not found' });
@@ -644,9 +789,9 @@ portal.post(
     const replacement = await c.env.DB.prepare(
       `SELECT id, marketplace
        FROM tracking_ids
-       WHERE id = ? AND agent_id = ? AND is_active = 1`
+       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'} AND is_active = 1`
     )
-      .bind(body.replacement_tracking_id, agentId)
+      .bind(...(isAdminRole ? [body.replacement_tracking_id] : [body.replacement_tracking_id, agentId]))
       .first<{ id: number; marketplace: string }>();
 
     if (!replacement || replacement.id === current.id) {
@@ -672,14 +817,14 @@ portal.post(
        SET tracking_id = ?, updated_at = CURRENT_TIMESTAMP
        WHERE tracking_id = ? AND agent_id = ?`
     )
-      .bind(replacement.id, current.id, agentId)
+      .bind(replacement.id, current.id, current.agent_id)
       .run();
 
     if (current.is_default) {
       await c.env.DB.prepare(
         'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
       )
-        .bind(agentId, current.marketplace)
+        .bind(current.agent_id, current.marketplace)
         .run();
 
       await c.env.DB.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ?')
@@ -805,15 +950,37 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
     .run();
 
   const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.deletePageData(agent.slug, resolvedAsin));
-  c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, resolvedAsin));
+  c.executionCtx.waitUntil(cache.deletePageData(agent.slug, resolvedAsin, marketplace));
+  c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, resolvedAsin, marketplace));
   const origin = getPublicAppOrigin(c.req.url, c.env);
 
   return c.json(
     {
       message: 'Product link is ready.',
-      link: `${origin}/${agent.slug}/${resolvedAsin}`,
-      redirectLink: `${origin}/go/${agent.slug}/${resolvedAsin}`,
+      link: buildCanonicalBridgeUrl(
+        origin,
+        await getPublicSlugForTracking({
+          db: c.env.DB,
+          agentId: agent.id,
+          trackingId: trackingId.id,
+          marketplace,
+          fallbackSlug: agent.slug,
+        }),
+        resolvedAsin,
+        marketplace
+      ),
+      redirectLink: buildCanonicalRedirectUrl(
+        origin,
+        await getPublicSlugForTracking({
+          db: c.env.DB,
+          agentId: agent.id,
+          trackingId: trackingId.id,
+          marketplace,
+          fallbackSlug: agent.slug,
+        }),
+        resolvedAsin,
+        marketplace
+      ),
       status: product.status,
       product: {
         asin: resolvedAsin,

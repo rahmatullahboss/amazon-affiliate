@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 964 notes | Score threshold: >40
+> 1156 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,47 +20,45 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability** — - export default router;
-+ router.get("/blog-images/:key", async (c) =
-- **⚠️ GOTCHA: Added JWT tokens authentication — hardens HTTP security headers** — - 
-+ import blogs from './routes/blogs';
-- const app = new Hono<AppEnv
-- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - import { extractApiErrorMessage } from "../../utils/api-errors";
-+ i
-- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
-+ import {
-
-- **⚠️ GOTCHA: Fixed null crash in Response — prevents brute-force and DoS attacks** — - /**
-+ function createNoindexRedirect(targetUrl: string): Response {
-
-- **⚠️ GOTCHA: Fixed null crash in SELECT — parallelizes async operations for speed** — -   const { results: shortcutResults } = await c.env.DB.prepare(
-+   c
+- **⚠️ GOTCHA: Fixed null crash in Agent — prevents null/undefined runtime crashes** — - import { useState, useEffect } from "react";
++ import { useEffect, u
+- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - 
++ import { filterPortalLinksByMarketplace, getPortalLinkMarketplace
+- **⚠️ GOTCHA: Fixed null crash in HTTPException — parallelizes async operations for speed** — -   if (data.email !== undefined) { updates.push('email = ?'); values.
+- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React** — - 
++ import { copyTextToClipboard } from "../../utils/clipboard";
+- co
+- **⚠️ GOTCHA: Fixed null crash in Authorization** — -   const [form, setForm] = useState({ name: "", slug: "", email: "", 
+- **⚠️ GOTCHA: Fixed null crash in Review — parallelizes async operations for speed** — -     ).first<{
++     )
+-       total_products: number;
++       .bind(
 
 ## Project Standards
 
-- Replaced auth RouteFiles — reduces initial bundle size with code splitting — confirmed 3x
-- Replaced dependency asin-import — confirmed 13x
-- Added JWT tokens authentication — formalizes the data contract with explicit ... — confirmed 3x
-- Fixed null crash in ASIN — parallelizes async operations for speed — confirmed 4x
-- discovery in portal.ts — confirmed 3x
-- Fixed null crash in Skipping — externalizes configuration for environment fle... — confirmed 4x
-- Fixed null crash in Link — offloads heavy computation off the main thread — confirmed 3x
-- Replaced auth Admin — confirmed 3x
+- Fixed null crash in Discovering — confirmed 8x
+- Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x
+- Fixed null crash in CacheService — parallelizes async operations for speed — confirmed 5x
+- what-changed in portal.ts — confirmed 3x
+- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
+- what-changed in tracking.tsx — confirmed 3x
+- Fixed null crash in ImportResult — parallelizes async operations for speed — confirmed 3x
+- what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x
 
 ## Known Fixes
 
 - ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
 - ❌ -     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' }) → ✅ Fixed null crash in Hono — prevents brute-force and DoS attacks
-- ❌ -       if (!res.ok) { const d = await res.json(); throw new Error(d.error); } → ✅ Fixed null crash in Mapping
-- ❌ -     } catch (err) { console.error("Failed to fetch dashboard data:", err); } → ✅ Fixed null crash in Array — prevents null/undefined runtime crashes
+- ❌ copyError: string; → ✅ Fixed null crash in Route — formalizes the data contract with explicit types
+- ❌ -     throw new HTTPException(400, { message: 'Missing agent or ASIN' }); → ✅ Fixed null crash in SELECT — parallelizes async operations for speed
 
 ## Recent Decisions
 
+- Optimized impliedFormat — offloads heavy computation off the main thread
 - decision in Footer.tsx
 - Optimized BlogCard — parallelizes async operations for speed
 - decision in ProductCard.tsx
-- Optimized Content — prevents null/undefined runtime crashes
 
 ## Learned Patterns
 

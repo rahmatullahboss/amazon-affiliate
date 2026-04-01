@@ -553,8 +553,8 @@ async function syncAgentProductRow(input: {
       .bind(agent.id, input.productId, tracking.id, input.customTitle, nextIsActive)
       .run();
 
-    await input.cache.deletePageData(agent.slug, input.asin);
-    await input.cache.deleteRedirectUrl(agent.slug, input.asin);
+    await input.cache.deletePageData(agent.slug, input.asin, input.marketplace);
+    await input.cache.deleteRedirectUrl(agent.slug, input.asin, input.marketplace);
 
     return "created";
   }
@@ -580,8 +580,8 @@ async function syncAgentProductRow(input: {
     .bind(tracking.id, input.customTitle, nextIsActive, existing.id)
     .run();
 
-  await input.cache.deletePageData(agent.slug, input.asin);
-  await input.cache.deleteRedirectUrl(agent.slug, input.asin);
+  await input.cache.deletePageData(agent.slug, input.asin, input.marketplace);
+  await input.cache.deleteRedirectUrl(agent.slug, input.asin, input.marketplace);
 
   return "updated";
 }

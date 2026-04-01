@@ -11,9 +11,11 @@ const tracking = new Hono<AppEnv>();
  */
 tracking.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT t.*, a.name as agent_name, a.slug as agent_slug
+    `SELECT t.*, a.name as agent_name, a.slug as agent_slug, asa.slug as alias_slug
      FROM tracking_ids t
      JOIN agents a ON a.id = t.agent_id
+     LEFT JOIN agent_slug_aliases asa
+       ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
      ORDER BY t.created_at DESC`
   ).all();
 
@@ -58,12 +60,25 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
 
     const trackingId = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE tag = ?')
       .bind(data.tag)
-      .first();
+      .first<{ id: number; agent_id: number; marketplace: string }>();
+
+    if (trackingId && data.alias_slug) {
+      await c.env.DB.prepare(
+        `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
+         VALUES (?, ?, ?, ?, 1)`
+      )
+        .bind(trackingId.agent_id, trackingId.id, trackingId.marketplace, data.alias_slug)
+        .run();
+    }
 
     return c.json({ trackingId, message: 'Tag created' }, 201);
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
-      throw new HTTPException(409, { message: 'Tracking tag already exists' });
+      throw new HTTPException(409, {
+        message: error.message.includes('agent_slug_aliases')
+          ? 'Public slug alias already exists'
+          : 'Tracking tag already exists',
+      });
     }
     throw error;
   }
@@ -76,7 +91,7 @@ tracking.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
-  const body = await c.req.json<{ label?: string; is_default?: boolean; is_active?: boolean }>();
+  const body = await c.req.json<{ label?: string; is_default?: boolean; is_active?: boolean; alias_slug?: string | null }>();
 
   const current = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?')
     .bind(id)
@@ -98,14 +113,55 @@ tracking.put('/:id', async (c) => {
   if (body.is_default !== undefined) { updates.push('is_default = ?'); values.push(body.is_default ? 1 : 0); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
 
-  if (updates.length > 0) {
-    values.push(id);
-    await c.env.DB.prepare(`UPDATE tracking_ids SET ${updates.join(', ')} WHERE id = ?`)
-      .bind(...values)
-      .run();
+  try {
+    if (updates.length > 0) {
+      values.push(id);
+      await c.env.DB.prepare(`UPDATE tracking_ids SET ${updates.join(', ')} WHERE id = ?`)
+        .bind(...values)
+        .run();
+    }
+
+    if (body.alias_slug !== undefined) {
+      const normalizedAliasSlug = body.alias_slug?.trim() || null;
+      if (normalizedAliasSlug) {
+        await c.env.DB.prepare(
+          `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
+           VALUES (?, ?, ?, ?, 1)
+           ON CONFLICT(tracking_id, marketplace) DO UPDATE SET
+             slug = excluded.slug,
+             is_active = 1,
+             updated_at = CURRENT_TIMESTAMP`
+        )
+          .bind(current.agent_id, current.id, current.marketplace, normalizedAliasSlug)
+          .run();
+      } else {
+        await c.env.DB.prepare(
+          `DELETE FROM agent_slug_aliases
+           WHERE tracking_id = ? AND marketplace = ?`
+        )
+          .bind(current.id, current.marketplace)
+          .run();
+      }
+    }
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('UNIQUE')) {
+      throw new HTTPException(409, {
+        message: error.message.includes('agent_slug_aliases')
+          ? 'Public slug alias already exists'
+          : 'Tracking tag already exists',
+      });
+    }
+    throw error;
   }
 
-  const updated = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?').bind(id).first();
+  const updated = await c.env.DB.prepare(
+    `SELECT t.*, a.name as agent_name, a.slug as agent_slug, asa.slug as alias_slug
+     FROM tracking_ids t
+     JOIN agents a ON a.id = t.agent_id
+     LEFT JOIN agent_slug_aliases asa
+       ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
+     WHERE t.id = ?`
+  ).bind(id).first();
   return c.json({ trackingId: updated, message: 'Tag updated' });
 });
 

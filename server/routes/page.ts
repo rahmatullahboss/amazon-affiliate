@@ -1,33 +1,62 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import type { Context } from 'hono';
 import type { AppEnv, LandingPageData } from '../utils/types';
 import { buildAmazonUrl } from '../utils/types';
 import { CacheService } from '../services/cache';
 import { recordView, hashIp } from '../services/analytics';
-import { DynamicLinkResolutionError, ensureDynamicLinkByAgentSlug } from '../services/dynamic-links';
+import {
+  DynamicLinkResolutionError,
+  ensureDynamicLinkByAgentSlug,
+  hasAgentMarketplaceCandidate,
+  resolveAgentProductBySlug,
+  type AgentProductResolution,
+} from '../services/dynamic-links';
+import { normalizeMarketplaceHint } from '../utils/url';
 
 const page = new Hono<AppEnv>();
 
 /**
- * GET /api/page/:agentSlug/:asin — Landing page data
+ * GET /api/page/:agentSlug/:asin and /api/page/:agentSlug/:country/:asin — Landing page data
  *
  * Returns product info + Amazon URL for bridge page SSR rendering.
  * In the single-worker architecture, the bridge loader calls this
  * via internal Data directly (D1 access) — NOT over HTTP.
  * This endpoint is kept for API consumers and future flexibility.
  */
-page.get('/:agentSlug/:asin', async (c) => {
+const handlePageRequest = async (c: Context<AppEnv>) => {
   const agentSlug = c.req.param('agentSlug');
   const asin = c.req.param('asin');
+  const countryParam = c.req.param('country');
+  const countryMarketplace = countryParam ? normalizeMarketplaceHint(countryParam) : null;
+
+  if (countryParam && !countryMarketplace) {
+    throw new HTTPException(404, { message: 'Product page not found' });
+  }
+
+  const preferredMarketplace = countryMarketplace ?? normalizeMarketplaceHint(c.req.query('m'));
 
   if (!agentSlug || !asin) {
     throw new HTTPException(400, { message: 'Missing agent slug or ASIN' });
   }
 
   const cache = new CacheService(c.env.KV);
+  let resolution: AgentProductResolution | null = null;
+
+  if (!preferredMarketplace) {
+    resolution = await resolveAgentProductBySlug({
+      db: c.env.DB,
+      agentSlug,
+      asin,
+    });
+  }
 
   // 1. Check cache
-  const cached = await cache.getPageData(agentSlug, asin);
+  const cached = await cache.getPageData(
+    agentSlug,
+    asin,
+    resolution?.resolvedMarketplace ?? preferredMarketplace ?? undefined
+  );
   if (cached) {
     // Record view asynchronously
     c.executionCtx.waitUntil(
@@ -36,49 +65,32 @@ page.get('/:agentSlug/:asin', async (c) => {
     return c.json(cached);
   }
 
-  const loadPageRow = async () =>
-    c.env.DB.prepare(
-      `SELECT
-         a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-         p.asin, p.title as product_title, p.image_url, p.description, p.features,
-         p.product_images, p.aplus_images, p.id as product_id,
-         t.tag as tracking_tag, t.marketplace,
-         ap.custom_title
-       FROM agent_products ap
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN products p ON p.id = ap.product_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE a.slug = ? AND p.asin = ?
-         AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
-       LIMIT 1`
-    )
-      .bind(agentSlug, asin)
-      .first<{
-        agent_slug: string;
-        agent_name: string;
-        agent_id: number;
-        asin: string;
-        product_title: string;
-        image_url: string;
-        description: string | null;
-        features: string | null;
-        product_images: string | null;
-        aplus_images: string | null;
-        product_id: number;
-        tracking_tag: string;
-        marketplace: string;
-        custom_title: string | null;
-      }>();
+  const loadPageResolution = async (): Promise<AgentProductResolution | null> => {
+    const directResolution = await resolveAgentProductBySlug({
+      db: c.env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
 
-  let row = await loadPageRow();
+    if (directResolution) {
+      return directResolution;
+    }
 
-  if (!row) {
+    if (
+      preferredMarketplace &&
+      !(await hasAgentMarketplaceCandidate(c.env.DB, agentSlug, preferredMarketplace))
+    ) {
+      throw new HTTPException(404, { message: 'Product page not found' });
+    }
+
     try {
       await ensureDynamicLinkByAgentSlug({
         db: c.env.DB,
         kv: c.env.KV,
         agentSlug,
         asin,
+        preferredMarketplace,
         apiKey: c.env.AMAZON_API_KEY,
         fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
       });
@@ -90,12 +102,24 @@ page.get('/:agentSlug/:asin', async (c) => {
       throw error;
     }
 
-    row = await loadPageRow();
+    return await resolveAgentProductBySlug({
+      db: c.env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
+  };
+
+  if (!resolution) {
+    resolution = await loadPageResolution();
   }
 
-  if (!row) {
+  if (!resolution) {
     throw new HTTPException(404, { message: 'Product page not found' });
   }
+
+  const row = resolution.row;
+  const resolvedMarketplace = resolution.resolvedMarketplace;
 
   const pageData: LandingPageData = {
     agent: {
@@ -122,7 +146,7 @@ page.get('/:agentSlug/:asin', async (c) => {
       ...pageData,
       agent_id: row.agent_id,
       product_id: row.product_id,
-    })
+    }, resolvedMarketplace)
   );
 
   // 4. Track view asynchronously
@@ -131,7 +155,10 @@ page.get('/:agentSlug/:asin', async (c) => {
   );
 
   return c.json(pageData);
-});
+};
+
+page.get('/:agentSlug/:country/:asin', handlePageRequest);
+page.get('/:agentSlug/:asin', handlePageRequest);
 
 function parseJsonArray(raw: string | null): string[] {
   if (!raw) return [];

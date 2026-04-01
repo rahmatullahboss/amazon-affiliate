@@ -13,6 +13,9 @@ export function meta({}: Route.MetaArgs) {
 
 interface TrackingIdRow {
   id: number;
+  agent_id?: number;
+  agent_name?: string;
+  agent_slug?: string;
   tag: string;
   label: string | null;
   marketplace: string;
@@ -28,6 +31,7 @@ const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 export default function PortalTrackingPage() {
   const [trackingIds, setTrackingIds] = useState<TrackingIdRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [canCreate, setCanCreate] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -52,8 +56,9 @@ export default function PortalTrackingPage() {
       throw new Error("Failed to load tags");
     }
 
-    const data = (await response.json()) as { trackingIds: TrackingIdRow[] };
+    const data = (await response.json()) as { trackingIds: TrackingIdRow[]; canCreate?: boolean };
     setTrackingIds(data.trackingIds);
+    setCanCreate(data.canCreate ?? true);
   }
 
   useEffect(() => {
@@ -150,14 +155,18 @@ export default function PortalTrackingPage() {
       <article className="bg-[#111827] border border-white/10 rounded-2xl p-6">
         <h1 className="m-0 mb-3 text-xl font-bold text-gray-50">Tags</h1>
         <p className="m-0 mb-2 text-slate-300 leading-relaxed">
-          Add the tag the client gave you for each marketplace. Once a marketplace has a saved tag,
-          you can paste an ASIN and generate your link automatically.
+          {canCreate
+            ? "Add the tag the client gave you for each marketplace. Once a marketplace has a saved tag, you can paste an ASIN and generate your link automatically."
+            : "Admin view can review and edit existing tags here. Creating a new tag still requires an agent-specific context."}
         </p>
+        {canCreate ? (
         <p className="m-0 mb-4 text-slate-400 text-[0.92rem] leading-relaxed">
           You can paste just the tag or the full tag format like <code className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">?tag=agent-us-20</code>. The
           system will save only the clean tag automatically.
         </p>
+        ) : null}
 
+        {canCreate || editingId !== null ? (
         <form onSubmit={handleSubmit} className="grid gap-3">
           <select
             className="w-full px-4 py-3 bg-gray-800 border border-white/10 rounded-xl text-gray-50 focus:outline-none focus:ring-2 focus:ring-amber-500 appearance-auto"
@@ -205,6 +214,11 @@ export default function PortalTrackingPage() {
             </button>
           ) : null}
         </form>
+        ) : (
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-sm text-slate-300">
+            New tag creation is hidden in admin view. You can still edit, set default, or delete the saved tags below.
+          </div>
+        )}
 
         {editingId ? (
           <p className="m-0 mt-3 text-xs text-slate-400">
@@ -232,6 +246,11 @@ export default function PortalTrackingPage() {
                 <p className="m-0 text-slate-300 text-sm leading-relaxed">
                   {trackingId.marketplace} · {trackingId.label || "Default tag"}
                 </p>
+                {!canCreate && trackingId.agent_name ? (
+                  <p className="m-0 mt-2 text-xs text-slate-400">
+                    {trackingId.agent_name} · {trackingId.agent_slug}
+                  </p>
+                ) : null}
                 {trackingId.is_portal_editable !== 1 ? (
                   <p className="m-0 mt-2 text-xs text-amber-300">
                     Admin-managed extra tag. You can view it here, but only admin can edit it.

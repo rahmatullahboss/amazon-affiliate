@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
+import { buildAgentFormValues, isInlineEditingAgent } from "../../utils/agents";
 
 interface Agent {
   id: number; slug: string; name: string; email: string | null;
@@ -19,6 +20,7 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ name: "", slug: "", email: "", phone: "" });
   const [error, setError] = useState("");
 
@@ -35,13 +37,13 @@ export default function AgentsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
     try {
-      const res = await fetch("/api/agents", {
-        method: "POST",
+      const res = await fetch(editingId ? `/api/agents/${editingId}` : "/api/agents", {
+        method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify(form),
       });
       if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error); }
-      setShowForm(false); setForm({ name: "", slug: "", email: "", phone: "" });
+      setShowForm(false); setEditingId(null); setForm({ name: "", slug: "", email: "", phone: "" });
       fetchAgents();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
   };
@@ -59,7 +61,17 @@ export default function AgentsPage() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Agents</h1>
-        <button onClick={() => setShowForm(!showForm)} className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap">
+        <button onClick={() => {
+          if (showForm) {
+            setShowForm(false);
+            setEditingId(null);
+            setForm({ name: "", slug: "", email: "", phone: "" });
+            setError("");
+          } else {
+            setEditingId(null);
+            setShowForm(true);
+          }
+        }} className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap">
           {showForm ? "Cancel" : "+ Add Agent"}
         </button>
       </div>
@@ -85,7 +97,7 @@ export default function AgentsPage() {
             </div>
             <div className="col-span-1 sm:col-span-2 mt-2">
               {error && <p className="text-red-500 text-sm m-0 mb-3">{error}</p>}
-              <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer hover:bg-indigo-600 transition-colors">Create Agent</button>
+              <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer hover:bg-indigo-600 transition-colors">{editingId ? "Update Agent" : "Create Agent"}</button>
             </div>
           </form>
         </div>
@@ -110,7 +122,59 @@ export default function AgentsPage() {
                   {agent.email || "No email"} · {agent.phone || "No phone"} · {agent.user_count} login account{agent.user_count === 1 ? "" : "s"} · Last click: {agent.last_click_at ? new Date(agent.last_click_at).toLocaleString() : "Never"}
                 </div>
               </div>
-              <button onClick={() => void toggleActive(agent.id, agent.is_active)} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#a0a0b8] text-xs font-medium cursor-pointer hover:bg-white/10 transition-colors shrink-0">{agent.is_active ? "Deactivate" : "Activate"}</button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingId(agent.id);
+                    setError("");
+                    setForm(buildAgentFormValues(agent));
+                  }}
+                  className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 rounded-md text-indigo-300 text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors"
+                >
+                  Edit
+                </button>
+                <button onClick={() => void toggleActive(agent.id, agent.is_active)} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-md text-[#a0a0b8] text-xs font-medium cursor-pointer hover:bg-white/10 transition-colors shrink-0">{agent.is_active ? "Deactivate" : "Activate"}</button>
+              </div>
+              {isInlineEditingAgent(editingId, agent.id) ? (
+                <div className="w-full border-t border-white/10 pt-4 mt-1">
+                  <form onSubmit={(e) => void handleSubmit(e)} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-[#a0a0b8] mb-1.5">Name*</label>
+                      <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#a0a0b8] mb-1.5">Slug* (URL-safe)</label>
+                      <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.slug} onChange={e => setForm({...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})} required placeholder="agent-name" />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#a0a0b8] mb-1.5">Email</label>
+                      <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm text-[#a0a0b8] mb-1.5">Phone</label>
+                      <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
+                    </div>
+                    <div className="col-span-1 sm:col-span-2 mt-2">
+                      {error && <p className="text-red-500 text-sm m-0 mb-3">{error}</p>}
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-indigo-500 border-none rounded-lg text-white font-semibold cursor-pointer hover:bg-indigo-600 transition-colors">Update Agent</button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingId(null);
+                            setError("");
+                            setForm({ name: "", slug: "", email: "", phone: "" });
+                          }}
+                          className="w-full sm:w-auto px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-semibold cursor-pointer hover:bg-white/10 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                </div>
+              ) : null}
             </div>
           ))}
           {agents.length === 0 && <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No agents yet. Create your first agent above.</p>}

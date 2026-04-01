@@ -22,6 +22,14 @@ const trackingTagSchema = z
     'Use the full tag, like jahid29000-21 or tag=jahid29000-21'
   );
 
+const slugAliasSchema = z
+  .string()
+  .min(1)
+  .max(60)
+  .regex(/^[a-z0-9-]+$/, 'Alias slug must be lowercase alphanumeric with hyphens')
+  .optional()
+  .nullable();
+
 // ─── Agent Schemas ─────────────────────────────────────
 export const createAgentSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100),
@@ -36,6 +44,12 @@ export const createAgentSchema = z.object({
 
 export const updateAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
+  slug: z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[a-z0-9-]+$/, 'Slug must be lowercase alphanumeric with hyphens')
+    .optional(),
   email: z.string().email().optional().nullable(),
   phone: z.string().max(20).optional().nullable(),
   is_active: z.boolean().optional(),
@@ -69,6 +83,19 @@ export const updateProductSchema = z.object({
   status: z.enum(PRODUCT_STATUSES).optional(),
 });
 
+export const bulkRegenerateProductContentSchema = z
+  .object({
+    productIds: z
+      .array(z.number().int().positive())
+      .min(1, 'Select at least 1 product')
+      .max(100, 'Max 100 products per run')
+      .optional(),
+    marketplace: z.enum([...MARKETPLACES, 'ALL']).optional(),
+  })
+  .refine((value) => Boolean(value.productIds?.length) || Boolean(value.marketplace), {
+    message: 'Select products or choose a marketplace filter',
+  });
+
 // ─── Tracking ID Schemas ───────────────────────────────
 export const createTrackingIdSchema = z.object({
   agent_id: z.number().int().positive(),
@@ -77,6 +104,7 @@ export const createTrackingIdSchema = z.object({
   marketplace: z.enum(MARKETPLACES).default('US'),
   is_default: z.boolean().default(false),
   is_portal_editable: z.boolean().optional().default(false),
+  alias_slug: slugAliasSchema,
 });
 
 // ─── Mapping Schemas ───────────────────────────────────
@@ -193,8 +221,24 @@ export const createAgentSheetSourceSchema = z.object({
   agent_id: z.number().int().positive(),
   sheet_url: z.string().url('Valid Google Sheet URL required'),
   sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  selected_tabs: z
+    .array(
+      z.object({
+        gid: z.number().int().nonnegative().optional().nullable(),
+        title: z.string().min(1).max(200),
+      })
+    )
+    .min(1)
+    .optional(),
   is_active: z.boolean().default(true),
   auto_approve_clean_rows: z.boolean().default(true),
+}).refine((value) => Boolean(value.selected_tabs?.length) || Boolean(value.sheet_tab_name), {
+  message: 'Select at least one sheet tab',
+  path: ['selected_tabs'],
+});
+
+export const discoverAgentSheetTabsSchema = z.object({
+  sheet_url: z.string().url('Valid Google Sheet URL required'),
 });
 
 export const updateAgentSheetSourceSchema = z.object({

@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
+import type { Context } from 'hono';
 import type { AppEnv } from '../utils/types';
 import { buildAmazonUrl } from '../utils/types';
 import { recordClick, hashIp } from '../services/analytics';
@@ -10,7 +11,9 @@ import {
   DynamicLinkResolutionError,
   ensureDynamicLinkByAgentSlug,
   ensureDynamicLinkByTrackingTag,
+  resolveAgentProductBySlug,
 } from '../services/dynamic-links';
+import { buildCanonicalRedirectPath, normalizeMarketplaceHint } from '../utils/url';
 
 const redirect = new Hono<AppEnv>();
 
@@ -41,11 +44,44 @@ function createNoindexRedirect(targetUrl: string): Response {
   });
 }
 
+function buildCanonicalGoRedirectLocation(requestUrl: string, pathname: string): string {
+  const url = new URL(requestUrl);
+  url.pathname = pathname;
+  url.searchParams.delete('m');
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
 async function resolveFallbackRedirectContext(
   db: D1Database,
-  asin: string
+  asin: string,
+  preferredMarketplace?: string | null
 ): Promise<RedirectContext | null> {
-  const row = await db
+  const row = preferredMarketplace
+    ? await db
+    .prepare(
+      `SELECT
+         p.asin,
+         t.tag,
+         t.marketplace,
+         a.id AS agent_id,
+         p.id AS product_id
+       FROM products p
+       JOIN agent_products ap ON ap.product_id = p.id
+       JOIN agents a ON a.id = ap.agent_id
+       JOIN tracking_ids t ON t.id = ap.tracking_id
+       WHERE p.asin = ?
+         AND t.marketplace = ?
+         AND p.is_active = 1
+         AND p.status = 'active'
+         AND ap.is_active = 1
+         AND a.is_active = 1
+         AND t.is_active = 1
+       ORDER BY t.is_default DESC, ap.updated_at DESC, ap.id DESC
+       LIMIT 1`
+    )
+    .bind(asin, preferredMarketplace)
+    .first<RedirectFallbackRow>()
+    : await db
     .prepare(
       `SELECT
          p.asin,
@@ -78,7 +114,33 @@ async function resolveFallbackRedirectContext(
     };
   }
 
-  const fallbackTag = await db
+  const fallbackTag = preferredMarketplace
+    ? await db
+    .prepare(
+      `SELECT
+         p.asin,
+         t.tag,
+         t.marketplace,
+         a.id AS agent_id,
+         p.id AS product_id
+       FROM products p
+       JOIN tracking_ids t ON t.marketplace = p.marketplace
+       JOIN agents a ON a.id = t.agent_id
+       WHERE p.asin = ?
+         AND p.marketplace = ?
+         AND p.is_active = 1
+         AND p.status = 'active'
+         AND t.is_active = 1
+         AND a.is_active = 1
+       ORDER BY
+         CASE WHEN a.id = 1 THEN 0 ELSE 1 END ASC,
+         t.is_default DESC,
+         t.created_at ASC
+       LIMIT 1`
+    )
+    .bind(asin, preferredMarketplace)
+    .first<RedirectFallbackRow>()
+    : await db
     .prepare(
       `SELECT
          p.asin,
@@ -188,12 +250,57 @@ redirect.get('/t/:trackingTag/:asin', async (c) => {
   return createNoindexRedirect(ctx.amazonUrl);
 });
 
-redirect.get('/:agentSlug/:asin', async (c) => {
+const handleRedirectRequest = async (c: Context<AppEnv>) => {
   const agentSlug = c.req.param('agentSlug');
   const asin = c.req.param('asin');
+  const countryMarketplace = normalizeMarketplaceHint(c.req.param('country'));
+  const preferredMarketplace = countryMarketplace ?? normalizeMarketplaceHint(c.req.query('m'));
 
   if (!agentSlug || !asin) {
     throw new HTTPException(400, { message: 'Missing agent or ASIN' });
+  }
+
+  if (!countryMarketplace) {
+    const directResolution = await resolveAgentProductBySlug({
+      db: c.env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
+
+    if (directResolution) {
+      return c.redirect(
+        buildCanonicalGoRedirectLocation(
+          c.req.url,
+          buildCanonicalRedirectPath(agentSlug, asin, directResolution.resolvedMarketplace)
+        ),
+        302
+      );
+    }
+
+    try {
+      const resolved = await ensureDynamicLinkByAgentSlug({
+        db: c.env.DB,
+        kv: c.env.KV,
+        agentSlug,
+        asin,
+        preferredMarketplace,
+        apiKey: c.env.AMAZON_API_KEY,
+        fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+      });
+
+      return c.redirect(
+        buildCanonicalGoRedirectLocation(
+          c.req.url,
+          buildCanonicalRedirectPath(agentSlug, asin, resolved.marketplace)
+        ),
+        302
+      );
+    } catch (error) {
+      if (!(error instanceof DynamicLinkResolutionError) || (error.status !== 400 && error.status !== 404)) {
+        throw error;
+      }
+    }
   }
 
   const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '';
@@ -212,7 +319,9 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   }
 
   // ─── Core Redirect Logic ──────────────────────────────
-  const cacheKey = `redirect:${agentSlug}:${asin}`;
+  const cacheKey = preferredMarketplace
+    ? `redirect:${agentSlug}:${preferredMarketplace}:${asin}`
+    : `redirect:${agentSlug}:${asin}`;
   let ctx: RedirectContext | null = null;
 
   // 1. Try KV cache first (sub-millisecond)
@@ -222,26 +331,21 @@ redirect.get('/:agentSlug/:asin', async (c) => {
   }
 
   if (!ctx) {
-    const row = await c.env.DB.prepare(
-      `SELECT p.asin, t.tag, t.marketplace, a.id as agent_id, p.id as product_id
-       FROM agent_products ap
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN products p ON p.id = ap.product_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE a.slug = ? AND p.asin = ?
-         AND ap.is_active = 1 AND a.is_active = 1 AND p.is_active = 1 AND p.status = 'active'
-       LIMIT 1`
-    )
-      .bind(agentSlug, asin)
-      .first<{ asin: string; tag: string; marketplace: string; agent_id: number; product_id: number }>();
+    const directResolution = await resolveAgentProductBySlug({
+      db: c.env.DB,
+      agentSlug,
+      asin,
+      preferredMarketplace,
+    });
 
-    if (!row) {
+    if (!directResolution) {
       try {
         const resolved = await ensureDynamicLinkByAgentSlug({
           db: c.env.DB,
           kv: c.env.KV,
           agentSlug,
           asin,
+          preferredMarketplace,
           apiKey: c.env.AMAZON_API_KEY,
           fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
         });
@@ -255,7 +359,7 @@ redirect.get('/:agentSlug/:asin', async (c) => {
       } catch (error) {
         if (error instanceof DynamicLinkResolutionError) {
           if (error.status === 404 || error.status === 400) {
-            ctx = await resolveFallbackRedirectContext(c.env.DB, asin);
+            ctx = await resolveFallbackRedirectContext(c.env.DB, asin, preferredMarketplace);
             if (ctx) {
               c.executionCtx.waitUntil(
                 safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
@@ -271,11 +375,12 @@ redirect.get('/:agentSlug/:asin', async (c) => {
         }
       }
     } else {
+      const row = directResolution.row;
       ctx = {
-        amazonUrl: buildAmazonUrl(row.asin, row.tag, row.marketplace),
+        amazonUrl: buildAmazonUrl(row.asin, row.tracking_tag, row.marketplace),
         agentId: row.agent_id,
         productId: row.product_id,
-        trackingTag: row.tag,
+        trackingTag: row.tracking_tag,
       };
 
       // 3. Warm cache for next hit (cache the FULL context, not just URL)
@@ -290,7 +395,10 @@ redirect.get('/:agentSlug/:asin', async (c) => {
 
   // 5. 302 redirect — user goes to Amazon
   return createNoindexRedirect(ctx.amazonUrl);
-});
+};
+
+redirect.get('/:agentSlug/:country/:asin', handleRedirectRequest);
+redirect.get('/:agentSlug/:asin', handleRedirectRequest);
 
 async function recordRedirectClickAsync(
   c: {

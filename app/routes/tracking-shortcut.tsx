@@ -4,6 +4,7 @@ import {
   ASIN_IMPORT_PAUSED_DETAIL,
 } from "../utils/asin-import";
 import { DynamicLinkResolutionError, ensureDynamicLinkByTrackingTag } from "../../server/services/dynamic-links";
+import { buildCanonicalBridgePath } from "../../server/utils/url";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -33,7 +34,16 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
         : [],
     });
 
-    return Response.redirect(new URL(`/${resolved.agentSlug}/${resolved.asin}`, request.url), 302);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: buildCanonicalBridgePath(
+          resolved.agentSlug,
+          resolved.asin,
+          resolved.marketplace
+        ),
+      },
+    });
   } catch (error) {
     if (error instanceof DynamicLinkResolutionError) {
       throw new Response(error.message, { status: error.status });
