@@ -91,7 +91,13 @@ tracking.put('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
-  const body = await c.req.json<{ label?: string; is_default?: boolean; is_active?: boolean; alias_slug?: string | null }>();
+  const body = await c.req.json<{
+    label?: string;
+    is_default?: boolean;
+    is_active?: boolean;
+    is_portal_editable?: boolean;
+    alias_slug?: string | null;
+  }>();
 
   const current = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?')
     .bind(id)
@@ -112,6 +118,7 @@ tracking.put('/:id', async (c) => {
   if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
   if (body.is_default !== undefined) { updates.push('is_default = ?'); values.push(body.is_default ? 1 : 0); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
+  if (body.is_portal_editable !== undefined) { updates.push('is_portal_editable = ?'); values.push(body.is_portal_editable ? 1 : 0); }
 
   try {
     if (updates.length > 0) {
