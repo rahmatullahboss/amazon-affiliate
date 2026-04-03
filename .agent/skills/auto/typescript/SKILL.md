@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 57 gotchas, 104 conventions, 71 fixes."
+description: "Typescript for amazon-affiliate. 72 gotchas, 189 conventions, 94 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **551 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **863 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -19,6 +19,21 @@ Auto-compiled from **551 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in HTTPException — imp | - router.get("/blog-images/*", async (c) => { + router.get("/blog-images/:key", async (c) => { -   c |
+| ⚠️ GOTCHA: Fixed null crash in Hono — parallelizes | -  + import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog'; - const products = n |
+| ⚠️ GOTCHA: Replaced auth Protected | - // ─── Protected Routes (Admin Only) ─────────────────────── + // ─── Protected Routes ─────────── |
+| ⚠️ GOTCHA: Fixed null crash in SELECT — prevents n | -   const { results } = await input.db +   if (preferredMarketplace) { -     .prepare( +     const s |
+| ⚠️ GOTCHA: Replaced auth Blocks — parallelizes asy | -   it('P0-004B: Does not use configured default tags for public product redirects when no site prim |
+| ⚠️ GOTCHA: Replaced auth Allows — parallelizes asy | -   it('P0-004B: Does not use configured default tags for public product redirects when no site prim |
+| ⚠️ GOTCHA: Optimized Link — parallelizes async ope | - })); +   useState: <T,>(value: T) => [value, () => undefined] as const, -  + })); - vi.mock('react |
+| ⚠️ GOTCHA: Fixed null crash in PublicRedirectResol | - function createNoindexRedirect(targetUrl: string): Response { + interface PublicRedirectResolution |
+| ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | -   if (preferredMarketplace && preferredTrackingCandidates.length === 0) { +  -     throw new Dynam |
+| ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | -   let deferredStatusError: DynamicLinkResolutionError - null = null; +  -   let deferredFetchError |
+| ⚠️ GOTCHA: Strengthened types Falls — parallelizes | -   it('P0-016: Resolves alias slugs to the linked marketplace-specific tracking tag', async () => { |
+| ⚠️ GOTCHA: Fixed null crash in UPDATE — prevents n | -       ...(results ?? []).map((product) => [ +       ...(results ?? []).map((product) => { -        |
+| ⚠️ GOTCHA: Fixed null crash in ConfiguredMarketpla | - function getConfiguredDefaultTrackingTag( + type ConfiguredMarketplace = keyof typeof MARKETPLACE_ |
+| ⚠️ GOTCHA: Fixed null crash in Record — prevents b | - function createNoindexRedirect(targetUrl: string): Response { + const MARKETPLACE_DEFAULT_TAG_ENV_ |
+| ⚠️ GOTCHA: Added JWT tokens authentication — harde | -  + import siteBranding from './routes/site-branding'; - const app = new Hono<AppEnv>(); +  -  + co |
 | ⚠️ GOTCHA: Fixed null crash in HTTPException — par | -   if (data.email !== undefined) { updates.push('email = ?'); values.push(data.email); } +   if (da |
 | ⚠️ GOTCHA: Fixed null crash in Review — paralleliz | -     ).first<{ +     ) -       total_products: number; +       .bind(...whereParams) -       active |
 | ⚠️ GOTCHA: Fixed null crash in Number — paralleliz | -   const page = Number.isNaN(requestedPage) ? 1 : Math.max(1, requestedPage); +   const marketplace |
@@ -54,138 +69,125 @@ Auto-compiled from **551 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Added JWT tokens authentication — preve | -  + import * as urlHelpers from "../../server/utils/url"; - describe("Portal Tracking API", () => { |
 | ⚠️ GOTCHA: Fixed null crash in Context — offloads  | - import type { AppEnv, LandingPageData } from '../utils/types'; + import type { Context } from 'hon |
 | ⚠️ GOTCHA: Fixed null crash in Hono — parallelizes | - import { appendMarketplaceHint, getPublicAppOrigin } from '../utils/url'; + import { -  +   buildC |
-| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { normalizeMarketplaceHint } from '../utils/url'; - const redirect = new Hono<AppEnv>(); |
-| ⚠️ GOTCHA: Fixed null crash in Hono — offloads hea | -  + import { normalizeMarketplaceHint } from '../utils/url'; - const page = new Hono<AppEnv>(); +   |
-| ⚠️ GOTCHA: Fixed null crash in HTTPException — imp | - export default router; + router.get("/blog-images/:key", async (c) => { -  +   const key = c.req.p |
-| ⚠️ GOTCHA: Added JWT tokens authentication — harde | -  + import blogs from './routes/blogs'; - const app = new Hono<AppEnv>(); +  -  + const app = new H |
-| ⚠️ GOTCHA: Fixed null crash in Response — prevents | - /** + function createNoindexRedirect(targetUrl: string): Response { -  * GET /go/:agentSlug/:asin  |
-| ⚠️ GOTCHA: Fixed null crash in SELECT — paralleliz | -   const { results: shortcutResults } = await c.env.DB.prepare( +   const { results: dynamicBridgeR |
-| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { authMiddleware } from '../middleware/auth'; - const auth = new Hono<AppEnv>(); +  -  + |
-| ⚠️ GOTCHA: Fixed null crash in SELECT — prevents n | -          COALESCE(SUM(ac.ordered_items), 0) as ordered_items, +          ( -          COALESCE( +  |
-| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | - } +   marketplaceOrderBreakdown: Array<{ -  +     marketplace: string; - type CsvRecord = Record<s |
-| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvDelete, safeKvGetText, safeKvPut } from '../services/kv-safe'; - const auth = ne |
-| ⚠️ GOTCHA: Fixed null crash in Hono — prevents bru | -  + import { safeKvGetJson, safeKvPut } from '../services/kv-safe'; - const redirect = new Hono<App |
-| ⚠️ GOTCHA: Fixed null crash in HTTPException — pre | -   let resolvedAgentId = body.agent_id ?? null; +   if (body.role === 'agent' && !body.agent_id) {  |
-| ⚠️ GOTCHA: Fixed null crash in COALESCE — prevents | -          COALESCE(SUM(ac.revenue_amount), 0) as revenue_amount, +          COALESCE( -          CO |
-| ⚠️ GOTCHA: Fixed null crash in SELECT — paralleliz | -  +   const origin = getPublicAppOrigin(c.req.url, c.env); -   const { results } = await c.env.DB.p |
-| ⚠️ GOTCHA: discovery in portal.ts | -     throw new HTTPException(403, { message: 'Only linked agent accounts can manage tracking IDs' } |
 
 ## 🔧 Problem Playbooks
 
-### Fixed null crash in SELECT — prevents null/undefined runtime crashes
--          ass.sheet_tab_name,
-+          ass.spreadsheet_id,
--          ass.is_active,
-+          ass.sheet_tab_name,
--          ass.auto_approve_clean_rows,
-+          ass.sheet_gid,
--          ass.last_synced_at,
-+          ass.is_active,
--          ass.last_sync_status,
-+          ass.auto_approve_clean_rows,
--          ass.last_sync_message,
-+          ass.last_synced_at,
--          ass.creat
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: SELECT
-3. identifier: COUNT
-4. identifier: FROM
-5. identifier: WHERE
-
-### Fixed null crash in WHERE — parallelizes async operations for speed
--   parseSpreadsheetReference(nextSheetUrl);
-+   const reference = parseSpreadsheetReference(nextSheetUrl);
--            sheet_tab_name = ?,
-+            spreadsheet_id = ?,
--            is_active = ?,
-+            sheet_tab_name = ?,
--            auto_approve_clean_rows = ?,
-+            sheet_gid = ?,
--            updated_at = CURRENT_TIMESTAMP
-+            is_active = ?,
--        WHERE id = ?`
-
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: WHERE
-3. identifier: Array
-4. identifier: Promise
-5. identifier: SheetControlOverview
-
-### Fixed null crash in Error — parallelizes async operations for speed
--   parseSpreadsheetReference(input.sheetUrl);
-+   const sources = await createAgentSheetSources(db, {
+### Fixed null crash in List — prevents null/undefined runtime crashes
+- import { createTrackingIdSchema, MARKETPLACES, portalTrackingReplaceDeleteSchema } from '../schemas';
++ import { createTrackingIdSchema } from '../schemas';
+- function normalizeTrackingTag(value: string): string {
++ /**
+-   return value.trim().replace(/^\?/i, '').replace(/^tag=/i, '');
++  * GET /api/tracking — List all tags with agent info
+- }
++  */
 - 
-+     agentId: input.agentId,
--   const agent = await db
-+     sheetUrl: input.sheetUrl,
--     .prepare(`SELECT id FROM agents WHERE id = ? LIMIT 1`)
-+     selections: [{ sheetTabName: input.sheetTabName, sheetGid: null }],
--     .bind(input.agentId)
-+     isActive: input.isActive,
--     .firs
++ tracking.get('/', async (c) => {
+- functi
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Error
-3. identifier: Sheet
-4. identifier: Array
-5. identifier: Promise
+2. identifier: GET
+3. identifier: List
+4. identifier: SELECT
+5. identifier: FROM
 
-### Fixed null crash in SheetSubmissionRowListItem — parallelizes async operation...
--   sheet_tab_name: string | null;
-+   spreadsheet_id: string | null;
--   is_active: number;
-+   sheet_tab_name: string | null;
--   auto_approve_clean_rows: number;
-+   sheet_gid: number | null;
--   last_synced_at: string | null;
-+   is_active: number;
--   last_sync_status: "success" | "partial" | "failed" | null;
-+   auto_approve_clean_rows: number;
--   last_sync_message: string | null;
-+   last_
+### Fixed null crash in Cache — prevents null/undefined runtime crashes
+-       reviewContent: row.review_content,
++       description: row.description,
+-       productImages: parseJsonArray(row.product_images),
++       features: parseJsonArray(row.features),
+-       aplusImages: parseJsonArray(row.aplus_images),
++       productImages: parseJsonArray(row.product_images),
+-     },
++       aplusImages: parseJsonArray(row.aplus_images),
+-     trackingTag: row.tracking_ta
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: SheetSubmissionRowListItem
-3. identifier: SheetControlOverview
-4. identifier: Array
-5. identifier: AgentSheetSyncSummary
+2. identifier: Cache
+3. identifier: Track
+4. identifier: JSON
+5. identifier: Array
 
-### Fixed null crash in HTTPException — prevents null/undefined runtime crashes
--       throw new HTTPException(409, { message: 'Tracking tag already exists' });
-+       throw new HTTPException(409, {
--     }
-+         message: error.message.includes('agent_slug_aliases')
--     throw error;
-+           ? 'Public slug alias already exists'
+### Fixed null crash in RuntimeSecretEnv — prevents null/undefined runtime crashes
+- function isCommonBotProbe(pathname: string): boolean {
++ type RuntimeSecretEnv = Env & {
+-   return (
++   AMAZON_API_KEY?: string;
+-     pathname === "/.env" ||
++   AMAZON_API_KEY_FALLBACK?: string;
+-     pathname === "/xmlrpc.php" ||
++   GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
+-     pathname === "/wordpress" ||
++   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+-     pathname.endsWith("/wlwmanifes
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: RuntimeSecretEnv
+3. identifier: Env
+4. identifier: Date
+5. identifier: Number
+
+### Fixed null crash in SiteBrandingMeta — prevents null/undefined runtime crashes
+- export interface SiteBrandingMeta {
++ function containsAmazonTrademark(value: string | null | undefined): boolean {
+-   ogSiteName: string;
++   return /amazon/i.test(value?.trim() || "");
+-   ogDescription: string;
++ }
+-   ogImageUrl: string;
++ 
+- }
++ export interface SiteBrandingMeta {
+- 
++   ogSiteName: string;
+- export function toSiteBrandingMeta(input?: {
++   ogDescription: string;
+-   og_si
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: SiteBrandingMeta
+3. identifier: URL
+4. identifier: Array
+5. identifier: Record
+
+### Fixed null crash in ProductEditorialSection — prevents null/undefined runtime...
+- export function getProductDetailTitleClass(title: string): string {
++ interface ProductEditorialSection {
+-   const normalizedLength = title.trim().length;
++   heading: string;
+- 
++   body: string;
+-   if (normalizedLength > 90) {
++   bullets: string[];
+-     return "mt-5 text-2xl font-black leading-tight tracking-[-0.02em] text-gray-950 break-words md:text-3xl xl:text-[2.6rem]";
++ }
 -   }
-+           : 'Tracking tag already exists',
-- });
-+       });
++ 
 - 
-+     }
-- /**
-+     throw error;
--  * PUT /api/tracking/:id — Updat
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: HTTPException
-3. identifier: Public
-4. identifier: Tracking
-5. identifier: PUT
+2. identifier: ProductEditorialSection
+3. identifier: Editorial
+4. identifier: Summary
+5. identifier: Amazon
 
-### Fixed null crash in SELECT — prevents null/undefined runtime crashes
--     `SELECT t.*, a.name as agent_name, a.slug as agent_slug
-+     `SELECT t.*, a.name as agent_name, a.slug as agent_slug, asa.slug as alias_slug
--      ORDER BY t.created_at DESC`
-+      LEFT JOIN agent_slug_aliases asa
--   ).all();
-+        ON asa.tracking_id = t.id AND asa.marketplace = t.mark
+### Fixed null crash in HeadlessChrome — prevents null/undefined runtime crashes
+- 
++ const REVIEWER_BLOCKED_PATTERNS = [
+- export function isReviewerUserAgent(userAgent: string | undefined): boolean {
++   /curl/i,
+-   if (!userAgent) return false;
++   /wget/i,
+- 
++   /HeadlessChrome/i,
+-   return REVIEWER_ALLOWLIST.some((pattern) => pattern.test(userAgent));
++   /python-requests/i,
+- }
++   /pytho
 
 ... [Truncated — see individual observations for full content]

@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 1156 notes | Score threshold: >40
+> 1699 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,51 +20,58 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in Agent — prevents null/undefined runtime crashes** — - import { useState, useEffect } from "react";
-+ import { useEffect, u
-- **⚠️ GOTCHA: Fixed null crash in Route — formalizes the data contract with explicit types** — - 
-+ import { filterPortalLinksByMarketplace, getPortalLinkMarketplace
-- **⚠️ GOTCHA: Fixed null crash in HTTPException — parallelizes async operations for speed** — -   if (data.email !== undefined) { updates.push('email = ?'); values.
-- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React** — - 
-+ import { copyTextToClipboard } from "../../utils/clipboard";
-- co
-- **⚠️ GOTCHA: Fixed null crash in Authorization** — -   const [form, setForm] = useState({ name: "", slug: "", email: "", 
-- **⚠️ GOTCHA: Fixed null crash in Review — parallelizes async operations for speed** — -     ).first<{
-+     )
--       total_products: number;
-+       .bind(
+- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability** — - router.get("/blog-images/*", async (c) => {
++ router.get("/blog-imag
+- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React** — - import { extractApiErrorMessage } from "../../utils/api-errors";
++ i
+- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
++ import { 
+- **⚠️ GOTCHA: Fixed null crash in Hono — parallelizes async operations for speed** — - 
++ import { buildBlogImageUrl, buildStoredImageKey } from '../servic
+- **⚠️ GOTCHA: Replaced auth Protected** — - // ─── Protected Routes (Admin Only) ───────────────────────
++ // ──
+- **⚠️ GOTCHA: Fixed null crash in Mapping — parallelizes async operations for speed** — - 
++ import { buildMarketplaceReadyLinkTemplate } from "../../utils/pu
+
+## Active: `.`
+
+- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability**
+- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React**
+- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed**
+- **⚠️ GOTCHA: Fixed null crash in Hono — parallelizes async operations for speed**
+- **⚠️ GOTCHA: Replaced auth Protected**
 
 ## Project Standards
 
-- Fixed null crash in Discovering — confirmed 8x
-- Added JWT tokens authentication — prevents null/undefined runtime crashes — confirmed 3x
-- Fixed null crash in CacheService — parallelizes async operations for speed — confirmed 5x
-- what-changed in portal.ts — confirmed 3x
-- Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x
-- what-changed in tracking.tsx — confirmed 3x
-- Fixed null crash in ImportResult — parallelizes async operations for speed — confirmed 3x
 - what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x
+- Added JWT tokens authentication — hardens HTTP security headers — confirmed 3x
+- what-changed in mappings.ts — confirmed 3x
+- Updated amazon_reports database schema — parallelizes async operations for speed — confirmed 4x
+- convention in TrustBadges.tsx
+- Fixed null crash in Route — prevents null/undefined runtime crashes — confirmed 6x
+- what-changed in ProductCard.tsx — confirmed 3x
+- discovery in products.tsx — confirmed 3x
 
 ## Known Fixes
 
 - ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
+- ❌ deferredStatusError: DynamicLinkResolutionError | null = null; → ✅ Fixed null crash in DynamicLinkResolutionError — prevents null/undefined runt...
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
 - ❌ -     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' }) → ✅ Fixed null crash in Hono — prevents brute-force and DoS attacks
 - ❌ copyError: string; → ✅ Fixed null crash in Route — formalizes the data contract with explicit types
-- ❌ -     throw new HTTPException(400, { message: 'Missing agent or ASIN' }); → ✅ Fixed null crash in SELECT — parallelizes async operations for speed
 
 ## Recent Decisions
 
 - Optimized impliedFormat — offloads heavy computation off the main thread
-- decision in Footer.tsx
-- Optimized BlogCard — parallelizes async operations for speed
-- decision in ProductCard.tsx
+- decision in upload_r2.sh
+- decision in deals.tsx
+- decision in ImageGallery.tsx
 
 ## Learned Patterns
 
 - Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x (seen 2x)
 - Decision: Optimized Argument — offloads heavy computation off the main thread (seen 2x)
-- Always: Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x (seen 2x)
+- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x (seen 3x)
 - Agent generates new migration for every change (squash related changes)
 - Agent installs packages without checking if already installed
 
@@ -349,7 +356,3 @@ Reference these guidelines when:
 (truncated)
 
 
-## Available Tools (ON-DEMAND only)
-- `query(q)` — Deep search when stuck
-- `find(query)` — Full-text lookup
-> Context above IS your context. Do NOT call load() at startup.

@@ -164,6 +164,8 @@ export interface LandingPageData {
     asin: string;
     title: string;
     imageUrl: string;
+    description?: string | null;
+    features?: string[];
     reviewContent?: string | null;
     productImages?: string[];
     aplusImages?: string[];

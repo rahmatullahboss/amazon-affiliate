@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { Route } from "./+types/blogs";
 import { getAuthToken } from "../../utils/auth-session";
 import { compressImageFile } from "../../utils/image-compression";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 import { formatBlogDate, slugifyClientTitle, type BlogPostSummary } from "../../utils/blog";
 
 interface BlogApiResponse {
@@ -137,7 +138,7 @@ export default function AdminBlogsPage() {
     setMessage("");
 
     try {
-      const payload = {
+      const requestPayload = {
         title: form.title,
         slug: form.slug || null,
         excerpt: form.excerpt || null,
@@ -157,16 +158,18 @@ export default function AdminBlogsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${getAuthToken()}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(requestPayload),
       });
 
-      const data = (await response.json()) as { message?: string; post?: BlogPostSummary; error?: string };
+      const data = (await response.json()) as unknown;
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Failed to save blog post");
+        throw new Error(extractApiErrorMessage(data, "Failed to save blog post"));
       }
 
-      setMessage(data.message || "Saved");
-      await fetchPosts(data.post?.id ?? "new");
+      const responsePayload = data as { message?: string; post?: BlogPostSummary };
+
+      setMessage(responsePayload.message || "Saved");
+      await fetchPosts(responsePayload.post?.id ?? "new");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to save blog post");
     } finally {
@@ -193,12 +196,13 @@ export default function AdminBlogsPage() {
         method: "DELETE",
         headers: { Authorization: `Bearer ${getAuthToken()}` },
       });
-      const data = (await response.json()) as { message?: string; error?: string };
+      const data = (await response.json()) as unknown;
       if (!response.ok) {
-        throw new Error(data.error || data.message || "Failed to archive blog post");
+        throw new Error(extractApiErrorMessage(data, "Failed to archive blog post"));
       }
 
-      setMessage(data.message || "Archived");
+      const payload = data as { message?: string };
+      setMessage(payload.message || "Archived");
       await fetchPosts("new");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to archive blog post");
@@ -228,15 +232,16 @@ export default function AdminBlogsPage() {
         body: formData,
       });
 
-      const data = (await response.json()) as { key?: string; url?: string; error?: string; message?: string };
-      if (!response.ok || !data.key || !data.url) {
-        throw new Error(data.error || data.message || "Failed to upload image");
+      const data = (await response.json()) as unknown;
+      const payload = data as { key?: string; url?: string };
+      if (!response.ok || !payload.key || !payload.url) {
+        throw new Error(extractApiErrorMessage(data, "Failed to upload image"));
       }
 
       setForm((current) => ({
         ...current,
-        cover_image_key: data.key || "",
-        cover_image_url: data.url || "",
+        cover_image_key: payload.key || "",
+        cover_image_url: payload.url || "",
       }));
       setMessage("Cover image uploaded");
     } catch (requestError) {

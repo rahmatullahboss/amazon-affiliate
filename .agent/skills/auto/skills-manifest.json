@@ -1,19 +1,19 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
-    "observationCount": 338,
+    "lastGenerated": "2026-04-03T17:47:03.152Z",
+    "observationCount": 470,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Project for amazon-affiliate. 20 gotchas, 73 conventions, 11 fixes."
+    "description": "Project for amazon-affiliate. 20 gotchas, 90 conventions, 11 fixes."
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
-    "observationCount": 25,
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "observationCount": 29,
     "skillCount": 0,
     "domain": "config",
     "triggerGlobs": [
@@ -22,34 +22,34 @@
       "**/*.json",
       "**/*.toml"
     ],
-    "description": "Config for amazon-affiliate. 3 conventions."
+    "description": "Config for amazon-affiliate. 4 conventions."
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.261Z",
-    "observationCount": 551,
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "observationCount": 863,
     "skillCount": 0,
     "domain": "typescript",
     "triggerGlobs": [
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for amazon-affiliate. 57 gotchas, 104 conventions, 71 fixes."
+    "description": "Typescript for amazon-affiliate. 72 gotchas, 189 conventions, 94 fixes."
   },
   "typescript-react": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.260Z",
-    "observationCount": 228,
+    "lastGenerated": "2026-04-03T17:47:03.158Z",
+    "observationCount": 319,
     "skillCount": 0,
     "domain": "typescript-react",
     "triggerGlobs": [
       "**/*.tsx"
     ],
-    "description": "Typescript React for amazon-affiliate. 46 gotchas, 42 conventions, 44 fixes, 1 error→fix pairs."
+    "description": "Typescript React for amazon-affiliate. 50 gotchas, 66 conventions, 60 fixes, 1 error→fix pairs."
   },
   "css": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
     "observationCount": 4,
     "skillCount": 0,
     "domain": "css",
@@ -61,7 +61,7 @@
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
     "observationCount": 4,
     "skillCount": 0,
     "domain": "javascript",
@@ -73,9 +73,9 @@
   },
   "convention": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
+    "lastGenerated": "2026-04-03T17:47:03.160Z",
     "observationCount": 0,
-    "skillCount": 58,
+    "skillCount": 99,
     "domain": "convention",
     "triggerGlobs": [
       "**/*"
@@ -84,7 +84,7 @@
   },
   "decision": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
+    "lastGenerated": "2026-04-03T17:47:03.160Z",
     "observationCount": 0,
     "skillCount": 6,
     "domain": "decision",
@@ -95,8 +95,8 @@
   },
   "database": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.260Z",
-    "observationCount": 5,
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "observationCount": 6,
     "skillCount": 0,
     "domain": "database",
     "triggerGlobs": [
@@ -106,13 +106,35 @@
   },
   "gotcha": {
     "enabled": true,
-    "lastGenerated": "2026-04-01T08:32:31.262Z",
+    "lastGenerated": "2026-04-03T17:47:03.160Z",
     "observationCount": 0,
-    "skillCount": 5,
+    "skillCount": 6,
     "domain": "gotcha",
     "triggerGlobs": [
       "**/*"
     ],
     "description": "Gotcha for amazon-affiliate. ."
+  },
+  "html": {
+    "enabled": true,
+    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "observationCount": 2,
+    "skillCount": 0,
+    "domain": "html",
+    "triggerGlobs": [
+      "**/*.html"
+    ],
+    "description": "Html for amazon-affiliate. ."
+  },
+  "problem-fix": {
+    "enabled": true,
+    "lastGenerated": "2026-04-03T17:47:03.160Z",
+    "observationCount": 0,
+    "skillCount": 1,
+    "domain": "problem-fix",
+    "triggerGlobs": [
+      "**/*"
+    ],
+    "description": "Problem Fix for amazon-affiliate. 28 error→fix pairs."
   }
 }

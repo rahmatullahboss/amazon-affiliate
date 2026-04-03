@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 73 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 20 gotchas, 90 conventions, 11 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **338 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **470 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -198,6 +198,27 @@ The SKILL-template provides a minimal skeleton: frontmatter, overview, and activ
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
+- 📐 **decision in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-wal — confirmed 10x**
+- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-shm — confirmed 10x**
+- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-wal — confirmed 9x**
+- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-shm — confirmed 9x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 5x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 4x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
+- 📐 **Replaced auth DESC — evolves the database schema to support new requirements — confirmed 3x** — - ON sheet_submission_rows(status, validation_color, created_at DESC)
++ ON sheet_submission_rows(sta
+- 📐 **Replaced auth SQLite — evolves the database schema to support new requirements — confirmed 6x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 25x**
+- 📐 **Updated schema 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc871862... — confirmed 3x**
+- 📐 **Updated page_views database schema — evolves the database schema to support n... — confirmed 6x**
+- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 6x** — - If you are looking for a top-tier experience and do not mind paying a slight premium, this is curr
+- 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
+
+Content summary (1 lines):
+{"fileNames":["
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
 - 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
 
@@ -209,23 +230,6 @@ Content summary (1 lines):
 - 
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
 - 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
-
-Content summary (1 lines):
-{"fileNames":["
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 4x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized Property — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized Property — hardens HTTP security headers — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Added JWT tokens authentication — confirmed 4x** — -     "PUBLIC_APP_URL": "https://dealsrky.com"
-+     "PUBLIC_APP_URL": "https://dealsrky.com",
--   }
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐
+- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x** — - {"fileNames":["./node_mo
 
 ... [Truncated — see individual observations for full content]

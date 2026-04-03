@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for amazon-affiliate. 46 gotchas, 42 conventions, 44 fixes, 1 error→fix pairs."
+description: "Typescript React for amazon-affiliate. 50 gotchas, 66 conventions, 60 fixes, 1 error→fix pairs."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,7 +12,7 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **228 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -20,6 +20,10 @@ Auto-compiled from **228 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in TrackingId — avoids | - import { extractApiErrorMessage } from "../../utils/api-errors"; + import { getAuthToken } from ". |
+| ⚠️ GOTCHA: Fixed null crash in Product — paralleli | - import { getAuthToken } from "../../utils/auth-session"; + import { getAuthToken, getAuthUser } fr |
+| ⚠️ GOTCHA: Fixed null crash in Mapping — paralleli | -  + import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links"; - const getToken  |
+| ⚠️ GOTCHA: Fixed null crash in TrackingPage — avoi | -   marketplace: string; is_default: number; is_active: number; is_portal_editable: number; +   mark |
 | ⚠️ GOTCHA: Fixed null crash in Agent — prevents nu | - import { useState, useEffect } from "react"; + import { useEffect, useRef, useState } from "react" |
 | ⚠️ GOTCHA: Fixed null crash in Route — formalizes  | -  + import { filterPortalLinksByMarketplace, getPortalLinkMarketplaces } from "../../utils/portal-l |
 | ⚠️ GOTCHA: Fixed null crash in TrackingId — avoids | -  + import { copyTextToClipboard } from "../../utils/clipboard"; - const getToken = () => getAuthTo |
@@ -75,128 +79,109 @@ Auto-compiled from **228 real patterns** in **amazon-affiliate**. This skill is 
 |-------|-----|------|
 | `- import { extractApiErrorMessage } from "../../ut` | Fixed null crash in Route — avoids unnecessary re-renders in | 2x |
 
-### Fixed null crash in Discover — parallelizes async operations for speed
+### Fixed null crash in Mapping — parallelizes async operations for speed
+- import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
++ 
 - 
-+     if (!editingSourceId && selectedTabTitles.length === 0) {
--     setSaving(true);
-+       setError("Discover tabs and select at least one tab.");
--     setError("");
-+       return;
--     setMessage("");
-+     }
--     try {
-+     setSaving(true);
--       const method = editingSourceId ? "PUT" : "POST";
-+     setError("");
--       const url = editingSourceId
-+     setMessage("");
--         
++ const getToken = () => getAuthToken();
+- const getToken = () => getAuthToken();
++ 
+- 
++ interface Mapping {
+- interface Mapping {
++   id: number; agent_name: string; agent_slug: string; asin: string;
+-   id: number; agent_name: string; agent_slug: string; asin: string;
++   product_title: string; image_url: stri
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Discover
-3. identifier: PUT
-4. identifier: POST
-5. identifier: Number
+2. identifier: Mapping
+3. identifier: Agent
+4. identifier: Product
+5. identifier: TrackId
 
-### Fixed null crash in Authorization
-- import { useEffect, useRef, useState } from "react";
+### Fixed null crash in ImportFormState — hardens HTTP security headers
+- import { useEffect, useMemo, useState } from "react";
 + import { useEffect, useState } from "react";
-- import { buildAgentFormValues, shouldScrollAgentEditorIntoView } from "../../utils/agents";
-+ import { buildAgentFormValues, isInlineEditingAgent } from "../../utils/agents";
--   const formRef = useRef<HTMLDivElement | null>(null);
-+ 
-- 
-+   useEffect(() => { fetchAgents(); }, []);
--   useEffect
+- interface MonthlyAnalyticsResponse {
++ interface ImportFormState {
+-   summary: {
++   marketplace: string;
+-     thisMonthRevenue: number;
++   source_file_name: string;
+-     thisMonthOrders: number;
++   report_type: string;
+-     thisMonthCommission: number;
++   period_start: string;
+-     lif
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Authorization
-3. identifier: Bearer
-4. identifier: Agent
-5. identifier: React
+2. identifier: ImportFormState
+3. identifier: AnalyticsPage
+4. identifier: OverviewData
+5. identifier: ReportsResponse
 
-### Fixed null crash in React — parallelizes async operations for speed
-- 
-+   const canBulkRegenerate =
--   function toggleVisibleSelection(checked: boolean) {
-+     !bulkRegenerating && (selectedProductIds.length > 0 || productPagination.totalItems > 0);
--     setSelectedProductIds(checked ? products.map((product) => product.id) : []);
-+ 
--   }
-+   function toggleVisibleSelection(checked: boolean) {
-- 
-+     setSelectedProductIds(checked ? products.map((product) => 
+### Fixed null crash in Outlet — prevents null/undefined runtime crashes
+- import { Outlet, NavLink, useNavigate } from "react-router";
++ import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
+-   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
++   const location = useLocation();
+-   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
++   const [user, setUser] = useState<{ username: string; role: string
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Set
-3. identifier: React
-4. identifier: FormEvent
-5. identifier: POST
+2. identifier: Outlet
+3. identifier: NavLink
+4. identifier: Dealsrky
+5. identifier: RKY
 
-### Fixed null crash in ImportResult — parallelizes async operations for speed
-- 
-+   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
--   const [bulkAsins, setBulkAsins] = useState("");
-+   const [bulkRegenerating, setBulkRegenerating] = useState(false);
--   const [bulkMarketplace, setBulkMarketplace] = useState("US");
-+ 
--   const [bulkPrefix, setBulkPrefix] = useState("");
-+   const [bulkAsins, setBulkAsins] = useState("");
--   const [importing,
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ImportResult
-3. identifier: HTMLInputElement
-4. identifier: SheetSyncConfig
-5. identifier: SheetSyncLog
-
-### Fixed null crash in Route — formalizes the data contract with explicit types
+### Fixed null crash in Types — offloads heavy computation off the main thread
 - import {
-+ import { copyTextToClipboard } from "../../utils/clipboard";
--   ASIN_IMPORT_ENABLED,
-+ import { getAuthToken } from "../../utils/auth-session";
--   ASIN_IMPORT_PAUSED_DETAIL,
-+ 
-- } from "../../utils/asin-import";
-+ export function meta({}: Route.MetaArgs) {
-- import { copyTextToClipboard } from "../../utils/clipboard";
-+   return [
-- import { getAuthToken } from "../../utils/auth-se
++ import { getProductEditorialSections } from "../utils/product-detail";
+-   buildCanonicalRedirectPath,
++ import {
+-   normalizeMarketplaceHint,
++   buildCanonicalRedirectPath,
+- } from "../../server/utils/url";
++   normalizeMarketplaceHint,
+- import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
++ } from "../../server/utils/url";
+- import {
++ import
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Route
-3. identifier: MetaArgs
-4. identifier: RKY
-5. identifier: Tag
+2. identifier: Types
+3. identifier: BridgeData
+4. identifier: Continue
+5. identifier: Meta
 
-### Fixed null crash in DynamicLinkResolutionError — improves module reusability
--       new URL(
-+       buildCanonicalBridgePath(resolved.agentSlug, resolved.asin, resolved.marketplace),
--         buildCanonicalBridgePath(resolved.agentSlug, resolved.asin, resolved.marketplace),
-+       302
--         request.url
-+     );
--       ),
-+   } catch (error) {
--       302
-+     if (error instanceof DynamicLinkResolutionError) {
--     );
-+       throw new Response(error.message, { s
+### Fixed null crash in ProductRow — prevents null/undefined runtime crashes
+-   getProductDetailTitleClass,
++   getProductEditorialSections,
+-   getPublicProductPageCallout,
++   getProductDetailTitleClass,
+- } from "../utils/product-detail";
++   getPublicProductPageCallout,
+- import {
++ } from "../utils/product-detail";
+-   AMAZON_DESTINATION_NOTE,
++ import {
+-   AMAZON_PRIMARY_CTA_LABEL,
++   AMAZON_DESTINATION_NOTE,
+-   INLINE_AFFILIATE_DISCLOSURE,
++   AMAZON_PRIMARY_CTA
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: DynamicLinkResolutionError
-3. identifier: Response
-4. identifier: TrackingShortcutPage
-5. identifier: Dynamic
+2. identifier: ProductRow
+3. identifier: RelatedProductRow
+4. identifier: ProductDetailData
+5. identifier: Explore
 
-### Fixed null crash in Bridge — prevents null/undefined runtime crashes
--         if (error.status === 404) {
-+         console.log("[Bridge] dy
+### Fixed null crash in ProductRow — prevents null/undefined runtime crashes
+- import { buildSeo
 
 ... [Truncated — see individual observations for full content]
