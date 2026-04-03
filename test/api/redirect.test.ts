@@ -189,6 +189,105 @@ describe('Redirect Engine API', () => {
     expect(mapping?.tracking_id).toBe(trackingId);
   });
 
+  it('P0-004A: Redirects public product URLs with the same-country site primary tag', async () => {
+    await DbFactory.seedAgent(env.DB, 1, 'admin-agent', 'Admin');
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (71, 'B0PUBLIC123', 'Public Product', 'http://img.com/public.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES (72, 1, 'site-default-20', 'US', 1, 1, 1)`
+    ).run();
+
+    const waitPromises: Promise<unknown>[] = [];
+    const res = await apiApp.fetch(
+      new Request('http://localhost/go/p/us/B0PUBLIC123', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      }),
+      env as any,
+      {
+        waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        passThroughOnException: () => {},
+      } as any
+    );
+
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('amazon.com/dp/B0PUBLIC123');
+    expect(res.headers.get('Location')).toContain('tag=site-default-20');
+  });
+
+  it('P0-004C: Allows Amazonbot validation through public redirects with the site primary tag', async () => {
+    await DbFactory.seedAgent(env.DB, 1, 'admin-agent', 'Admin');
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (75, 'B0REVIEW123', 'Review Product', 'http://img.com/review.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES (76, 1, 'review-tag-20', 'US', 1, 1, 1)`
+    ).run();
+
+    const waitPromises: Promise<unknown>[] = [];
+    const res = await apiApp.fetch(
+      new Request('http://localhost/go/p/us/B0REVIEW123', {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)',
+        },
+      }),
+      env as any,
+      {
+        waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        passThroughOnException: () => {},
+      } as any
+    );
+
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('Location')).toContain('tag=review-tag-20');
+  });
+
+  it('P0-004B: Does not use configured default tags for public product redirects when no site primary tag exists', async () => {
+    env.DEFAULT_AMAZON_TAG_US = 'preferred-us-20';
+
+    await DbFactory.seedAgent(env.DB, 1, 'admin-agent', 'Admin');
+    await DbFactory.seedAgent(env.DB, 14, 'rky-agent', 'RKY');
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (73, 'B0PREFERRED1', 'Preferred Product', 'http://img.com/preferred.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES
+       (74, 1, 'admin-us-20', 'US', 1, 1),
+       (75, 14, 'preferred-us-20', 'US', 1, 1)`
+    ).run();
+
+    const waitPromises: Promise<unknown>[] = [];
+    const res = await apiApp.fetch(
+      new Request('http://localhost/go/p/us/B0PREFERRED1', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      }),
+      env as any,
+      {
+        waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        passThroughOnException: () => {},
+      } as any
+    );
+
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(404);
+  });
+
   it('P0-015: Redirects tracking shortcuts to the canonical country-coded bridge path', async () => {
     const agentId = 51;
 
@@ -408,6 +507,31 @@ describe('Redirect Engine API', () => {
     expect(pageJson.amazonUrl).toContain('amazon.de/dp/B0CANON123');
   });
 
+  it('P0-007A: Exposes country-specific public redirect options on generic product detail pages', async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES
+       (1101, 'B0DETAIL12', 'Detail Product DE', 'http://img.com/detail.jpg', 'DE', 'active', 1),
+       (1102, 'B0DETAIL12', 'Detail Product US', 'http://img.com/detail-us.jpg', 'US', 'active', 1)`
+    ).run();
+
+    const loaderResult = (await productDetailLoader({
+      params: {
+        asin: 'B0DETAIL12',
+      },
+      context: {
+        cloudflare: {
+          env: env as unknown,
+        },
+      },
+      request: new Request('http://localhost/deals/B0DETAIL12'),
+    } as never)) as { canonicalPath: string; redirectUrl?: string; availableMarketplaces: string[] };
+
+    expect(loaderResult.canonicalPath).toBe('/deals/B0DETAIL12');
+    expect(loaderResult.redirectUrl).toBeUndefined();
+    expect(loaderResult.availableMarketplaces).toEqual(['DE', 'US']);
+  });
+
   it('P0-008: Rejects an unsupported country path instead of resolving another marketplace', async () => {
     const agentId = 22;
 
@@ -555,6 +679,56 @@ describe('Redirect Engine API', () => {
     expect(location.searchParams.get('utm_source')).toBe('newsletter');
     expect(location.searchParams.get('fbclid')).toBe('abc123');
     expect(location.searchParams.has('m')).toBe(false);
+  });
+
+  it('P0-010A: Falls back to the same-country site primary tag when an agent has no marketplace tag', async () => {
+    const sourceAgentId = 61;
+    const primaryAgentId = 62;
+
+    await DbFactory.seedAgent(env.DB, sourceAgentId, 'source-agent', 'Source Agent');
+    await DbFactory.seedAgent(env.DB, primaryAgentId, 'client-primary', 'Client Primary');
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6101, 'B0SITE0101', 'Site Primary Product', 'http://img.com/site-primary.jpg', 'DE', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active, is_site_primary)
+       VALUES
+       (6102, ?, 'client-primary-de-21', 'DE', 1, 1, 1),
+       (6103, ?, 'source-agent-us-20', 'US', 1, 1, 0)`
+    )
+      .bind(primaryAgentId, sourceAgentId)
+      .run();
+
+    const waitPromises: Promise<unknown>[] = [];
+    const res = await apiApp.fetch(
+      new Request('http://localhost/go/source-agent/de/B0SITE0101', {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        },
+      }),
+      env as any,
+      {
+        waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        passThroughOnException: () => {},
+      } as any
+    );
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(302);
+    const location = res.headers.get('Location');
+    expect(location).toContain('amazon.de/dp/B0SITE0101');
+    expect(location).toContain('tag=client-primary-de-21');
+
+    const mapping = await env.DB.prepare(
+      `SELECT agent_id, tracking_id
+       FROM agent_products
+       WHERE agent_id = ? AND product_id = ?`
+    )
+      .bind(sourceAgentId, 6101)
+      .first<{ agent_id: number; tracking_id: number }>();
+
+    expect(mapping).toEqual({ agent_id: sourceAgentId, tracking_id: 6102 });
   });
 
   it('P0-016: Resolves alias slugs to the linked marketplace-specific tracking tag', async () => {

@@ -41,11 +41,21 @@ const BOT_PATTERNS = [
   /Bytespider/i,
 ];
 
+export const REVIEWER_ALLOWLIST = [/Amazonbot/i];
+
+export function isReviewerUserAgent(userAgent: string | undefined): boolean {
+  if (!userAgent) return false;
+
+  return REVIEWER_ALLOWLIST.some((pattern) => pattern.test(userAgent));
+}
+
 /**
  * Check if the request looks like it's from a bot or automation tool.
  * Returns true if the request should be BLOCKED.
  */
 export function isSuspiciousRequest(userAgent: string | undefined): boolean {
+  if (isReviewerUserAgent(userAgent)) return false;
+
   // No user-agent at all → very suspicious
   if (!userAgent) return true;
 
