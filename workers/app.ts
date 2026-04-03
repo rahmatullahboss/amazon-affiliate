@@ -251,7 +251,7 @@ export default {
 
       const runtimeEnv = env as RuntimeSecretEnv;
 
-      if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
+      if (!runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL || !runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
         console.warn("[SHEET_SYNC] Skipping scheduled import because Google credentials are missing.");
         return;
       }
@@ -259,13 +259,13 @@ export default {
       await syncAgentSheetSources({
         db: env.DB,
         kv: env.KV,
-        apiKey: env.AMAZON_API_KEY,
+        apiKey: runtimeEnv.AMAZON_API_KEY,
         fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
           ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
           : [],
         credentials: {
-          clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+          clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          privateKey: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
         },
       });
 
@@ -277,14 +277,14 @@ export default {
       await syncProductsFromSheet({
         db: env.DB,
         kv: env.KV,
-        apiKey: env.AMAZON_API_KEY,
+        apiKey: runtimeEnv.AMAZON_API_KEY,
         fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
           ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
           : [],
         config,
         credentials: {
-          clientEmail: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          privateKey: env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
+          clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+          privateKey: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
         },
       });
     } catch (error) {

@@ -35,6 +35,18 @@ interface ProductRouteContext {
   status: string;
 }
 
+interface SourceAgentContext {
+  agentId: number;
+  agentSlug: string;
+  agentName: string;
+}
+
+interface SitePrimaryTrackingRow {
+  trackingId: number;
+  trackingTag: string;
+  marketplace: string;
+}
+
 export interface AgentProductResolutionRow {
   agent_slug: string;
   agent_name: string;
@@ -43,6 +55,7 @@ export interface AgentProductResolutionRow {
   product_title: string;
   image_url: string;
   description: string | null;
+  review_content: string | null;
   features: string | null;
   product_images: string | null;
   aplus_images: string | null;
@@ -104,7 +117,7 @@ function isAmazonProductFetchError(
 
 const AGENT_PRODUCT_SELECT = `SELECT
   a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
-  p.asin, p.title as product_title, p.image_url, p.description, p.features,
+  p.asin, p.title as product_title, p.image_url, p.description, p.review_content, p.features,
   p.product_images, p.aplus_images, p.id as product_id,
   t.tag as tracking_tag, t.marketplace,
   ap.custom_title
@@ -221,7 +234,23 @@ export async function hasAgentMarketplaceCandidate(
     .bind(resolvedSlug.agentId, marketplace)
     .first<{ 1: number }>();
 
-  return candidate !== null;
+  if (candidate !== null) {
+    return true;
+  }
+
+  const sitePrimary = await db
+    .prepare(
+      `SELECT 1
+       FROM tracking_ids t
+       WHERE t.marketplace = ?
+         AND t.is_active = 1
+         AND t.is_site_primary = 1
+       LIMIT 1`
+    )
+    .bind(marketplace)
+    .first<{ 1: number }>();
+
+  return sitePrimary !== null;
 }
 
 export async function resolveAgentProductBySlug(input: {
@@ -253,6 +282,57 @@ export async function resolveAgentProductBySlug(input: {
     row,
     resolvedMarketplace: row.marketplace,
   };
+}
+
+async function loadSourceAgentContext(
+  db: D1Database,
+  resolvedSlug: {
+    agentId: number;
+    publicSlug: string;
+  }
+): Promise<SourceAgentContext> {
+  const agent = await db
+    .prepare(
+      `SELECT id, name
+       FROM agents
+       WHERE id = ? AND is_active = 1
+       LIMIT 1`
+    )
+    .bind(resolvedSlug.agentId)
+    .first<{ id: number; name: string }>();
+
+  if (!agent) {
+    throw new DynamicLinkResolutionError(
+      404,
+      "No active tracking tag was found for this link. Ask admin to review the agent setup."
+    );
+  }
+
+  return {
+    agentId: agent.id,
+    agentSlug: resolvedSlug.publicSlug,
+    agentName: agent.name,
+  };
+}
+
+async function loadSitePrimaryTracking(
+  db: D1Database,
+  marketplace: string
+): Promise<SitePrimaryTrackingRow | null> {
+  return db
+    .prepare(
+      `SELECT
+         t.id as trackingId,
+         t.tag as trackingTag,
+         t.marketplace as marketplace
+       FROM tracking_ids t
+       WHERE t.marketplace = ?
+         AND t.is_active = 1
+         AND t.is_site_primary = 1
+       LIMIT 1`
+    )
+    .bind(marketplace)
+    .first<SitePrimaryTrackingRow>();
 }
 
 async function finalizeDynamicLinkResolution(input: {
@@ -425,6 +505,40 @@ export async function ensureDynamicLinkByAgentSlug(
     throw new DynamicLinkResolutionError(404, "This marketplace is not available for the selected agent.");
   }
 
+  const sourceAgent = await loadSourceAgentContext(input.db, {
+    agentId: resolvedSlug.agentId,
+    publicSlug: resolvedSlug.publicSlug,
+  });
+
+  if (preferredMarketplace) {
+    const sitePrimaryTracking = await loadSitePrimaryTracking(input.db, preferredMarketplace);
+    if (sitePrimaryTracking) {
+      const sitePrimaryProduct = await input.db
+        .prepare(
+          `SELECT id, title, image_url, status
+           FROM products
+           WHERE asin = ? AND marketplace = ?`
+        )
+        .bind(resolvedAsin, preferredMarketplace)
+        .first<ProductRouteContext>();
+
+      if (sitePrimaryProduct) {
+        return finalizeDynamicLinkResolution({
+          db: input.db,
+          kv: input.kv,
+          tracking: {
+            ...sitePrimaryTracking,
+            agentId: sourceAgent.agentId,
+            agentSlug: sourceAgent.agentSlug,
+            agentName: sourceAgent.agentName,
+          },
+          asin: resolvedAsin,
+          product: sitePrimaryProduct,
+        });
+      }
+    }
+  }
+
   const { results } = await input.db
     .prepare(
       `SELECT
@@ -446,9 +560,11 @@ export async function ensureDynamicLinkByAgentSlug(
 
   const trackingCandidates = (results ?? []).map((tracking) => ({
     ...tracking,
-    agentSlug: resolvedSlug.publicSlug,
+    agentId: sourceAgent.agentId,
+    agentSlug: sourceAgent.agentSlug,
+    agentName: sourceAgent.agentName,
   }));
-  if (trackingCandidates.length === 0) {
+  if (trackingCandidates.length === 0 && !preferredMarketplace) {
     throw new DynamicLinkResolutionError(
       404,
       "No active tracking tag was found for this link. Ask admin to review the agent setup."
@@ -462,14 +578,27 @@ export async function ensureDynamicLinkByAgentSlug(
   const preferredTrackingCandidates = preferredMarketplace
     ? baseCandidates.filter((tracking) => tracking.marketplace === preferredMarketplace)
     : baseCandidates;
+
+  const resolutionCandidates = [...(preferredMarketplace ? preferredTrackingCandidates : trackingCandidates)];
+
   if (preferredMarketplace && preferredTrackingCandidates.length === 0) {
+    const sitePrimaryTracking = await loadSitePrimaryTracking(input.db, preferredMarketplace);
+    if (sitePrimaryTracking) {
+      resolutionCandidates.push({
+        ...sitePrimaryTracking,
+        agentId: sourceAgent.agentId,
+        agentSlug: sourceAgent.agentSlug,
+        agentName: sourceAgent.agentName,
+      });
+    }
+  }
+
+  if (preferredMarketplace && resolutionCandidates.length === 0) {
     throw new DynamicLinkResolutionError(
       404,
       "This marketplace is not available for the selected agent."
     );
   }
-
-  const resolutionCandidates = preferredMarketplace ? preferredTrackingCandidates : trackingCandidates;
   let deferredStatusError: DynamicLinkResolutionError | null = null;
   let deferredFetchError: unknown = null;
 
