@@ -33,6 +33,13 @@ interface SitemapEntry {
   lastModified?: string | null;
 }
 
+type RuntimeSecretEnv = Env & {
+  AMAZON_API_KEY?: string;
+  AMAZON_API_KEY_FALLBACK?: string;
+  GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+};
+
 function isCommonBotProbe(pathname: string): boolean {
   return (
     pathname === "/.env" ||
@@ -242,7 +249,7 @@ export default {
         return;
       }
 
-      const runtimeEnv = env as Env & { AMAZON_API_KEY_FALLBACK?: string };
+      const runtimeEnv = env as RuntimeSecretEnv;
 
       if (!env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
         console.warn("[SHEET_SYNC] Skipping scheduled import because Google credentials are missing.");

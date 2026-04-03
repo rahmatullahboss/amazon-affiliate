@@ -35,7 +35,14 @@
     "ENVIRONMENT": "production",
     "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES",
     "PUBLIC_APP_URL": "https://dealsrky.com",
-    "DEFAULT_AMAZON_TAG": "dealsrky-20",
+    "DEFAULT_AMAZON_TAG": "rky3001-20",
+    "DEFAULT_AMAZON_TAG_US": "rky3001-20",
+    "DEFAULT_AMAZON_TAG_CA": "rky3002-20",
+    "DEFAULT_AMAZON_TAG_UK": "rky3003-21",
+    "DEFAULT_AMAZON_TAG_DE": "rky3007-21",
+    "DEFAULT_AMAZON_TAG_FR": "rky3006-21",
+    "DEFAULT_AMAZON_TAG_ES": "rky3004-21",
+    "DEFAULT_AMAZON_TAG_IT": "rky3005-21",
     "BLOG_IMAGES_PUBLIC_BASE_URL": ""
   },
 

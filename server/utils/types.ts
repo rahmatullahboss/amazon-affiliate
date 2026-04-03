@@ -7,6 +7,13 @@ export type Bindings = {
   SUPPORTED_MARKETPLACES: string;
   PUBLIC_APP_URL?: string;
   DEFAULT_AMAZON_TAG?: string;
+  DEFAULT_AMAZON_TAG_US?: string;
+  DEFAULT_AMAZON_TAG_CA?: string;
+  DEFAULT_AMAZON_TAG_UK?: string;
+  DEFAULT_AMAZON_TAG_DE?: string;
+  DEFAULT_AMAZON_TAG_FR?: string;
+  DEFAULT_AMAZON_TAG_ES?: string;
+  DEFAULT_AMAZON_TAG_IT?: string;
   BLOG_IMAGES_PUBLIC_BASE_URL?: string;
   JWT_SECRET: string;
   ADMIN_USERNAME?: string;
@@ -66,6 +73,7 @@ export interface TrackingIdRow {
   label: string | null;
   marketplace: string;
   is_default: number;
+  is_site_primary: number;
   is_active: number;
   is_portal_editable: number;
   created_at: string;
@@ -153,8 +161,7 @@ export interface LandingPageData {
     asin: string;
     title: string;
     imageUrl: string;
-    description?: string | null;
-    features?: string[];
+    reviewContent?: string | null;
     productImages?: string[];
     aplusImages?: string[];
     customTitle?: string;
@@ -197,6 +204,31 @@ export interface AnalyticsOverview {
     importedAt: string;
     importedByUsername: string | null;
     conversionsCount: number;
+  }>;
+}
+
+export interface MonthlyRevenueAnalytics {
+  summary: {
+    thisMonthRevenue: number;
+    thisMonthOrders: number;
+    thisMonthCommission: number;
+    lifetimeRevenue: number;
+    lifetimeCommission: number;
+  };
+  monthlyRevenueTrend: Array<{
+    month: string;
+    revenueAmount: number;
+    orderedItems: number;
+    commissionAmount: number;
+  }>;
+  agentMonthlyBreakdown: Array<{
+    month: string;
+    agentId: number;
+    agentName: string;
+    agentSlug: string;
+    orderedItems: number;
+    revenueAmount: number;
+    commissionAmount: number;
   }>;
 }
 

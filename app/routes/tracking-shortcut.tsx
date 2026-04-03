@@ -5,10 +5,25 @@ import {
 } from "../utils/asin-import";
 import { DynamicLinkResolutionError, ensureDynamicLinkByTrackingTag } from "../../server/services/dynamic-links";
 import { buildCanonicalBridgePath } from "../../server/utils/url";
+import {
+  DEFAULT_OG_IMAGE_URL,
+  DEFAULT_SITE_DESCRIPTION,
+  DEFAULT_SITE_TITLE,
+} from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Preparing Product Link — DealsRky" },
+    { title: DEFAULT_SITE_TITLE },
+    { name: "description", content: DEFAULT_SITE_DESCRIPTION },
+    { property: "og:title", content: DEFAULT_SITE_TITLE },
+    { property: "og:description", content: DEFAULT_SITE_DESCRIPTION },
+    { property: "og:type", content: "website" },
+    { property: "og:site_name", content: DEFAULT_SITE_TITLE },
+    { property: "og:image", content: DEFAULT_OG_IMAGE_URL },
+    { name: "twitter:card", content: "summary_large_image" },
+    { name: "twitter:title", content: DEFAULT_SITE_TITLE },
+    { name: "twitter:description", content: DEFAULT_SITE_DESCRIPTION },
+    { name: "twitter:image", content: DEFAULT_OG_IMAGE_URL },
     { name: "robots", content: "noindex, nofollow" },
   ];
 }
@@ -16,7 +31,10 @@ export function meta({}: Route.MetaArgs) {
 export async function loader({ request, params, context }: Route.LoaderArgs) {
   const trackingTag = params.trackingTag;
   const asin = params.asin;
-  const workerEnv = context.cloudflare.env as Env & { AMAZON_API_KEY_FALLBACK?: string };
+  const workerEnv = context.cloudflare.env as Env & {
+    AMAZON_API_KEY?: string;
+    AMAZON_API_KEY_FALLBACK?: string;
+  };
 
   if (!trackingTag || !asin) {
     throw new Response("Invalid shortcut link.", { status: 400 });

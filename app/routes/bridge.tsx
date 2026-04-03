@@ -116,7 +116,10 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     countryMarketplace ?? normalizeMarketplaceHint(new URL(request.url).searchParams.get("m"));
 
   const { env, ctx } = context.cloudflare;
-  const workerEnv = env as Env & { AMAZON_API_KEY_FALLBACK?: string };
+  const workerEnv = env as Env & {
+    AMAZON_API_KEY?: string;
+    AMAZON_API_KEY_FALLBACK?: string;
+  };
 
 const loadBridgeResolution = async () => {
     const directResolution = await resolveAgentProductBySlug({
@@ -184,7 +187,11 @@ const loadBridgeResolution = async () => {
     throw redirect(canonicalLocation);
   }
 
-  const { row } = resolution;
+  const row = resolution.row as typeof resolution.row & {
+    review_content?: string | null;
+    product_images?: string | null;
+    aplus_images?: string | null;
+  };
 
   // Record page view asynchronously with waitUntil (zero impact on render)
   ctx.waitUntil(

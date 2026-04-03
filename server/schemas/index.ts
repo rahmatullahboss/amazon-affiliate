@@ -103,6 +103,7 @@ export const createTrackingIdSchema = z.object({
   label: z.string().max(100).optional().nullable(),
   marketplace: z.enum(MARKETPLACES).default('US'),
   is_default: z.boolean().default(false),
+  is_site_primary: z.boolean().default(false),
   is_portal_editable: z.boolean().optional().default(false),
   alias_slug: slugAliasSchema,
 });
@@ -221,6 +222,7 @@ export const createAgentSheetSourceSchema = z.object({
   agent_id: z.number().int().positive(),
   sheet_url: z.string().url('Valid Google Sheet URL required'),
   sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  source_code: z.string().min(1).max(80).optional().nullable(),
   selected_tabs: z
     .array(
       z.object({
@@ -244,8 +246,21 @@ export const discoverAgentSheetTabsSchema = z.object({
 export const updateAgentSheetSourceSchema = z.object({
   sheet_url: z.string().url('Valid Google Sheet URL required').optional(),
   sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  source_code: z.string().min(1).max(80).optional().nullable(),
   is_active: z.boolean().optional(),
   auto_approve_clean_rows: z.boolean().optional(),
+});
+
+export const updateSheetControlMasterConfigSchema = z.object({
+  sheet_url: z.string().url('Valid Google Sheet URL required').optional().nullable(),
+  sheet_tab_name: z.string().min(1).max(200).optional().nullable(),
+  is_active: z.boolean().default(false),
+});
+
+export const updateSiteBrandingSettingsSchema = z.object({
+  og_site_name: z.string().min(1).max(120),
+  og_description: z.string().min(1).max(300),
+  og_image_url: z.string().url('Valid image URL required'),
 });
 
 export const triggerAgentSheetSyncSchema = z.object({
