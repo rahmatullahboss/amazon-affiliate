@@ -37,7 +37,7 @@ export default function AdminLogin() {
         user: { id: number; username: string; role: string; agentId: number | null };
       };
       persistAuthSession(data.token, data.user);
-      navigate("/admin");
+      navigate(data.user.role === "editor" ? "/admin/products" : "/admin");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {

@@ -5,7 +5,8 @@ import {
   BATCH_ASIN_IMPORT_ENABLED,
   BATCH_ASIN_IMPORT_PAUSED_DETAIL,
 } from "../../utils/asin-import";
-import { getAuthToken } from "../../utils/auth-session";
+import { getAuthToken, getAuthUser } from "../../utils/auth-session";
+import { compressImageFile } from "../../utils/image-compression";
 
 interface Product {
   id: number;
@@ -14,6 +15,9 @@ interface Product {
   image_url: string;
   marketplace: string;
   category: string | null;
+  description?: string | null;
+  features?: string | string[] | null;
+  review_content?: string | null;
   status: "active" | "pending_review" | "rejected";
   is_active: number;
   agent_count: number;
@@ -89,6 +93,15 @@ type ProductMarketplaceFilter = (typeof PRODUCT_MARKETPLACE_FILTERS)[number];
 const getToken = () => getAuthToken();
 const PRODUCT_PAGE_SIZE = 12;
 
+interface ProductEditorForm {
+  title: string;
+  image_url: string;
+  category: string;
+  description: string;
+  review_content: string;
+  featuresText: string;
+}
+
 function analyzeBulkAsins(text: string) {
   const rawEntries = text
     .split(/[\n,\t\s]+/)
@@ -108,6 +121,8 @@ function analyzeBulkAsins(text: string) {
 }
 
 export default function ProductsPage() {
+  const authUser = getAuthUser();
+  const isEditor = authUser?.role === "editor";
   const [products, setProducts] = useState<Product[]>([]);
   const [productSummary, setProductSummary] = useState<ProductSummary>({
     totalProducts: 0,
@@ -140,6 +155,17 @@ export default function ProductsPage() {
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
   const [bulkRegenerating, setBulkRegenerating] = useState(false);
   const [marketplaceFilter, setMarketplaceFilter] = useState<ProductMarketplaceFilter>("ALL");
+  const [editingProductId, setEditingProductId] = useState<number | null>(null);
+  const [editorForm, setEditorForm] = useState<ProductEditorForm>({
+    title: "",
+    image_url: "",
+    category: "",
+    description: "",
+    review_content: "",
+    featuresText: "",
+  });
+  const [savingProductId, setSavingProductId] = useState<number | null>(null);
+  const [uploadingProductImage, setUploadingProductImage] = useState(false);
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -163,6 +189,60 @@ export default function ProductsPage() {
   const [sheetImporting, setSheetImporting] = useState(false);
   const [sheetExporting, setSheetExporting] = useState(false);
   const [sheetMessage, setSheetMessage] = useState("");
+
+  function parseProductFeatures(features: Product["features"]): string[] {
+    if (Array.isArray(features)) {
+      return features.filter((value) => value.trim().length > 0);
+    }
+
+    if (typeof features !== "string" || features.trim().length === 0) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(features) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((value): value is string => typeof value === "string")
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      return features
+        .split(/\r?\n|,/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
+  function openProductEditor(product: Product) {
+    setEditingProductId(product.id);
+    setEditorForm({
+      title: product.title,
+      image_url: product.image_url,
+      category: product.category || "",
+      description: product.description || "",
+      review_content: product.review_content || "",
+      featuresText: parseProductFeatures(product.features).join("\n"),
+    });
+    setError("");
+    setSheetMessage("");
+  }
+
+  function closeProductEditor() {
+    setEditingProductId(null);
+    setEditorForm({
+      title: "",
+      image_url: "",
+      category: "",
+      description: "",
+      review_content: "",
+      featuresText: "",
+    });
+    setUploadingProductImage(false);
+  }
 
   useEffect(() => {
     void Promise.all([fetchProducts(1), fetchSheetConfig()]);
@@ -319,6 +399,106 @@ export default function ProductsPage() {
       );
     } finally {
       setDeletingProductId(null);
+    }
+  }
+
+  async function handleProductSave(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editingProductId) {
+      return;
+    }
+
+    setSavingProductId(editingProductId);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const features = editorForm.featuresText
+        .split(/\r?\n/)
+        .map((value) => value.trim())
+        .filter(Boolean);
+
+      const response = await fetch(`/api/products/${editingProductId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          title: editorForm.title.trim(),
+          image_url: editorForm.image_url.trim(),
+          category: editorForm.category.trim() || null,
+          description: editorForm.description.trim() || null,
+          review_content: editorForm.review_content.trim() || null,
+          features,
+        }),
+      });
+
+      const payload = (await response.json()) as { error?: string; message?: string };
+      if (!response.ok) {
+        throw new Error(payload.error || payload.message || "Failed to save product content");
+      }
+
+      setSheetMessage("Product content updated.");
+      closeProductEditor();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to save product content"
+      );
+    } finally {
+      setSavingProductId(null);
+    }
+  }
+
+  async function handleProductImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setUploadingProductImage(true);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const compressed = await compressImageFile(file);
+      const formData = new FormData();
+      formData.append("file", compressed);
+
+      const response = await fetch("/api/products/upload-image", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+        body: formData,
+      });
+
+      const payload = (await response.json()) as {
+        url?: string;
+        error?: string;
+        message?: string;
+      };
+
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || payload.message || "Failed to upload product image");
+      }
+
+      setEditorForm((current) => ({
+        ...current,
+        image_url: payload.url || current.image_url,
+      }));
+      setSheetMessage("Product image uploaded.");
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to upload product image"
+      );
+    } finally {
+      setUploadingProductImage(false);
+      event.target.value = "";
     }
   }
 
@@ -664,39 +844,176 @@ export default function ProductsPage() {
           Products
         </h1>
         <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => void handleBulkRegenerateContent()}
-            disabled={!canBulkRegenerate}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              !canBulkRegenerate
-                ? "bg-white/5 border border-white/10 text-[#6b6b85] cursor-not-allowed"
-                : "bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-500/20"
-            }`}
-          >
-            {bulkRegenerating
-              ? "Regenerating..."
-              : selectedProductIds.length > 0
-                ? `Bulk Regenerate (${selectedProductIds.length})`
-                : marketplaceFilter === "ALL"
-                  ? "Regenerate All Products"
-                  : `Regenerate All ${marketplaceFilter}`}
-          </button>
-          <button onClick={() => void handleExport()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
-            📥 Export CSV
-          </button>
-          <button
-            onClick={() => {
-              setShowForm(!showForm);
-              setImportResults(null);
-              setError("");
-            }}
-            className="px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm hover:opacity-90 transition-opacity"
-          >
-            {showForm ? "Cancel" : "+ Add Product"}
-          </button>
+          {!isEditor ? (
+            <>
+              <button
+                onClick={() => void handleBulkRegenerateContent()}
+                disabled={!canBulkRegenerate}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  !canBulkRegenerate
+                    ? "bg-white/5 border border-white/10 text-[#6b6b85] cursor-not-allowed"
+                    : "bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 hover:bg-indigo-500/20"
+                }`}
+              >
+                {bulkRegenerating
+                  ? "Regenerating..."
+                  : selectedProductIds.length > 0
+                    ? `Bulk Regenerate (${selectedProductIds.length})`
+                    : marketplaceFilter === "ALL"
+                      ? "Regenerate All Products"
+                      : `Regenerate All ${marketplaceFilter}`}
+              </button>
+              <button onClick={() => void handleExport()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
+                📥 Export CSV
+              </button>
+              <button
+                onClick={() => {
+                  setShowForm(!showForm);
+                  setImportResults(null);
+                  setError("");
+                }}
+                className="px-6 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold cursor-pointer text-sm hover:opacity-90 transition-opacity"
+              >
+                {showForm ? "Cancel" : "+ Add Product"}
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
+      <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-4 mb-6">
+        <p className="text-[0.68rem] uppercase tracking-[0.18em] text-indigo-200 m-0">
+          Editorial Regeneration
+        </p>
+        <p className="text-sm text-[#d8dbf5] leading-relaxed mt-3 mb-0">
+          Regenerate content creates a fresh independent summary for the product page.
+          It updates only the editorial copy shown publicly. It does not change the
+          title, image, ASIN, tags, links, features, or A+ images.
+        </p>
+        <p className="text-sm text-[#aeb4d7] leading-relaxed mt-3 mb-0">
+          The generated copy is medium-length: usually a short intro, a practical fit
+          note, a few feature bullets, and a closing reminder to verify live pricing
+          on Amazon.
+        </p>
+      </div>
+
+      {editingProductId ? (
+        <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#ff9900] m-0">
+                Product Editor
+              </p>
+              <h2 className="text-xl font-bold text-[#f0f0f5] mt-2 mb-0">
+                Update product copy and image
+              </h2>
+              <p className="text-sm text-[#8d8da6] mt-2 mb-0">
+                Save cleaner descriptions, structured editorial notes, and a WebP-compressed product image stored in R2.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={closeProductEditor}
+              className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#d4d4e4] font-medium text-sm hover:bg-white/10 transition-colors"
+            >
+              Close Editor
+            </button>
+          </div>
+
+          <form onSubmit={(event) => void handleProductSave(event)} className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Title</label>
+              <input
+                value={editorForm.title}
+                onChange={(event) => setEditorForm((current) => ({ ...current, title: event.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Category</label>
+              <input
+                value={editorForm.category}
+                onChange={(event) => setEditorForm((current) => ({ ...current, category: event.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                placeholder="Home Office, Cleaning, Kitchen..."
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Image URL</label>
+              <input
+                value={editorForm.image_url}
+                onChange={(event) => setEditorForm((current) => ({ ...current, image_url: event.target.value }))}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                required
+              />
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <label className="inline-flex cursor-pointer items-center justify-center rounded-lg bg-white/5 px-4 py-2 text-sm font-medium text-[#d4d4e4] transition-colors hover:bg-white/10">
+                  {uploadingProductImage ? "Uploading..." : "Upload WebP Image"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => void handleProductImageUpload(event)}
+                    className="hidden"
+                    disabled={uploadingProductImage}
+                  />
+                </label>
+                <p className="text-xs text-[#8d8da6] m-0">
+                  Uploads are compressed to WebP in the browser, then stored in R2.
+                </p>
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Short Description</label>
+              <textarea
+                value={editorForm.description}
+                onChange={(event) => setEditorForm((current) => ({ ...current, description: event.target.value }))}
+                rows={4}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                placeholder="Write a concise, original product description."
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Features</label>
+              <textarea
+                value={editorForm.featuresText}
+                onChange={(event) => setEditorForm((current) => ({ ...current, featuresText: event.target.value }))}
+                rows={8}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                placeholder={"One feature per line\nQuiet motor\nUSB-C charging\nCompact base"}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Editorial Copy</label>
+              <textarea
+                value={editorForm.review_content}
+                onChange={(event) => setEditorForm((current) => ({ ...current, review_content: event.target.value }))}
+                rows={8}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                placeholder={"Overview\n\nWho this fits\n\nFeature highlights\n\nBefore you buy on Amazon"}
+              />
+            </div>
+            <div className="lg:col-span-2 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={savingProductId === editingProductId}
+                className="px-5 py-2.5 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {savingProductId === editingProductId ? "Saving..." : "Save Product Content"}
+              </button>
+              <button
+                type="button"
+                onClick={closeProductEditor}
+                className="px-5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#d4d4e4] font-semibold text-sm hover:bg-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+
+      {!isEditor ? (
       <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
         <div
           className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6"
@@ -873,6 +1190,7 @@ export default function ProductsPage() {
           )}
         </div>
       </div>
+      ) : null}
 
       {showForm ? (
         <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 mb-6">
@@ -1164,15 +1482,17 @@ export default function ProductsPage() {
                 Showing {products.length} of {productPagination.totalItems} products
                 {marketplaceFilter !== "ALL" ? ` in ${marketplaceFilter}` : ""}
               </p>
-              <label className="inline-flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
-                  checked={allVisibleSelected}
-                  onChange={(event) => toggleVisibleSelection(event.target.checked)}
-                />
-                Select all visible
-              </label>
+              {!isEditor ? (
+                <label className="inline-flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
+                    checked={allVisibleSelected}
+                    onChange={(event) => toggleVisibleSelection(event.target.checked)}
+                  />
+                  Select all visible
+                </label>
+              ) : null}
             </div>
             <div className="flex flex-col gap-2 min-w-[180px]">
               <label className="text-xs uppercase tracking-[0.16em] text-[#8d8da6]">
@@ -1203,15 +1523,17 @@ export default function ProductsPage() {
                 key={product.id}
                 className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 flex flex-col gap-3"
               >
-                <label className="inline-flex items-center gap-2 text-xs text-[#a0a0b8]">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
-                    checked={selectedProductIds.includes(product.id)}
-                    onChange={(event) => toggleProductSelection(product.id, event.target.checked)}
-                  />
-                  Select
-                </label>
+                {!isEditor ? (
+                  <label className="inline-flex items-center gap-2 text-xs text-[#a0a0b8]">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
+                      checked={selectedProductIds.includes(product.id)}
+                      onChange={(event) => toggleProductSelection(product.id, event.target.checked)}
+                    />
+                    Select
+                  </label>
+                ) : null}
                 <div
                   className="w-full aspect-square bg-white rounded-xl flex items-center justify-center overflow-hidden"
                 >
@@ -1243,8 +1565,21 @@ export default function ProductsPage() {
                     ASIN: {product.asin} · {product.marketplace} · {product.agent_count} agents ·{" "}
                     {product.total_clicks} clicks
                   </p>
+                  <p className="text-xs text-[#8d8da6] mt-2 m-0 leading-relaxed">
+                    Regenerate updates only the editorial summary shown on the public page.
+                  </p>
                 </div>
                 <div className="mt-auto grid grid-cols-1 gap-2">
+                  <button
+                    onClick={() => openProductEditor(product)}
+                    disabled={
+                      savingProductId === product.id ||
+                      uploadingProductImage
+                    }
+                    className="px-4 py-2 border border-[#ff9900]/30 rounded-lg font-medium text-sm transition-colors bg-[#ff9900]/10 text-[#ffcf8a] cursor-pointer hover:bg-[#ff9900]/20"
+                  >
+                    {editingProductId === product.id ? "Editing..." : "Edit Content"}
+                  </button>
                   <button
                     onClick={() => void handleRegenerateContent(product.id)}
                     disabled={
@@ -1260,37 +1595,41 @@ export default function ProductsPage() {
                   >
                     {regeneratingProductId === product.id ? "Regenerating..." : "Regenerate Content"}
                   </button>
-                  <button
-                    onClick={() => void handleProductRefresh(product.id)}
-                    disabled={
-                      refreshingProductId === product.id ||
-                      deletingProductId === product.id ||
-                      regeneratingProductId === product.id ||
-                      !ASIN_IMPORT_ENABLED
-                    }
-                    className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
-                      refreshingProductId === product.id || !ASIN_IMPORT_ENABLED
-                        ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
-                        : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
-                    }`}
-                  >
-                    {refreshingProductId === product.id ? "Refreshing..." : ASIN_IMPORT_ENABLED ? "Refresh Data" : "Refresh Paused"}
-                  </button>
-                  <button
-                    onClick={() => void handleProductDelete(product.id)}
-                    disabled={
-                      deletingProductId === product.id ||
-                      refreshingProductId === product.id ||
-                      regeneratingProductId === product.id
-                    }
-                    className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
-                      deletingProductId === product.id
-                        ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
-                        : "border-red-500/30 bg-red-500/10 text-red-300 cursor-pointer hover:bg-red-500/20"
-                    }`}
-                  >
-                    {deletingProductId === product.id ? "Removing..." : "Remove Product"}
-                  </button>
+                  {!isEditor ? (
+                    <>
+                      <button
+                        onClick={() => void handleProductRefresh(product.id)}
+                        disabled={
+                          refreshingProductId === product.id ||
+                          deletingProductId === product.id ||
+                          regeneratingProductId === product.id ||
+                          !ASIN_IMPORT_ENABLED
+                        }
+                        className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                          refreshingProductId === product.id || !ASIN_IMPORT_ENABLED
+                            ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                            : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 cursor-pointer hover:bg-indigo-500/20"
+                        }`}
+                      >
+                        {refreshingProductId === product.id ? "Refreshing..." : ASIN_IMPORT_ENABLED ? "Refresh Data" : "Refresh Paused"}
+                      </button>
+                      <button
+                        onClick={() => void handleProductDelete(product.id)}
+                        disabled={
+                          deletingProductId === product.id ||
+                          refreshingProductId === product.id ||
+                          regeneratingProductId === product.id
+                        }
+                        className={`px-4 py-2 border rounded-lg font-medium text-sm transition-colors ${
+                          deletingProductId === product.id
+                            ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                            : "border-red-500/30 bg-red-500/10 text-red-300 cursor-pointer hover:bg-red-500/20"
+                        }`}
+                      >
+                        {deletingProductId === product.id ? "Removing..." : "Remove Product"}
+                      </button>
+                    </>
+                  ) : null}
                 </div>
               </div>
             ))}

@@ -79,6 +79,9 @@ export const updateProductSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   image_url: z.string().url('Valid image URL required').optional(),
   category: z.string().max(100).optional().nullable(),
+  description: z.string().max(4000).optional().nullable(),
+  review_content: z.string().max(12000).optional().nullable(),
+  features: z.array(z.string().min(1).max(280)).max(12).optional().nullable(),
   is_active: z.boolean().optional(),
   status: z.enum(PRODUCT_STATUSES).optional(),
 });
@@ -190,14 +193,14 @@ export const createUserSchema = z.object({
   username: z.string().min(3).max(50),
   email: z.string().email().optional().nullable(),
   password: z.string().min(8),
-  role: z.enum(['super_admin', 'admin', 'agent']).default('agent'),
+  role: z.enum(['super_admin', 'admin', 'editor', 'agent']).default('agent'),
   agent_id: z.number().int().positive().optional().nullable(),
 });
 
 export const updateUserSchema = z.object({
   email: z.string().email().optional().nullable(),
   password: z.string().min(8).optional(),
-  role: z.enum(['super_admin', 'admin', 'agent']).optional(),
+  role: z.enum(['super_admin', 'admin', 'editor', 'agent']).optional(),
   agent_id: z.number().int().positive().optional().nullable(),
   is_active: z.boolean().optional(),
 });

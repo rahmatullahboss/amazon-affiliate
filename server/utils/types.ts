@@ -34,7 +34,7 @@ export type AppEnv = {
   Bindings: Bindings;
   Variables: {
     userId?: number;
-    userRole?: 'super_admin' | 'admin' | 'agent';
+    userRole?: 'super_admin' | 'admin' | 'editor' | 'agent';
     agentId?: number | null;
     username?: string;
   };
@@ -59,6 +59,9 @@ export interface ProductRow {
   image_url: string;
   marketplace: string;
   category: string | null;
+  description?: string | null;
+  features?: string | null;
+  review_content?: string | null;
   status?: 'active' | 'pending_review' | 'rejected';
   is_active: number;
   fetched_at: string | null;
@@ -144,7 +147,7 @@ export interface UserRow {
   username: string;
   email: string | null;
   password_hash: string;
-  role: 'super_admin' | 'admin' | 'agent';
+  role: 'super_admin' | 'admin' | 'editor' | 'agent';
   agent_id: number | null;
   is_active: number;
   created_at: string;

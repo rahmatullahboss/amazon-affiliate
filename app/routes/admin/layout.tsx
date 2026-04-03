@@ -1,4 +1,4 @@
-import { Outlet, NavLink, useNavigate } from "react-router";
+import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
 import { useEffect, useState } from "react";
 import type { Route } from "./+types/layout";
 import { clearAuthSession, getAuthToken, restoreAuthSession } from "../../utils/auth-session";
@@ -14,6 +14,7 @@ export function meta({}: Route.MetaArgs) {
 
 export default function AdminLayout() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -56,7 +57,11 @@ export default function AdminLayout() {
           };
         };
 
-        if (data.user?.role !== "admin" && data.user?.role !== "super_admin") {
+        if (
+          data.user?.role !== "admin" &&
+          data.user?.role !== "super_admin" &&
+          data.user?.role !== "editor"
+        ) {
           clearAuthSession();
           navigate("/admin/login", { replace: true });
           return;
@@ -78,6 +83,23 @@ export default function AdminLayout() {
 
     void verifySession();
   }, [navigate]);
+
+  useEffect(() => {
+    if (!user || user.role !== "editor") {
+      return;
+    }
+
+    const editorAllowedPaths = new Set(["/admin", "/admin/products", "/admin/blogs"]);
+
+    if (!editorAllowedPaths.has(location.pathname)) {
+      navigate("/admin/products", { replace: true });
+      return;
+    }
+
+    if (location.pathname === "/admin") {
+      navigate("/admin/products", { replace: true });
+    }
+  }, [location.pathname, navigate, user]);
 
   const handleLogout = () => {
     clearAuthSession();
@@ -115,20 +137,26 @@ export default function AdminLayout() {
 
   if (!user) return null;
 
-  const navItems = [
-    { to: "/admin", label: "Dashboard", icon: "📊", end: true },
-    { to: "/admin/users", label: "Users", icon: "🧑‍💼" },
-    { to: "/admin/agents", label: "Agents", icon: "👥" },
-    { to: "/admin/products", label: "Products", icon: "📦" },
-    { to: "/admin/sheet-control", label: "Sheet Control", icon: "🗂️" },
-    { to: "/admin/product-submissions", label: "Reviews", icon: "🛂" },
-    { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
-    { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
-    { to: "/admin/analytics", label: "Analytics", icon: "📈" },
-    { to: "/admin/reports", label: "Reports", icon: "🧾" },
-    { to: "/admin/blogs", label: "Blogs", icon: "📝" },
-    { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
-  ];
+  const navItems = user.role === "editor"
+    ? [
+        { to: "/admin/products", label: "Products", icon: "📦" },
+        { to: "/admin/blogs", label: "Blogs", icon: "📝" },
+      ]
+    : [
+        { to: "/admin", label: "Dashboard", icon: "📊", end: true },
+        { to: "/admin/users", label: "Users", icon: "🧑‍💼" },
+        { to: "/admin/agents", label: "Agents", icon: "👥" },
+        { to: "/admin/products", label: "Products", icon: "📦" },
+        { to: "/admin/sheet-control", label: "Sheet Control", icon: "🗂️" },
+        { to: "/admin/product-submissions", label: "Reviews", icon: "🛂" },
+        { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
+        { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
+        { to: "/admin/analytics", label: "Analytics", icon: "📈" },
+        { to: "/admin/reports", label: "Reports", icon: "🧾" },
+        { to: "/admin/site-branding", label: "Site Branding", icon: "🎨" },
+        { to: "/admin/blogs", label: "Blogs", icon: "📝" },
+        { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
+      ];
 
   return (
     <div className="flex min-h-screen bg-[#0a0a0f] text-[#f0f0f5]">

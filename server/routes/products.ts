@@ -25,6 +25,7 @@ import {
   refreshProductRecord,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
+import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog';
 
 const products = new Hono<AppEnv>();
 
@@ -184,6 +185,40 @@ products.post('/', zValidator('json', createProductSchema), async (c) => {
     }
     throw error;
   }
+});
+
+products.post('/upload-image', async (c) => {
+  const formData = await c.req.formData();
+  const file = formData.get('file');
+
+  if (!(file instanceof File)) {
+    throw new HTTPException(400, { message: 'Image file is required' });
+  }
+
+  if (!file.type.startsWith('image/')) {
+    throw new HTTPException(400, { message: 'Only image uploads are supported' });
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    throw new HTTPException(400, { message: 'Compressed image must be 5MB or smaller' });
+  }
+
+  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/jpeg' ? 'jpg' : 'webp';
+  const key = buildStoredImageKey('product', extension);
+
+  await c.env.BLOG_IMAGES.put(key, await file.arrayBuffer(), {
+    httpMetadata: {
+      contentType: file.type,
+      cacheControl: 'public, max-age=31536000, immutable',
+    },
+  });
+
+  return c.json({
+    key,
+    url: buildBlogImageUrl(c.env, key),
+    contentType: file.type,
+    size: file.size,
+  });
 });
 
 /**
@@ -604,6 +639,9 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
   if (body.title) { updates.push('title = ?'); values.push(body.title); }
   if (body.image_url) { updates.push('image_url = ?'); values.push(body.image_url); }
   if (body.category !== undefined) { updates.push('category = ?'); values.push(body.category); }
+  if (body.description !== undefined) { updates.push('description = ?'); values.push(body.description); }
+  if (body.review_content !== undefined) { updates.push('review_content = ?'); values.push(body.review_content); }
+  if (body.features !== undefined) { updates.push('features = ?'); values.push(body.features ? JSON.stringify(body.features) : null); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
   if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
 
@@ -641,6 +679,9 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
         titleUpdated: body.title !== undefined,
         imageUpdated: body.image_url !== undefined,
         categoryUpdated: body.category !== undefined,
+        descriptionUpdated: body.description !== undefined,
+        reviewContentUpdated: body.review_content !== undefined,
+        featuresUpdated: body.features !== undefined,
         isActive: body.is_active,
         status: body.status,
       },

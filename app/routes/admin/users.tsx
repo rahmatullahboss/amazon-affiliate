@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 
 interface AdminUser {
   id: number;
   username: string;
   email: string | null;
-  role: "super_admin" | "admin" | "agent";
+  role: "super_admin" | "admin" | "editor" | "agent";
   agent_id: number | null;
   is_active: number;
   agent_name?: string | null;
@@ -26,11 +26,12 @@ export default function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [form, setForm] = useState({
     username: "",
     email: "",
     password: "",
-    role: "agent" as "super_admin" | "admin" | "agent",
+    role: "agent" as "super_admin" | "admin" | "editor" | "agent",
     agent_id: 0,
   });
 
@@ -61,6 +62,26 @@ export default function AdminUsersPage() {
       setLoading(false);
     });
   }, []);
+
+  const filteredUsers = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) {
+      return users;
+    }
+
+    return users.filter((user) => {
+      const haystacks = [
+        user.username,
+        user.email || "",
+        user.role,
+        user.agent_name || "",
+        user.agent_slug || "",
+      ];
+
+      return haystacks.some((value) => value.toLowerCase().includes(query));
+    });
+  }, [searchQuery, users]);
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -114,13 +135,24 @@ export default function AdminUsersPage() {
   return (
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Users</h1>
-        <button
-          onClick={() => setShowForm((value) => !value)}
-          className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap"
-        >
-          {showForm ? "Cancel" : "+ Add User"}
-        </button>
+        <div className="w-full sm:w-auto">
+          <h1 className="text-2xl sm:text-3xl font-bold text-[#f0f0f5] m-0">Users</h1>
+        </div>
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search users, email, agent..."
+            className="w-full sm:w-[280px] rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+          />
+          <button
+            onClick={() => setShowForm((value) => !value)}
+            className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap"
+          >
+            {showForm ? "Cancel" : "+ Add User"}
+          </button>
+        </div>
       </div>
 
       {showForm ? (
@@ -140,8 +172,9 @@ export default function AdminUsersPage() {
             </div>
             <div>
               <label className="block text-sm text-[#a0a0b8] mb-1.5">Role*</label>
-              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "super_admin" | "admin" | "agent" })}>
+              <select className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "super_admin" | "admin" | "editor" | "agent" })}>
                 <option className="bg-gray-800" value="agent">agent</option>
+                <option className="bg-gray-800" value="editor">editor</option>
                 <option className="bg-gray-800" value="admin">admin</option>
                 <option className="bg-gray-800" value="super_admin">super_admin</option>
               </select>
@@ -177,7 +210,7 @@ export default function AdminUsersPage() {
         <p className="text-[#a0a0b8] m-0">Loading users...</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {users.map((user) => (
+          {filteredUsers.map((user) => (
             <div key={user.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="min-w-0 w-full sm:w-auto">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -200,7 +233,16 @@ export default function AdminUsersPage() {
               </button>
             </div>
           ))}
-          {users.length === 0 ? <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No users yet.</p> : null}
+          {users.length === 0 ? (
+            <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">
+              No users yet.
+            </p>
+          ) : null}
+          {users.length > 0 && filteredUsers.length === 0 ? (
+            <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">
+              No users matched your search.
+            </p>
+          ) : null}
         </div>
       )}
     </div>

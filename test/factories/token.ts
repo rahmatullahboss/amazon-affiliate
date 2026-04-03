@@ -28,3 +28,18 @@ export async function generateAgentToken(
     secret
   );
 }
+
+export async function generateEditorToken(
+  username = 'editor',
+  secret = 'test-secret'
+): Promise<string> {
+  return createTestJwt(
+    {
+      sub: 2,
+      role: 'editor',
+      username,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    },
+    secret
+  );
+}

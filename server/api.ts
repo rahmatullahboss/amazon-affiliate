@@ -23,6 +23,7 @@ import sheets from './routes/sheets';
 import auditLogs from './routes/audit-logs';
 import blogs from './routes/blogs';
 import sheetControl from './routes/sheet-control';
+import siteBranding from './routes/site-branding';
 
 const app = new Hono<AppEnv>();
 
@@ -70,10 +71,14 @@ app.route('/api/auth', auth);
 // Public API endpoints for the main site
 app.route('/api/public', publicRoutes);
 
-// ─── Protected Routes (Admin Only) ───────────────────────
-const admin = new Hono<AppEnv>();
-admin.use('*', authMiddleware);
-admin.use('*', requireRole('admin', 'super_admin'));
+// ─── Protected Routes ────────────────────────────────────
+const adminContent = new Hono<AppEnv>();
+adminContent.use('*', authMiddleware);
+adminContent.use('*', requireRole('editor', 'admin', 'super_admin'));
+
+const adminOnly = new Hono<AppEnv>();
+adminOnly.use('*', authMiddleware);
+adminOnly.use('*', requireRole('admin', 'super_admin'));
 
 const portalApi = new Hono<AppEnv>();
 portalApi.use('*', authMiddleware);
@@ -82,18 +87,21 @@ portalApi.route('/', portal);
 
 app.route('/api/portal', portalApi);
 
-admin.route('/agents', agents);
-admin.route('/users', users);
-admin.route('/products', products);
-admin.route('/tracking', tracking);
-admin.route('/mappings', mappings);
-admin.route('/analytics', analytics);
-admin.route('/sheets', sheets);
-admin.route('/sheet-control', sheetControl);
-admin.route('/audit-logs', auditLogs);
-admin.route('/blogs', blogs);
+adminContent.route('/products', products);
+adminContent.route('/blogs', blogs);
 
-app.route('/api', admin);
+adminOnly.route('/agents', agents);
+adminOnly.route('/users', users);
+adminOnly.route('/tracking', tracking);
+adminOnly.route('/mappings', mappings);
+adminOnly.route('/analytics', analytics);
+adminOnly.route('/sheets', sheets);
+adminOnly.route('/sheet-control', sheetControl);
+adminOnly.route('/audit-logs', auditLogs);
+adminOnly.route('/site-branding', siteBranding);
+
+app.route('/api', adminContent);
+app.route('/api', adminOnly);
 
 // ─── Global Error Handler ─────────────────────────────────
 app.onError(async (err, c) => {

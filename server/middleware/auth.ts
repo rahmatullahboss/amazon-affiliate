@@ -23,7 +23,7 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next): Promise<vo
     }
 
     c.set('userId', payload.sub as number);
-    c.set('userRole', payload.role as 'super_admin' | 'admin' | 'agent');
+    c.set('userRole', payload.role as 'super_admin' | 'admin' | 'editor' | 'agent');
     c.set('agentId', (payload.agentId as number | null | undefined) ?? null);
     c.set('username', payload.username as string);
   } catch (error) {
@@ -35,7 +35,7 @@ export const authMiddleware = async (c: Context<AppEnv>, next: Next): Promise<vo
 };
 
 export const requireRole =
-  (...roles: Array<'super_admin' | 'admin' | 'agent'>) =>
+  (...roles: Array<'super_admin' | 'admin' | 'editor' | 'agent'>) =>
   async (c: Context<AppEnv>, next: Next): Promise<void> => {
     const role = c.get('userRole');
     if (!role || !roles.includes(role)) {

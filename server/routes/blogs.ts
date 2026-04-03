@@ -7,6 +7,7 @@ import {
   buildBlogExcerpt,
   buildBlogImageKey,
   buildBlogImageUrl,
+  buildStoredImageKey,
   createUniqueBlogSlug,
   estimateReadingMinutes,
 } from "../services/blog";
@@ -77,7 +78,7 @@ blogs.post("/upload-image", async (c) => {
   }
 
   const extension = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" : "webp";
-  const key = buildBlogImageKey(extension);
+  const key = buildStoredImageKey("blog", extension);
 
   await c.env.BLOG_IMAGES.put(key, await file.arrayBuffer(), {
     httpMetadata: {

@@ -102,8 +102,12 @@ export function buildBlogImageUrl(env: Pick<Bindings, "BLOG_IMAGES_PUBLIC_BASE_U
   return `/api/public/blog-images/${key}`;
 }
 
-export function buildBlogImageKey(extension: string): string {
+export function buildStoredImageKey(prefix: string, extension: string): string {
   const safeExtension = extension.replace(/[^a-z0-9]/gi, "").toLowerCase() || "webp";
   const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-  return `blog-${Date.now()}-${randomPart}.${safeExtension}`;
+  return `${prefix}-${Date.now()}-${randomPart}.${safeExtension}`;
+}
+
+export function buildBlogImageKey(extension: string): string {
+  return buildStoredImageKey("blog", extension);
 }
