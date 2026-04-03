@@ -38,7 +38,6 @@ export default [
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("reports", "routes/admin/reports.tsx"),
-    route("site-branding", "routes/admin/site-branding.tsx"),
     route("audit-logs", "routes/admin/audit-logs.tsx"),
     route("blogs", "routes/admin/blogs.tsx"),
   ]),
