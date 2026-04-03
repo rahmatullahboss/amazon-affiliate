@@ -253,6 +253,36 @@ describe('Redirect Engine API', () => {
     expect(res.headers.get('Location')).toContain('tag=review-tag-20');
   });
 
+  it('P0-004D: Blocks mixed scripted user agents even when Amazonbot is appended', async () => {
+    await DbFactory.seedAgent(env.DB, 1, 'admin-agent', 'Admin');
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (77, 'B0REVIEW124', 'Review Product 2', 'http://img.com/review2.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES (78, 1, 'review-tag-21', 'US', 1, 1, 1)`
+    ).run();
+
+    const waitPromises: Promise<unknown>[] = [];
+    const res = await apiApp.fetch(
+      new Request('http://localhost/go/p/us/B0REVIEW124', {
+        headers: {
+          'User-Agent': 'curl/8.1.2 Amazonbot/0.1',
+        },
+      }),
+      env as any,
+      {
+        waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        passThroughOnException: () => {},
+      } as any
+    );
+
+    await Promise.all(waitPromises);
+
+    expect(res.status).toBe(403);
+  });
+
   it('P0-004B: Does not use configured default tags for public product redirects when no site primary tag exists', async () => {
     env.DEFAULT_AMAZON_TAG_US = 'preferred-us-20';
 

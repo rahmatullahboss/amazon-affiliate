@@ -42,20 +42,39 @@ const BOT_PATTERNS = [
 ];
 
 export const REVIEWER_ALLOWLIST = [/Amazonbot/i];
+const REVIEWER_BLOCKED_PATTERNS = [
+  /curl/i,
+  /wget/i,
+  /HeadlessChrome/i,
+  /python-requests/i,
+  /python-urllib/i,
+  /Go-http-client/i,
+  /httpie/i,
+  /PostmanRuntime/i,
+];
 
 export function isReviewerUserAgent(userAgent: string | undefined): boolean {
   if (!userAgent) return false;
 
-  return REVIEWER_ALLOWLIST.some((pattern) => pattern.test(userAgent));
+  const isAllowlisted = REVIEWER_ALLOWLIST.some((pattern) => pattern.test(userAgent));
+  if (!isAllowlisted) return false;
+
+  return !REVIEWER_BLOCKED_PATTERNS.some((pattern) => pattern.test(userAgent));
+}
+
+interface SuspiciousRequestOptions {
+  allowReviewerAccess?: boolean;
 }
 
 /**
  * Check if the request looks like it's from a bot or automation tool.
  * Returns true if the request should be BLOCKED.
  */
-export function isSuspiciousRequest(userAgent: string | undefined): boolean {
-  if (isReviewerUserAgent(userAgent)) return false;
-
+export function isSuspiciousRequest(
+  userAgent: string | undefined,
+  options?: SuspiciousRequestOptions
+): boolean {
+  if (options?.allowReviewerAccess && isReviewerUserAgent(userAgent)) return false;
   // No user-agent at all → very suspicious
   if (!userAgent) return true;
 

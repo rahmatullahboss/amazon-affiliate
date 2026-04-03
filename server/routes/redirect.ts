@@ -25,12 +25,16 @@ interface RedirectContext {
   trackingTag: string;
 }
 
-interface RedirectFallbackRow {
-  asin: string;
-  tag: string;
-  marketplace: string;
-  agent_id: number;
-  product_id: number;
+interface RedirectRequestMetadata {
+  ip: string;
+  userAgent: string;
+}
+
+interface PublicRedirectResolution {
+  amazonUrl: string;
+  agentId: number;
+  productId: number;
+  trackingTag: string;
 }
 
 function createNoindexRedirect(targetUrl: string): Response {
@@ -49,132 +53,6 @@ function buildCanonicalGoRedirectLocation(requestUrl: string, pathname: string):
   url.pathname = pathname;
   url.searchParams.delete('m');
   return `${url.pathname}${url.search}${url.hash}`;
-}
-
-async function resolveFallbackRedirectContext(
-  db: D1Database,
-  asin: string,
-  preferredMarketplace?: string | null
-): Promise<RedirectContext | null> {
-  const row = preferredMarketplace
-    ? await db
-    .prepare(
-      `SELECT
-         p.asin,
-         t.tag,
-         t.marketplace,
-         a.id AS agent_id,
-         p.id AS product_id
-       FROM products p
-       JOIN agent_products ap ON ap.product_id = p.id
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE p.asin = ?
-         AND t.marketplace = ?
-         AND p.is_active = 1
-         AND p.status = 'active'
-         AND ap.is_active = 1
-         AND a.is_active = 1
-         AND t.is_active = 1
-       ORDER BY t.is_default DESC, ap.updated_at DESC, ap.id DESC
-       LIMIT 1`
-    )
-    .bind(asin, preferredMarketplace)
-    .first<RedirectFallbackRow>()
-    : await db
-    .prepare(
-      `SELECT
-         p.asin,
-         t.tag,
-         t.marketplace,
-         a.id AS agent_id,
-         p.id AS product_id
-       FROM products p
-       JOIN agent_products ap ON ap.product_id = p.id
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE p.asin = ?
-         AND p.is_active = 1
-         AND p.status = 'active'
-         AND ap.is_active = 1
-         AND a.is_active = 1
-         AND t.is_active = 1
-       ORDER BY t.is_default DESC, ap.updated_at DESC, ap.id DESC
-       LIMIT 1`
-    )
-    .bind(asin)
-    .first<RedirectFallbackRow>();
-
-  if (row) {
-    return {
-      amazonUrl: buildAmazonUrl(row.asin, row.tag, row.marketplace),
-      agentId: row.agent_id,
-      productId: row.product_id,
-      trackingTag: row.tag,
-    };
-  }
-
-  const fallbackTag = preferredMarketplace
-    ? await db
-    .prepare(
-      `SELECT
-         p.asin,
-         t.tag,
-         t.marketplace,
-         a.id AS agent_id,
-         p.id AS product_id
-       FROM products p
-       JOIN tracking_ids t ON t.marketplace = p.marketplace
-       JOIN agents a ON a.id = t.agent_id
-       WHERE p.asin = ?
-         AND p.marketplace = ?
-         AND p.is_active = 1
-         AND p.status = 'active'
-         AND t.is_active = 1
-         AND a.is_active = 1
-       ORDER BY
-         CASE WHEN a.id = 1 THEN 0 ELSE 1 END ASC,
-         t.is_default DESC,
-         t.created_at ASC
-       LIMIT 1`
-    )
-    .bind(asin, preferredMarketplace)
-    .first<RedirectFallbackRow>()
-    : await db
-    .prepare(
-      `SELECT
-         p.asin,
-         t.tag,
-         t.marketplace,
-         a.id AS agent_id,
-         p.id AS product_id
-       FROM products p
-       JOIN tracking_ids t ON t.marketplace = p.marketplace
-       JOIN agents a ON a.id = t.agent_id
-       WHERE p.asin = ?
-         AND p.is_active = 1
-         AND p.status = 'active'
-         AND t.is_active = 1
-         AND a.is_active = 1
-       ORDER BY
-         CASE WHEN a.id = 1 THEN 0 ELSE 1 END ASC,
-         t.is_default DESC,
-         t.created_at ASC
-       LIMIT 1`
-    )
-    .bind(asin)
-    .first<RedirectFallbackRow>();
-
-  if (!fallbackTag) {
-    return null;
-  }
-
-  return {
-    amazonUrl: buildAmazonUrl(fallbackTag.asin, fallbackTag.tag, fallbackTag.marketplace),
-    agentId: fallbackTag.agent_id,
-    productId: fallbackTag.product_id,
-    trackingTag: fallbackTag.tag,
-  };
 }
 
 /**
@@ -248,6 +126,83 @@ redirect.get('/t/:trackingTag/:asin', async (c) => {
   );
 
   return createNoindexRedirect(ctx.amazonUrl);
+});
+
+async function getRedirectRequestMetadata(c: Context<AppEnv>): Promise<RedirectRequestMetadata> {
+  const ip = c.req.header('cf-connecting-ip') || c.req.header('x-forwarded-for') || '';
+  const userAgent = c.req.header('user-agent') || '';
+
+  if (isSuspiciousRequest(userAgent, { allowReviewerAccess: true })) {
+    throw new HTTPException(403, { message: 'Access denied' });
+  }
+
+  return { ip, userAgent };
+}
+
+redirect.get('/p/:country/:asin', async (c) => {
+  const marketplace = normalizeMarketplaceHint(c.req.param('country'));
+  const asin = c.req.param('asin');
+
+  if (!marketplace || !asin) {
+    throw new HTTPException(400, { message: 'Missing marketplace or ASIN' });
+  }
+
+  const { ip } = await getRedirectRequestMetadata(c);
+  const rateCheck = await checkRedirectRateLimit(c.env.KV, ip, `public:${marketplace}`);
+  if (!rateCheck.allowed) {
+    throw new HTTPException(429, { message: 'Too many requests. Please try again later.' });
+  }
+
+  const resolution = await c.env.DB
+    .prepare(
+      `SELECT
+         p.id AS product_id,
+         t.agent_id AS agent_id,
+         t.tag AS tracking_tag
+       FROM products p
+       JOIN tracking_ids t
+         ON t.marketplace = p.marketplace
+        AND t.is_active = 1
+        AND t.is_site_primary = 1
+       WHERE p.asin = ?
+         AND p.marketplace = ?
+         AND p.is_active = 1
+         AND p.status = 'active'
+       LIMIT 1`
+    )
+    .bind(asin, marketplace)
+    .first<{
+      product_id: number;
+      agent_id: number;
+      tracking_tag: string;
+    }>();
+
+  if (!resolution) {
+    throw new HTTPException(404, {
+      message: 'No site primary tracking tag is configured for this marketplace.',
+    });
+  }
+
+  const ctx: PublicRedirectResolution = {
+    amazonUrl: buildAmazonUrl(asin, resolution.tracking_tag, marketplace),
+    agentId: resolution.agent_id,
+    productId: resolution.product_id,
+    trackingTag: resolution.tracking_tag,
+  };
+
+  c.executionCtx.waitUntil(
+    recordRedirectClickAsync(c, {
+      agentSlug: `public:${marketplace.toLowerCase()}`,
+      asin,
+      context: ctx,
+    })
+  );
+
+  return createNoindexRedirect(ctx.amazonUrl);
+});
+
+redirect.get('/p/:asin', async (c) => {
+  throw new HTTPException(404, { message: 'Public product redirects are disabled.' });
 });
 
 const handleRedirectRequest = async (c: Context<AppEnv>) => {
@@ -359,14 +314,7 @@ const handleRedirectRequest = async (c: Context<AppEnv>) => {
       } catch (error) {
         if (error instanceof DynamicLinkResolutionError) {
           if (error.status === 404 || error.status === 400) {
-            ctx = await resolveFallbackRedirectContext(c.env.DB, asin, preferredMarketplace);
-            if (ctx) {
-              c.executionCtx.waitUntil(
-                safeKvPut(c.env.KV, cacheKey, JSON.stringify(ctx), { expirationTtl: 3600 })
-              );
-            } else {
-              throw new HTTPException(error.status, { message: error.message });
-            }
+            throw new HTTPException(error.status, { message: error.message });
           } else {
             throw new HTTPException(error.status, { message: error.message });
           }
