@@ -1,8 +1,19 @@
 import type { Route } from "./+types/product-detail";
 import { Link } from "react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
 import { ImageGallery } from "../components/product/ImageGallery";
+import {
+  getInitialPublicMarketplace,
+  getProductEditorialSections,
+  getProductDetailTitleClass,
+  getPublicProductPageCallout,
+} from "../utils/product-detail";
+import {
+  AMAZON_DESTINATION_NOTE,
+  AMAZON_PRIMARY_CTA_LABEL,
+  INLINE_AFFILIATE_DISCLOSURE,
+} from "../utils/affiliate-copy";
 import { buildSeoMeta } from "../utils/seo";
 import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
 
@@ -10,11 +21,9 @@ interface ProductRow {
   id: number;
   asin: string;
   title: string;
-  description: string | null;
   image_url: string;
   category: string | null;
   marketplace: string | null;
-  features: string | null;
   review_content: string | null;
   product_images: string | null;
   aplus_images: string | null;
@@ -32,8 +41,21 @@ interface RelatedProductRow {
 interface ProductDetailData {
   product: ProductRow;
   relatedProducts: RelatedProductRow[];
-  redirectUrl: string;
   canonicalPath: string;
+  availableMarketplaces: string[];
+}
+
+function buildEditorialExcerpt(reviewContent: string | null, title: string): string {
+  const firstMeaningfulLine = reviewContent
+    ?.split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0 && !line.startsWith("•"));
+
+  if (firstMeaningfulLine) {
+    return firstMeaningfulLine;
+  }
+
+  return `Explore ${title} and continue to the final retailer page for the latest price, delivery details, and checkout.`;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -43,9 +65,7 @@ export function meta({ data }: Route.MetaArgs) {
 
   return buildSeoMeta({
     title: `${product.title} | DealsRky`,
-    description:
-      product.description ||
-      `Review ${product.title} and continue to Amazon for the latest price and checkout.`,
+    description: buildEditorialExcerpt(product.review_content, product.title),
     path: (data as ProductDetailData).canonicalPath,
     imageUrl: product.image_url,
   });
@@ -55,19 +75,31 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const asin = params.asin;
 
-  const product = await env.DB.prepare(
-    `
-      SELECT id, asin, title, description, image_url, category, marketplace, features, review_content, product_images, aplus_images
-      FROM products
-      WHERE asin = ? AND is_active = 1 AND status = 'active'
-    `
-  )
+  const { results: productMatches } = await env.DB
+    .prepare(
+      `
+        SELECT id, asin, title, image_url, category, marketplace, review_content, product_images, aplus_images
+        FROM products
+        WHERE asin = ? AND is_active = 1 AND status = 'active'
+        ORDER BY created_at DESC, id DESC
+      `
+    )
     .bind(asin)
-    .first<ProductRow>();
+    .all<ProductRow>();
+
+  const product = productMatches[0] ?? null;
 
   if (!product) {
     throw new Response("Not Found", { status: 404 });
   }
+
+  const availableMarketplaces = Array.from(
+    new Set(
+      productMatches
+        .map((item) => item.marketplace?.trim().toUpperCase() || null)
+        .filter((item): item is string => item !== null && item.length > 0)
+    )
+  ).sort((left, right) => left.localeCompare(right));
 
   const relatedQuery =
     product.category && product.category.trim().length > 0
@@ -91,14 +123,11 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const { results: related } = await relatedQuery.all<RelatedProductRow>();
 
-  const defaultTag = env.DEFAULT_AMAZON_TAG || "dealsrky-20";
-  const redirectUrl = `/go/t/${defaultTag}/${asin}`;
-
   return {
     product,
     relatedProducts: related || [],
-    redirectUrl,
     canonicalPath: `/deals/${asin}`,
+    availableMarketplaces,
   } satisfies ProductDetailData;
 }
 
@@ -116,11 +145,13 @@ function parseJsonArray(raw: string | null): string[] {
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
-  const { product, relatedProducts, redirectUrl } = loaderData as ProductDetailData;
-  const features = parseJsonArray(product.features);
+  const { product, relatedProducts, availableMarketplaces } = loaderData as ProductDetailData;
   const galleryImages = parseJsonArray(product.product_images);
-  const aplusImages = parseJsonArray(product.aplus_images);
-
+  const publicProductCallout = getPublicProductPageCallout();
+  const editorialSections = getProductEditorialSections(product.review_content);
+  const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(
+    getInitialPublicMarketplace(availableMarketplaces, product.marketplace)
+  );
   useEffect(() => {
     const context = {
       page_type: "product_detail",
@@ -136,22 +167,8 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
     });
   }, [product.asin, product.category, product.marketplace]);
 
-  const handleAmazonClick =
-    (ctaPlacement: "mobile" | "primary" | "secondary") =>
-    () => {
-      void trackZaraz("amazon_click", {
-        page_type: "product_detail",
-        cta_placement: ctaPlacement,
-        destination: "amazon",
-        asin: product.asin,
-        marketplace: product.marketplace || "US",
-        category: product.category || "general",
-        ...getZarazAttributionPayload(),
-      });
-    };
-
   return (
-    <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
       <div className="border-b border-gray-200 bg-white/70">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-4 text-sm text-gray-500 lg:px-6">
           <Link to="/" className="hover:text-primary">
@@ -170,20 +187,9 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-10 lg:px-6">
-        <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="mb-4 md:hidden">
-              <a
-                href={redirectUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                onClick={handleAmazonClick("mobile")}
-                className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
-              >
-                Continue to Amazon
-              </a>
-            </div>
+      <div className="mx-auto max-w-7xl px-4 py-10 pb-28 lg:px-6 lg:pb-10">
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:items-start">
+          <section className="min-w-0 overflow-hidden rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-8">
             <ImageGallery
               mainImage={product.image_url}
               galleryImages={galleryImages}
@@ -191,7 +197,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
             />
           </section>
 
-          <section className="rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+          <section className="min-w-0 rounded-[2rem] border border-gray-200 bg-white p-5 shadow-sm sm:p-6 md:p-8">
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-primary">
                 {product.marketplace || "US"}
@@ -201,111 +207,111 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
               </span>
             </div>
 
-            <h1 className="mt-5 text-3xl font-black leading-tight text-gray-950 md:text-4xl">
+            <h1 className={getProductDetailTitleClass(product.title)}>
               {product.title}
             </h1>
 
-            <p className="mt-5 text-sm leading-7 text-gray-600">
-              We do not display fixed prices on DealsRky. Use the Amazon button
-              below to check the latest price, shipping, and availability directly
-              on Amazon.
-            </p>
+            {product.review_content ? (
+              <div className="mt-4 rounded-[1.5rem] border border-gray-200 bg-gray-50/80 p-5 md:mt-5">
+                <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">
+                  Editorial Summary
+                </p>
+                <div className="mt-4 space-y-4">
+                  {editorialSections.map((section, index) => (
+                    <div
+                      key={`${section.heading}-${index}`}
+                      className="rounded-2xl border border-gray-200 bg-white/90 p-4"
+                    >
+                      <p className="text-sm font-bold text-gray-900">{section.heading}</p>
+                      {section.body ? (
+                        <p className="mt-2 text-sm leading-7 text-gray-700">{section.body}</p>
+                      ) : null}
+                      {section.bullets.length > 0 ? (
+                        <ul className="mt-3 space-y-2 text-sm leading-6 text-gray-700">
+                          {section.bullets.map((bullet) => (
+                            <li key={bullet} className="flex gap-2">
+                              <span className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary" />
+                              <span>{bullet}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-sm leading-7 text-gray-600 md:mt-5">
+                We do not display fixed prices on DealsRky. Use the retailer link
+                below to check the latest price, shipping, and availability directly
+                on the final product page.
+              </p>
+            )}
 
             <div className="mt-6 rounded-[1.5rem] border border-primary/20 bg-primary/5 p-5">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">
-                Amazon checkout
+                {publicProductCallout.eyebrow}
               </p>
               <p className="mt-2 text-lg font-bold text-gray-900">
-                Continue to Amazon for live pricing
+                {publicProductCallout.title}
               </p>
               <p className="mt-2 text-sm leading-6 text-gray-600">
-                Pricing, delivery windows, reviews, coupons, and stock status are
-                managed on Amazon.
+                {publicProductCallout.body}
               </p>
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <a
-                href={redirectUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                onClick={handleAmazonClick("primary")}
-                className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
-              >
-                View on Amazon
-              </a>
-              <a
-                href={redirectUrl}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                onClick={handleAmazonClick("secondary")}
-                className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
-              >
-                Read Amazon reviews
-              </a>
-            </div>
+            {availableMarketplaces.length > 0 ? (
+              <div className="mt-6">
+                {availableMarketplaces.length > 1 ? (
+                  <>
+                    <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
+                      Choose marketplace
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {availableMarketplaces.map((marketplace) => {
+                        const isSelected = marketplace === selectedMarketplace;
 
-            {product.description ? (
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h2 className="text-lg font-bold text-gray-900">Product overview</h2>
-                <p className="mt-3 text-sm leading-7 text-gray-600">
-                  {product.description}
-                </p>
+                        return (
+                          <button
+                            key={marketplace}
+                            type="button"
+                            onClick={() => setSelectedMarketplace(marketplace)}
+                            className={
+                              isSelected
+                                ? "inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-white transition-colors hover:bg-primary-hover"
+                                : "inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-gray-700 transition-colors hover:border-primary hover:text-primary"
+                            }
+                          >
+                            {marketplace}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : null}
+
+                {selectedMarketplace ? (
+                  <div className="mt-4">
+                    <a
+                      href={`/go/p/${selectedMarketplace.toLowerCase()}/${product.asin}`}
+                      className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                      rel="nofollow sponsored"
+                    >
+                      {AMAZON_PRIMARY_CTA_LABEL}
+                    </a>
+                    <p className="mt-3 text-sm leading-6 text-gray-600">
+                      {AMAZON_DESTINATION_NOTE}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-gray-500">
+                      {INLINE_AFFILIATE_DISCLOSURE}
+                    </p>
+                  </div>
+                ) : null}
               </div>
             ) : null}
+
           </section>
         </div>
-
-        {features.length > 0 ? (
-          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-            <h2 className="text-2xl font-black text-gray-950">Key features</h2>
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
-              {features.map((feature) => (
-                <div key={feature} className="rounded-2xl bg-gray-50 p-4 text-sm leading-6 text-gray-700">
-                  {feature}
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {/* A+ Content — Premium Visual Details */}
-        {aplusImages.length > 0 ? (
-          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-            <div className="mb-6">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                From the manufacturer
-              </p>
-              <h2 className="mt-2 text-2xl font-black text-gray-950">
-                Product details
-              </h2>
-            </div>
-            <div className="flex flex-col gap-4">
-              {aplusImages.map((img, i) => (
-                <div
-                  key={`aplus-${i}`}
-                  className="overflow-hidden rounded-2xl border border-gray-100"
-                >
-                  <img
-                    src={img}
-                    alt={`${product.title} — detail ${i + 1}`}
-                    className="w-full object-contain"
-                    loading="lazy"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-        ) : null}
-
-        {product.review_content ? (
-          <section className="mt-8 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
-            <h2 className="text-2xl font-black text-gray-950">Editorial notes</h2>
-            <div className="mt-4 whitespace-pre-line text-sm leading-7 text-gray-600">
-              {product.review_content}
-            </div>
-          </section>
-        ) : null}
 
         {relatedProducts.length > 0 ? (
           <section className="mt-12">
@@ -328,6 +334,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
           </section>
         ) : null}
       </div>
+
     </div>
   );
 }

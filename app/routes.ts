@@ -9,6 +9,7 @@ export default [
     // Public Content Pages
     route("privacy", "routes/privacy.tsx"),
     route("disclosure", "routes/disclosure.tsx"),
+    route("terms", "routes/terms.tsx"),
     route("about", "routes/about.tsx"),
     route("contact", "routes/contact.tsx"),
     route("blog", "routes/blog.tsx"),
@@ -37,6 +38,7 @@ export default [
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("reports", "routes/admin/reports.tsx"),
+    route("site-branding", "routes/admin/site-branding.tsx"),
     route("audit-logs", "routes/admin/audit-logs.tsx"),
     route("blogs", "routes/admin/blogs.tsx"),
   ]),

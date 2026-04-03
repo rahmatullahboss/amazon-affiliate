@@ -27,8 +27,8 @@ export function meta({ data }: Route.MetaArgs) {
   const categorySlug = categoryData?.categorySlug || "category";
 
   return buildSeoMeta({
-    title: `${categoryName} Deals — DealsRky`,
-    description: `Browse the best ${categoryName} deals curated by DealsRky.`,
+    title: `${categoryName} Picks — DealsRky`,
+    description: `Browse curated ${categoryName} product picks and research pages on DealsRky.`,
     path: `/category/${categorySlug}`,
   });
 }
@@ -77,7 +77,7 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
             <span className="text-gray-800 font-medium">{data.categoryName}</span>
           </nav>
 
-          <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">{data.categoryName} Deals</h1>
+          <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">{data.categoryName} Picks</h1>
           <p className="text-primary font-medium text-sm">{data.products.length} product{data.products.length !== 1 ? 's' : ''} available</p>
         </div>
       </div>
@@ -91,12 +91,12 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
           <div className="text-center py-20 bg-white border border-gray-200 rounded-lg shadow-sm">
             <span className="text-4xl block mb-2">📦</span>
             <h3 className="text-lg font-bold text-gray-800">No Products Yet</h3>
-            <p className="text-gray-500 text-sm mb-6">We're actively curating deals for this category. Check back soon!</p>
+            <p className="text-gray-500 text-sm mb-6">We are reviewing the next batch of curated picks for this category. Check back soon.</p>
             <Link
               to="/deals"
               className="inline-flex items-center bg-gray-100 hover:bg-primary text-gray-700 hover:text-white font-semibold py-3 px-8 rounded-full border border-gray-200 transition-colors"
             >
-              Back to All Deals
+              Back to All Picks
             </Link>
           </div>
         )}

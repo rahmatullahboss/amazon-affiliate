@@ -1,9 +1,10 @@
 import { Form, Link, useLocation } from "react-router";
 import { useState } from "react";
+import { BROWSE_PICKS_LABEL } from "../utils/affiliate-copy";
 
 const navLinks = [
   { name: "Home", path: "/" },
-  { name: "Browse Deals", path: "/deals" },
+  { name: BROWSE_PICKS_LABEL, path: "/deals" },
   { name: "Blog", path: "/blog" },
   { name: "Disclosure", path: "/disclosure" },
   { name: "About", path: "/about" },
@@ -15,8 +16,16 @@ export function Header() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 shadow-sm backdrop-blur">
-      <div className="mx-auto max-w-7xl px-4 py-3 lg:px-6 lg:py-4">
+    <div className="sticky top-0 z-40 w-full">
+      {/* Amazon Affiliate Disclosure Banner */}
+      <div className="bg-gray-900 px-4 py-1.5 text-center text-[11px] font-medium text-gray-300 sm:text-xs">
+        As an Amazon Associate, we earn from qualifying purchases.{" "}
+        <Link to="/disclosure" className="underline hover:text-white">
+          Learn more
+        </Link>
+      </div>
+      <header className="bg-white/95 shadow-sm backdrop-blur">
+        <div className="mx-auto max-w-7xl px-4 py-3 lg:px-6 lg:py-4">
         {/* Main Desktop & Top Mobile Row */}
         <div className="flex items-center justify-between gap-4">
           
@@ -28,7 +37,7 @@ export function Header() {
             <div className="flex flex-col">
               <p className="text-[17px] font-black leading-none tracking-tight text-gray-950">DealsRky</p>
               <p className="text-[9px] font-bold uppercase tracking-[0.1em] text-gray-400 lg:tracking-[0.2em]">
-                Amazon Hub
+                Curated Picks
               </p>
             </div>
           </Link>
@@ -149,6 +158,7 @@ export function Header() {
           </nav>
         </div>
       )}
-    </header>
+      </header>
+    </div>
   );
 }

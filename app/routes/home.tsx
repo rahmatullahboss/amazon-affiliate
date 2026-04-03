@@ -2,7 +2,14 @@ import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
 import { BlogCard } from "../components/blog/BlogCard";
-import { buildSeoMeta } from "../utils/seo";
+import {
+  buildSeoMeta,
+  toSiteBrandingMeta,
+} from "../utils/seo";
+import {
+  HOME_HERO_EYEBROW,
+  HOME_HERO_TITLE,
+} from "../utils/affiliate-copy";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
 import type { BlogPostSummary } from "../utils/blog";
 
@@ -19,14 +26,23 @@ interface ProductRow {
 interface HomeLoaderData {
   products: ProductRow[];
   posts: BlogPostSummary[];
+  siteBranding: {
+    og_site_name: string;
+    og_description: string;
+    og_image_url: string;
+  } | null;
 }
 
-export function meta({}: Route.MetaArgs) {
+export function meta({ data }: Route.MetaArgs) {
+  const branding = toSiteBrandingMeta(
+    (data as HomeLoaderData | undefined)?.siteBranding ?? undefined
+  );
+
   return buildSeoMeta({
-    title: "DealsRky | Curated Amazon Finds",
-    description:
-      "Browse curated Amazon product picks, review pages, and quick-buy landing pages designed for fast, transparent shopping.",
+    title: branding.ogSiteName,
+    description: branding.ogDescription,
     path: "/",
+    imageUrl: branding.ogImageUrl,
   });
 }
 
@@ -55,6 +71,12 @@ export async function loader({ context }: Route.LoaderArgs) {
       }
     >(),
   ]);
+  const siteBranding = await env.DB.prepare(
+    `SELECT og_site_name, og_description, og_image_url
+     FROM site_branding_settings
+     WHERE id = 1
+     LIMIT 1`
+  ).first<HomeLoaderData["siteBranding"]>();
 
   const posts = (postsResult.results || []).map((row) => ({
     ...row,
@@ -66,21 +88,24 @@ export async function loader({ context }: Route.LoaderArgs) {
   return {
     products: productsResult.results || [],
     posts,
+    siteBranding,
   } satisfies HomeLoaderData;
 }
 
 const editorialHighlights = [
   {
     title: "Curated Expert Picks",
-    description: "Every product we feature is hand-selected and vetted for quality to give you the smartest deals.",
+    description:
+      "Every product we feature is hand-selected and reviewed for fit, quality, and buying context before it appears in our catalog.",
   },
   {
     title: "Transparent Shopping",
-    description: "Clear specifications, direct links without hidden fees, and pure transparency for all products.",
+    description:
+      "Clear specifications, direct retailer handoff, and visible affiliate disclosures help you understand exactly how each page works.",
   },
   {
-    title: "Secure Trusted Checkout",
-    description: "When you find a deal you love, your purchase is finalized securely directly on Amazon.",
+    title: "Retailer Checkout Clarity",
+    description: "When you find a product you like, the final retailer page shows live pricing, shipping, and checkout details.",
   },
 ];
 
@@ -97,14 +122,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-16 lg:flex-row lg:items-center lg:justify-between lg:px-6">
           <div className="max-w-2xl">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.35em] text-primary">
-              Handpicked Deals & Reviews
+              {HOME_HERO_EYEBROW}
             </p>
             <h1 className="max-w-xl text-4xl font-black leading-tight text-gray-950 md:text-6xl">
-              Discover top products at the best prices today.
+              {HOME_HERO_TITLE}
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 md:text-lg">
-              DealsRky is your premium destination for curated tech, gadgets, and home goods.
-              We do the heavy lifting of researching the best Amazon deals so you can shop with absolute confidence.
+              DealsRky publishes concise buying guidance, curated recommendations,
+              and marketplace-aware product pages so you can compare options before
+              continuing to Amazon for current pricing and checkout.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -112,7 +138,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 to="/deals"
                 className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
-                Browse latest products
+                Browse curated picks
               </Link>
               <Link
                 to="/disclosure"
@@ -127,12 +153,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.3em] text-primary/80">
-                  Global Availability
+                  Supported Marketplaces
                 </p>
-                <h2 className="mt-2 text-2xl font-bold">Top Markets Supported</h2>
+                <h2 className="mt-2 text-2xl font-bold">Research First, Then Continue</h2>
               </div>
               <div className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/80">
-                Live updates
+                Editorial guidance
               </div>
             </div>
 
@@ -152,7 +178,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
               <p className="text-sm leading-6 text-white/85">
-                Simply browse our top recommendations, read clear reviews, and check out directly and safely on Amazon without any middleman markup.
+                Use DealsRky to review product context and compare marketplace
+                availability before you continue to Amazon.
               </p>
             </div>
           </div>
@@ -184,10 +211,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              Featured now
+              Editor's picks
             </p>
             <h2 className="mt-2 text-3xl font-black text-gray-950">
-              New additions worth checking
+              Recent recommendations worth reviewing
             </h2>
           </div>
           <Link
@@ -206,10 +233,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </div>
         ) : (
           <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
-            <h3 className="text-lg font-bold text-gray-900">Check back soon for new deals</h3>
+            <h3 className="text-lg font-bold text-gray-900">Check back soon for new recommendations</h3>
             <p className="mt-2 text-sm text-gray-600">
-              Our team is currently updating the catalog with the latest top-rated items. 
-              Please check back shortly!
+              Our editors are reviewing the next batch of product pages and buying guides.
+              Please check back shortly.
             </p>
           </div>
         )}
@@ -222,13 +249,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               How it works
             </p>
             <h2 className="mt-3 text-3xl font-black text-gray-950">
-              Simple path from product curation to Amazon checkout
+              Simple path from product research to the final retailer page
             </h2>
             <div className="mt-8 grid gap-5">
               {[
-                "We search thousands of listings to identify the best, highly-rated tech and gadgets.",
-                "You browse clean, organized reviews without intrusive ads or confusing interfaces.",
-                "Click 'View Deal' to seamlessly finalize your purchase safely and directly on Amazon.",
+                "We review catalog data, product positioning, and marketplace availability before publishing a page.",
+                "You browse concise research notes, comparisons, and recommendation summaries without clutter.",
+                "When you are ready, continue to Amazon to review live pricing, shipping, and final checkout details.",
               ].map((step, index) => (
                 <div key={step} className="flex gap-4 rounded-2xl bg-gray-50 p-4">
                   <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary font-bold text-white">
@@ -271,7 +298,90 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 pb-16 lg:px-6">
+      <section className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
+        <div className="rounded-[2.5rem] bg-gray-900 px-6 py-16 text-center text-white sm:px-12 sm:py-20 lg:px-16">
+          <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+            Featured guide
+          </p>
+          <h2 className="mt-4 text-3xl font-black md:text-5xl">
+            Start with practical buying guides, not rush-driven deals
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-gray-300">
+            DealsRky works best when you use product pages and articles for research first, then continue to Amazon for the latest price, delivery details, reviews, and checkout.
+          </p>
+          <div className="mt-10 flex flex-wrap justify-center gap-4">
+            <Link
+              to="/blog"
+              className="rounded-full bg-primary px-8 py-4 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+            >
+              Read the Buying Guide
+            </Link>
+            <Link
+              to="/deals"
+              className="rounded-full border border-gray-600 px-8 py-4 text-sm font-bold text-white transition-colors hover:border-gray-400 hover:text-white"
+            >
+              Browse curated picks
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-gray-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6 lg:py-24">
+          <div className="max-w-3xl">
+            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+              Original Content
+            </p>
+            <h2 className="mt-3 text-3xl font-black text-gray-950 md:text-5xl">
+              Why Trust DealsRky? Our Methodology & Compliance
+            </h2>
+            <p className="mt-6 text-lg leading-8 text-gray-600">
+              DealsRky is built to help you research products before you continue to Amazon. We summarize relevant details,
+              compare marketplace coverage, and keep our public pages focused on clear editorial guidance instead of urgency-led sales copy.
+            </p>
+          </div>
+
+          <div className="mt-16 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-[2rem] bg-gray-50 p-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="mt-6 text-xl font-bold text-gray-900">Independent Research</h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                We independently research and curate all products. We do not accept payment to feature specific items in our regular catalog, ensuring unbiased recommendations.
+              </p>
+            </div>
+            
+            <div className="rounded-[2rem] bg-gray-50 p-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="mt-6 text-xl font-bold text-gray-900">Affiliate Disclosure</h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                As an Amazon Associate, we earn from qualifying purchases. This means if you click on a retailer link and make a purchase, we may earn a small commission at no additional cost to you.
+              </p>
+            </div>
+
+            <div className="rounded-[2rem] bg-gray-50 p-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              </div>
+              <h3 className="mt-6 text-xl font-bold text-gray-900">Live Retailer Pricing</h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                Prices fluctuate constantly. To avoid confusion, we link directly to the retailer's checkout page so you can see the guaranteed live price and shipping details.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
         <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">

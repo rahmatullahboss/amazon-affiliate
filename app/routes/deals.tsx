@@ -1,11 +1,12 @@
 import type { Route } from "./+types/deals";
 import { ProductCard } from "../components/home/ProductCard";
+import { DEALS_PAGE_TITLE } from "../utils/affiliate-copy";
 import { buildSeoMeta } from "../utils/seo";
 
 export function meta({}: Route.MetaArgs) {
   return buildSeoMeta({
-    title: "All Deals — DealsRky",
-    description: "Browse all curated Amazon deals on DealsRky.",
+    title: "Curated Product Picks — DealsRky",
+    description: "Browse marketplace-aware product recommendations on DealsRky.",
     path: "/deals",
   });
 }
@@ -50,9 +51,12 @@ export default function DealsPage({ loaderData }: Route.ComponentProps) {
       {/* Page Header */}
       <div className="bg-primary/5 border-b border-gray-200 py-10 mb-8">
         <div className="container mx-auto px-4 text-center">
-          <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">Shop All Deals</h1>
+          <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">
+            {DEALS_PAGE_TITLE}
+          </h1>
           <p className="text-gray-600 max-w-lg mx-auto text-sm md:text-base">
-            Find the best hand-picked products, updated daily.
+            Explore marketplace-aware recommendations and use each product page
+            for research before continuing to Amazon.
           </p>
         </div>
       </div>
@@ -65,7 +69,7 @@ export default function DealsPage({ loaderData }: Route.ComponentProps) {
                <div className="bg-white border md:sticky md:top-24 border-gray-200 rounded-lg p-5 shadow-sm">
                   <h3 className="font-bold text-gray-800 mb-4 pb-2 border-b border-gray-100">Categories</h3>
                   <div className="space-y-2">
-                    <a href="/deals" className="block text-sm font-bold text-primary hover:text-primary-hover">» All Deals</a>
+                    <a href="/deals" className="block text-sm font-bold text-primary hover:text-primary-hover">» All Picks</a>
                     {data.categories.map((cat: any) => (
                       <a 
                         key={cat.slug} 
@@ -93,8 +97,8 @@ export default function DealsPage({ loaderData }: Route.ComponentProps) {
                 ) : (
                   <div className="text-center py-20 bg-white border border-gray-200 rounded-lg shadow-sm">
                     <span className="text-4xl block mb-2">🔍</span>
-                    <h3 className="font-bold text-gray-800">No Products Found</h3>
-                    <p className="text-gray-500 text-sm">We're updating our inventory. Please check back later.</p>
+                    <h3 className="font-bold text-gray-800">No curated picks available yet</h3>
+                    <p className="text-gray-500 text-sm">We are reviewing the next batch of public product pages. Please check back soon.</p>
                   </div>
                 )}
 

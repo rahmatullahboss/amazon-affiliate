@@ -9,6 +9,7 @@ vi.mock('../../app/components/product/ImageGallery', () => ({
 
 vi.mock('react', () => ({
   useEffect: () => undefined,
+  useState: <T,>(value: T) => [value, () => undefined] as const,
 }));
 
 vi.mock('react-router', () => ({
@@ -32,6 +33,7 @@ vi.mock('react/jsx-runtime', () => ({
 }));
 
 import { loader as bridgeLoader } from '../../app/routes/bridge';
+import { loader as productDetailLoader } from '../../app/routes/product-detail';
 import { loader as trackingShortcutLoader } from '../../app/routes/tracking-shortcut';
 
 describe('Redirect Engine API', () => {
@@ -83,14 +85,8 @@ describe('Redirect Engine API', () => {
     expect(location).toContain('tag=test-tag-20');
   });
 
-  it('P0-002: Handles deleted/invalid Agent Slugs by falling back to Admin ID', async () => {
-    // 1. Seed Fallback Tag (Admin typically has agent_id=1)
-    await DbFactory.seedAgent(env.DB, 1, 'admin-agent', 'Admin');
-    await DbFactory.seedProduct(env.DB, 10, 'B0B123456');
-    await DbFactory.seedTrackingIdsFallback(env.DB, 15, 1, 'default-admin-20');
-
-    // 2. Perform Request with an invalid agent slug
-    const req = new Request('http://localhost/go/does-not-exist/B0B123456', {
+  it('P0-002: Returns not found for invalid agent slugs instead of falling back to another tag', async () => {
+    const req = new Request('http://localhost/go/does-not-exist/B0B1234567', {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
       }
@@ -104,10 +100,7 @@ describe('Redirect Engine API', () => {
     const res = await apiApp.fetch(req, env as any, ctx);
     await Promise.all(waitPromises);
 
-    // 3. Assert Fallback occurs
-    expect(res.status).toBe(302);
-    const location = res.headers.get('Location');
-    expect(location).toContain('tag=default-admin-20');
+    expect(res.status).toBe(404);
   });
 
   it('P1-003: Creates records in page_views and clicks correctly', async () => {

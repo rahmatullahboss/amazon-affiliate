@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { BROWSE_PICKS_LABEL } from "../utils/affiliate-copy";
 
 export function Footer() {
   return (
@@ -12,21 +13,22 @@ export function Footer() {
             <div>
               <p className="text-lg font-black">DealsRky</p>
               <p className="text-xs uppercase tracking-[0.25em] text-white/45">
-                Curated Amazon storefront
+                Curated Product Picks
               </p>
             </div>
           </div>
 
           <p className="mt-5 max-w-xl text-sm leading-7 text-white/70">
-            DealsRky publishes curated product pages and routes buyers to Amazon for
-            final checkout. We do not process payments, hold inventory, or manage
-            order fulfillment.
+            DealsRky publishes curated product pages and routes visitors to the final
+            retailer page for pricing and checkout. We do not process payments, hold
+            inventory, or manage order fulfillment.
           </p>
 
           <div className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-7 text-white/75">
-            <strong className="text-white">Affiliate disclosure:</strong> As an
-            Amazon Associate, we earn from qualifying purchases. Product prices and
-            availability are shown on Amazon and may change at any time.
+            <strong className="text-white">Affiliate disclosure:</strong> As an Amazon Associate, we earn from qualifying purchases. DealsRky may
+            earn a commission when you continue through eligible product links and make
+            a purchase. Final pricing and availability are always shown on the retailer
+            page.
           </div>
         </div>
 
@@ -39,7 +41,7 @@ export function Footer() {
               Home
             </Link>
             <Link to="/deals" className="hover:text-white">
-              Browse Deals
+              {BROWSE_PICKS_LABEL}
             </Link>
             <Link to="/blog" className="hover:text-white">
               Blog
@@ -61,6 +63,9 @@ export function Footer() {
             <Link to="/disclosure" className="hover:text-white">
               Affiliate Disclosure
             </Link>
+            <Link to="/terms" className="hover:text-white">
+              Terms of Use
+            </Link>
             <Link to="/privacy" className="hover:text-white">
               Privacy Policy
             </Link>
@@ -74,7 +79,7 @@ export function Footer() {
       <div className="border-t border-white/10">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-5 text-xs text-white/45 sm:flex-row sm:items-center sm:justify-between lg:px-6">
           <p>© {new Date().getFullYear()} DealsRky. All rights reserved.</p>
-          <p>Amazon checkout, pricing, inventory, and fulfillment are handled by Amazon.</p>
+          <p>Checkout, pricing, inventory, and fulfillment are handled by the retailer.</p>
         </div>
       </div>
     </footer>
