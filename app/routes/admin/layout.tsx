@@ -153,7 +153,6 @@ export default function AdminLayout() {
         { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
         { to: "/admin/analytics", label: "Analytics", icon: "📈" },
         { to: "/admin/reports", label: "Reports", icon: "🧾" },
-        { to: "/admin/site-branding", label: "Site Branding", icon: "🎨" },
         { to: "/admin/blogs", label: "Blogs", icon: "📝" },
         { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
       ];

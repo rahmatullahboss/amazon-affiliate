@@ -23,7 +23,6 @@ import sheets from './routes/sheets';
 import auditLogs from './routes/audit-logs';
 import blogs from './routes/blogs';
 import sheetControl from './routes/sheet-control';
-import siteBranding from './routes/site-branding';
 
 const app = new Hono<AppEnv>();
 
@@ -98,7 +97,6 @@ adminOnly.route('/analytics', analytics);
 adminOnly.route('/sheets', sheets);
 adminOnly.route('/sheet-control', sheetControl);
 adminOnly.route('/audit-logs', auditLogs);
-adminOnly.route('/site-branding', siteBranding);
 
 app.route('/api', adminContent);
 app.route('/api', adminOnly);
