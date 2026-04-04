@@ -3,6 +3,7 @@ import type { Route } from "./+types/blogs";
 import { getAuthToken } from "../../utils/auth-session";
 import { compressImageFile } from "../../utils/image-compression";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { normalizeOptionalUrl, validateBlogDraft } from "../../utils/blog-admin";
 import { formatBlogDate, slugifyClientTitle, type BlogPostSummary } from "../../utils/blog";
 
 interface BlogApiResponse {
@@ -55,6 +56,7 @@ export default function AdminBlogsPage() {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -147,6 +149,18 @@ export default function AdminBlogsPage() {
     setMessage("");
 
     try {
+      const validationError = validateBlogDraft({
+        title: form.title,
+        content: form.content,
+        cta_url: form.cta_url,
+      });
+
+      if (validationError) {
+        throw new Error(validationError);
+      }
+
+      const normalizedCtaUrl = form.cta_url ? normalizeOptionalUrl(form.cta_url) : "";
+
       const requestPayload = {
         title: form.title,
         slug: form.slug || null,
@@ -155,7 +169,7 @@ export default function AdminBlogsPage() {
         cover_image_key: form.cover_image_key || null,
         cover_image_alt: form.cover_image_alt || null,
         cta_label: form.cta_label || null,
-        cta_url: form.cta_url || null,
+        cta_url: normalizedCtaUrl || null,
         cta_disclosure: form.cta_disclosure || null,
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
@@ -181,6 +195,10 @@ export default function AdminBlogsPage() {
       const responsePayload = data as { message?: string; post?: BlogPostSummary };
 
       setMessage(responsePayload.message || "Saved");
+      setForm((current) => ({
+        ...current,
+        cta_url: normalizedCtaUrl,
+      }));
       await fetchPosts(responsePayload.post?.id ?? "new");
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to save blog post");
@@ -264,6 +282,33 @@ export default function AdminBlogsPage() {
     }
   }
 
+  async function handleGenerateDraft() {
+    setGeneratingDraft(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch("/api/blogs/generate-ai-draft", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+      });
+
+      const data = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(data, "Failed to generate AI draft"));
+      }
+
+      setMessage(data.message || "AI draft generated");
+      await fetchPosts();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to generate AI draft");
+    } finally {
+      setGeneratingDraft(false);
+    }
+  }
+
   return (
     <section className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -271,22 +316,32 @@ export default function AdminBlogsPage() {
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#ff9900]">Editorial</p>
           <h1 className="text-2xl font-bold text-[#f0f0f5]">Blog Management</h1>
           <p className="mt-1 text-sm text-[#a0a0b8]">
-            Create SEO articles, publish drafts, and upload compressed cover images to R2.
+            Create SEO articles, review hourly AI drafts, publish approved posts, and upload compressed cover images to R2.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedId("new");
-            setForm(emptyForm);
-            setSlugTouched(false);
-            setMessage("");
-            setError("");
-          }}
-          className="rounded-xl bg-[#ff9900] px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-[#ffad33]"
-        >
-          New Post
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => void handleGenerateDraft()}
+            disabled={generatingDraft}
+            className="rounded-xl border border-[#ff9900]/30 bg-[#ff9900]/10 px-4 py-2.5 text-sm font-bold text-[#ffcc80] transition-colors hover:bg-[#ff9900]/15 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generatingDraft ? "Generating..." : "Generate AI Draft"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedId("new");
+              setForm(emptyForm);
+              setSlugTouched(false);
+              setMessage("");
+              setError("");
+            }}
+            className="rounded-xl bg-[#ff9900] px-4 py-2.5 text-sm font-bold text-black transition-colors hover:bg-[#ffad33]"
+          >
+            New Post
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -336,21 +391,34 @@ export default function AdminBlogsPage() {
                       <p className="text-sm font-semibold text-[#f0f0f5]">{post.title}</p>
                       <p className="mt-1 text-xs text-[#6b7280]">/{post.slug}</p>
                     </div>
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
-                        post.status === "published"
-                          ? "bg-emerald-500/15 text-emerald-300"
-                          : "bg-amber-500/15 text-amber-300"
-                      }`}
-                    >
-                      {post.status}
-                    </span>
+                    <div className="flex flex-col items-end gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
+                          post.status === "published"
+                            ? "bg-emerald-500/15 text-emerald-300"
+                            : "bg-amber-500/15 text-amber-300"
+                        }`}
+                      >
+                        {post.status}
+                      </span>
+                      {post.generation_source === "ai" ? (
+                        <span className="rounded-full bg-sky-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300">
+                          AI Draft
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#94a3b8]">
                     <span>{formatBlogDate(post.published_at)}</span>
                     <span>•</span>
                     <span>{post.reading_minutes} min read</span>
+                    {post.generation_source === "ai" && post.generation_provider ? (
+                      <>
+                        <span>•</span>
+                        <span className="text-sky-300">{post.generation_provider}</span>
+                      </>
+                    ) : null}
                     {post.is_featured === 1 ? (
                       <>
                         <span>•</span>
@@ -389,6 +457,20 @@ export default function AdminBlogsPage() {
               />
             </label>
           </div>
+
+          {selectedPost?.generation_source === "ai" ? (
+            <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 p-4 text-sm text-sky-100">
+              <p className="m-0 font-semibold">AI-generated draft</p>
+              <p className="mt-2 mb-0 leading-7 text-sky-100/90">
+                Provider: {selectedPost.generation_provider || "unknown"}
+                {selectedPost.generation_topic ? ` · Topic: ${selectedPost.generation_topic}` : ""}
+                {selectedPost.generation_focus_asin ? ` · Focus ASIN: ${selectedPost.generation_focus_asin}` : ""}
+              </p>
+              <p className="mt-2 mb-0 leading-7 text-sky-100/80">
+                Review, edit, and switch status to <strong>published</strong> when ready to make this article live.
+              </p>
+            </div>
+          ) : null}
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-[#f0f0f5]">Excerpt</span>
