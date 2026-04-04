@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { getAuthToken } from "../../utils/auth-session";
+import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
 
 const getToken = () => getAuthToken();
 
 interface Mapping {
   id: number; agent_name: string; agent_slug: string; asin: string;
   product_title: string; image_url: string; tracking_tag: string; custom_title: string | null;
+  tracking_marketplace: string;
 }
 interface Agent { id: number; name: string; slug: string; }
 interface Product { id: number; asin: string; title: string; }
@@ -63,8 +65,8 @@ export default function MappingsPage() {
     fetchAll();
   };
 
-  const copyLink = (slug: string, asin: string) => {
-    const link = `${window.location.origin}/${slug}/${asin}`;
+  const copyLink = (slug: string, marketplace: string) => {
+    const link = buildMarketplaceReadyLinkTemplate(window.location.origin, slug, marketplace);
     navigator.clipboard.writeText(link);
     alert(`Link copied: ${link}`);
   };
@@ -131,7 +133,7 @@ export default function MappingsPage() {
                 </div>
               </div>
               <div className="flex gap-2 justify-end mt-auto pt-2 border-t border-white/5">
-                <button onClick={() => void copyLink(m.agent_slug, m.asin)} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-md text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors">📋 Copy Link</button>
+                <button onClick={() => void copyLink(m.agent_slug, m.tracking_marketplace)} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-md text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors">📋 Copy Link</button>
                 <button onClick={() => void handleDelete(m.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors">Delete</button>
               </div>
             </div>

@@ -203,6 +203,8 @@ export default function ProductsPage() {
   const [addingMappingProductId, setAddingMappingProductId] = useState<number | null>(null);
   const [mappingDraft, setMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
   const [removingMappingId, setRemovingMappingId] = useState<number | null>(null);
+  const [bulkMappingDraft, setBulkMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
+  const [bulkAssigningMappings, setBulkAssigningMappings] = useState(false);
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -651,6 +653,58 @@ export default function ProductsPage() {
         requestError instanceof Error ? requestError.message : "Failed to add tracking mapping"
       );
       setAddingMappingProductId(null);
+    }
+  }
+
+  async function handleBulkMappingAssign() {
+    if (selectedProductIds.length === 0) {
+      setError("Select products first.");
+      return;
+    }
+
+    if (!bulkMappingDraft.agent_id || !bulkMappingDraft.tracking_id) {
+      setError("Select an agent and tracking tag first.");
+      return;
+    }
+
+    setBulkAssigningMappings(true);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const response = await fetch("/api/mappings/bulk-assign", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          product_ids: selectedProductIds,
+          agent_id: bulkMappingDraft.agent_id,
+          tracking_id: bulkMappingDraft.tracking_id,
+        }),
+      });
+
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to update selected products"));
+      }
+
+      setSheetMessage(
+        payload.message ||
+          `Tracking assigned to ${selectedProductIds.length} selected products.`
+      );
+      setBulkMappingDraft({ agent_id: 0, tracking_id: 0 });
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to update selected products"
+      );
+    } finally {
+      setBulkAssigningMappings(false);
     }
   }
 
@@ -1711,6 +1765,87 @@ export default function ProductsPage() {
               </select>
             </div>
           </div>
+          {!isEditor ? (
+            <div className="mb-4 rounded-2xl border border-white/8 bg-[#0f172a]/70 p-4">
+              <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-[#8d8da6] m-0">
+                    Bulk Tracking Update
+                  </p>
+                  <p className="mt-2 text-sm text-[#a0a0b8] m-0">
+                    Mark products, then assign one agent tag to all selected items. Existing
+                    mappings for that same agent update automatically, and missing mappings are
+                    created.
+                  </p>
+                </div>
+                <div className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-[#d4d4e4]">
+                  {selectedProductIds.length} selected
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+                <select
+                  value={bulkMappingDraft.agent_id}
+                  onChange={(event) =>
+                    setBulkMappingDraft({
+                      agent_id: Number(event.target.value),
+                      tracking_id: 0,
+                    })
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+                >
+                  <option value={0}>Select agent for selected products</option>
+                  {agentOptions.map((agent) => (
+                    <option key={agent.id} value={agent.id}>
+                      {agent.name} (/{agent.slug})
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={bulkMappingDraft.tracking_id}
+                  onChange={(event) =>
+                    setBulkMappingDraft((current) => ({
+                      ...current,
+                      tracking_id: Number(event.target.value),
+                    }))
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+                >
+                  <option value={0}>Select tag for selected products</option>
+                  {trackingOptions
+                    .filter((tracking) => tracking.agent_id === bulkMappingDraft.agent_id)
+                    .map((tracking) => (
+                      <option key={tracking.id} value={tracking.id}>
+                        {tracking.tag} · {tracking.marketplace}
+                        {tracking.label ? ` (${tracking.label})` : ""}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  onClick={() => void handleBulkMappingAssign()}
+                  disabled={
+                    bulkAssigningMappings ||
+                    selectedProductIds.length === 0 ||
+                    !bulkMappingDraft.agent_id ||
+                    !bulkMappingDraft.tracking_id
+                  }
+                  className={`rounded-xl border px-4 py-3 text-sm font-semibold transition-colors ${
+                    bulkAssigningMappings ||
+                    selectedProductIds.length === 0 ||
+                    !bulkMappingDraft.agent_id ||
+                    !bulkMappingDraft.tracking_id
+                      ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                  }`}
+                >
+                  {bulkAssigningMappings ? "Updating..." : "Update Selected"}
+                </button>
+              </div>
+              <p className="mt-3 text-xs text-[#8d8da6] m-0">
+                Keep the marketplace filter on one country before bulk changing products, so one
+                country tag is applied cleanly.
+              </p>
+            </div>
+          ) : null}
           <div
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
           >

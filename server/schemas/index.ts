@@ -132,6 +132,12 @@ export const bulkMappingSchema = z.object({
   mappings: z.array(createMappingSchema).min(1).max(100),
 });
 
+export const bulkAssignMappingsSchema = z.object({
+  product_ids: z.array(z.number().int().positive()).min(1, 'Select at least 1 product').max(100),
+  agent_id: z.number().int().positive(),
+  tracking_id: z.number().int().positive(),
+});
+
 export const updateMappingSchema = z.object({
   tracking_id: z.number().int().positive().optional(),
   custom_title: z.string().max(500).optional().nullable(),

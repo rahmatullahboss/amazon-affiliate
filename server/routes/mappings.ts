@@ -2,7 +2,12 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { createMappingSchema, bulkMappingSchema, updateMappingSchema } from '../schemas';
+import {
+  createMappingSchema,
+  bulkAssignMappingsSchema,
+  bulkMappingSchema,
+  updateMappingSchema,
+} from '../schemas';
 import { CacheService } from '../services/cache';
 import {
   buildCanonicalBridgeUrl,
@@ -11,6 +16,20 @@ import {
 } from '../utils/url';
 
 const mappings = new Hono<AppEnv>();
+
+async function invalidateMappingCaches(
+  env: AppEnv['Bindings'],
+  executionCtx: ExecutionContext,
+  agentSlug: string,
+  products: Array<{ asin: string; marketplace: string }>
+) {
+  const cache = new CacheService(env.KV);
+
+  for (const product of products) {
+    executionCtx.waitUntil(cache.deleteRedirectUrl(agentSlug, product.asin, product.marketplace));
+    executionCtx.waitUntil(cache.deletePageData(agentSlug, product.asin, product.marketplace));
+  }
+}
 
 /**
  * GET /api/mappings — List all agent-product mappings
@@ -128,6 +147,82 @@ mappings.post('/bulk', zValidator('json', bulkMappingSchema), async (c) => {
   });
 });
 
+mappings.post('/bulk-assign', zValidator('json', bulkAssignMappingsSchema), async (c) => {
+  const data = c.req.valid('json');
+
+  const agent = await c.env.DB.prepare(
+    `SELECT id, slug
+     FROM agents
+     WHERE id = ? AND is_active = 1`
+  )
+    .bind(data.agent_id)
+    .first<{ id: number; slug: string }>();
+
+  if (!agent) {
+    throw new HTTPException(404, { message: 'Agent not found or inactive' });
+  }
+
+  const tracking = await c.env.DB.prepare(
+    `SELECT id, marketplace
+     FROM tracking_ids
+     WHERE id = ? AND agent_id = ? AND is_active = 1`
+  )
+    .bind(data.tracking_id, data.agent_id)
+    .first<{ id: number; marketplace: string }>();
+
+  if (!tracking) {
+    throw new HTTPException(404, { message: 'Selected tracking tag not found or inactive' });
+  }
+
+  const productPlaceholders = data.product_ids.map(() => '?').join(', ');
+  const productStatement = c.env.DB.prepare(
+    `SELECT id, asin, marketplace
+     FROM products
+     WHERE id IN (${productPlaceholders}) AND is_active = 1`
+  );
+  const { results } = await productStatement.bind(...data.product_ids).all<{
+    id: number;
+    asin: string;
+    marketplace: string;
+  }>();
+
+  const products = results || [];
+  if (products.length !== data.product_ids.length) {
+    throw new HTTPException(400, { message: 'Some selected products are missing or inactive' });
+  }
+
+  const incompatibleProducts = products.filter(
+    (product) => product.marketplace !== tracking.marketplace
+  );
+  if (incompatibleProducts.length > 0) {
+    throw new HTTPException(400, {
+      message: `Selected tag is for ${tracking.marketplace}. Remove products from other marketplaces before bulk assigning.`,
+    });
+  }
+
+  for (const product of products) {
+    await c.env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (?, ?, ?, NULL, 1)
+       ON CONFLICT(agent_id, product_id) DO UPDATE SET
+         tracking_id = excluded.tracking_id,
+         is_active = 1`
+    )
+      .bind(data.agent_id, product.id, data.tracking_id)
+      .run();
+  }
+
+  await invalidateMappingCaches(c.env, c.executionCtx, agent.slug, products);
+
+  return c.json({
+    message: 'Tracking tag assigned to selected products',
+    summary: {
+      updated: products.length,
+      marketplace: tracking.marketplace,
+    },
+  });
+});
+
 mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid mapping ID' });
@@ -188,9 +283,9 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
     )
     .run();
 
-  const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.deleteRedirectUrl(current.agent_slug, current.asin, current.marketplace));
-  c.executionCtx.waitUntil(cache.deletePageData(current.agent_slug, current.asin, current.marketplace));
+  await invalidateMappingCaches(c.env, c.executionCtx, current.agent_slug, [
+    { asin: current.asin, marketplace: current.marketplace },
+  ]);
 
   const mapping = await c.env.DB.prepare(
     `SELECT ap.*,
@@ -232,9 +327,9 @@ mappings.delete('/:id', async (c) => {
 
   await c.env.DB.prepare('DELETE FROM agent_products WHERE id = ?').bind(id).run();
 
-  const cache = new CacheService(c.env.KV);
-  c.executionCtx.waitUntil(cache.deleteRedirectUrl(current.agent_slug, current.asin, current.marketplace));
-  c.executionCtx.waitUntil(cache.deletePageData(current.agent_slug, current.asin, current.marketplace));
+  await invalidateMappingCaches(c.env, c.executionCtx, current.agent_slug, [
+    { asin: current.asin, marketplace: current.marketplace },
+  ]);
 
   return c.json({ message: 'Mapping removed successfully' });
 });

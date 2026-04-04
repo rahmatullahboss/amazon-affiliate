@@ -11,6 +11,7 @@ import {
   normalizeTrackingTag,
   type SheetRowRecord,
 } from "./sheet-rows";
+import { buildCanonicalBridgeUrl, buildCanonicalRedirectUrl } from "../utils/url";
 
 interface SheetSyncConfig {
   id: number;
@@ -422,9 +423,23 @@ export async function mirrorProductsToSheet(
             ? "active"
             : "hidden",
         product.product_status || "active",
-        product.agent_slug ? `${publicAppOrigin}/${product.agent_slug}/${product.asin}` : "",
+        product.agent_slug
+          ? buildCanonicalBridgeUrl(
+              publicAppOrigin,
+              product.agent_slug,
+              product.asin,
+              product.marketplace
+            )
+          : "",
         product.agent_slug ? `${publicAppOrigin}/${product.agent_slug}` : "",
-        product.agent_slug ? `${publicAppOrigin}/go/${product.agent_slug}/${product.asin}` : "",
+        product.agent_slug
+          ? buildCanonicalRedirectUrl(
+              publicAppOrigin,
+              product.agent_slug,
+              product.asin,
+              product.marketplace
+            )
+          : "",
         product.title,
         product.category || "",
         product.agent_slug
