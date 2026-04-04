@@ -17,6 +17,9 @@ interface BlogFormState {
   cover_image_key: string;
   cover_image_url: string;
   cover_image_alt: string;
+  cta_label: string;
+  cta_url: string;
+  cta_disclosure: string;
   seo_title: string;
   seo_description: string;
   status: "draft" | "published";
@@ -31,6 +34,9 @@ const emptyForm: BlogFormState = {
   cover_image_key: "",
   cover_image_url: "",
   cover_image_alt: "",
+  cta_label: "",
+  cta_url: "",
+  cta_disclosure: "",
   seo_title: "",
   seo_description: "",
   status: "draft",
@@ -123,6 +129,9 @@ export default function AdminBlogsPage() {
       cover_image_key: post.cover_image_key || "",
       cover_image_url: post.cover_image_url || "",
       cover_image_alt: post.cover_image_alt || "",
+      cta_label: post.cta_label || "",
+      cta_url: post.cta_url || "",
+      cta_disclosure: post.cta_disclosure || "",
       seo_title: post.seo_title || "",
       seo_description: post.seo_description || "",
       status: post.status,
@@ -145,6 +154,9 @@ export default function AdminBlogsPage() {
         content: form.content,
         cover_image_key: form.cover_image_key || null,
         cover_image_alt: form.cover_image_alt || null,
+        cta_label: form.cta_label || null,
+        cta_url: form.cta_url || null,
+        cta_disclosure: form.cta_disclosure || null,
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
         status: form.status,
@@ -434,6 +446,47 @@ export default function AdminBlogsPage() {
                 />
               </label>
             </div>
+          </div>
+
+          <div className="rounded-2xl border border-white/10 bg-[#0f172a] p-4">
+            <div className="mb-4">
+              <h3 className="text-sm font-semibold text-[#f0f0f5]">Amazon CTA Button</h3>
+              <p className="mt-1 text-xs leading-6 text-[#6b7280]">
+                Optional button shown inside the article so staff can send readers to Amazon with a clear affiliate disclosure.
+              </p>
+            </div>
+
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-[#f0f0f5]">CTA Label</span>
+                <input
+                  value={form.cta_label}
+                  onChange={(event) => setForm((current) => ({ ...current, cta_label: event.target.value }))}
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  placeholder="View on Amazon"
+                />
+              </label>
+
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-[#f0f0f5]">CTA URL</span>
+                <input
+                  value={form.cta_url}
+                  onChange={(event) => setForm((current) => ({ ...current, cta_url: event.target.value }))}
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  placeholder="https://www.amazon.com/dp/ASIN?tag=your-tag-20"
+                />
+              </label>
+            </div>
+
+            <label className="mt-5 block space-y-2">
+              <span className="text-sm font-semibold text-[#f0f0f5]">CTA Disclosure</span>
+              <input
+                value={form.cta_disclosure}
+                onChange={(event) => setForm((current) => ({ ...current, cta_disclosure: event.target.value }))}
+                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                placeholder="Affiliate link. As an Amazon Associate, DealsRky earns from qualifying purchases."
+              />
+            </label>
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">

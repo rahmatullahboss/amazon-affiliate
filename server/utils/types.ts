@@ -131,6 +131,9 @@ export interface BlogPostRow {
   content: string;
   cover_image_key: string | null;
   cover_image_alt: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  cta_disclosure: string | null;
   seo_title: string | null;
   seo_description: string | null;
   status: 'draft' | 'published';

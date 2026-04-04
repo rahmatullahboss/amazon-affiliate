@@ -131,8 +131,9 @@ blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
   const result = await c.env.DB.prepare(
     `INSERT INTO blog_posts (
        title, slug, excerpt, content, cover_image_key, cover_image_alt,
+       cta_label, cta_url, cta_disclosure,
        seo_title, seo_description, status, is_featured, published_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   )
     .bind(
       payload.title.trim(),
@@ -141,6 +142,9 @@ blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
       payload.content.trim(),
       payload.cover_image_key || null,
       payload.cover_image_alt?.trim() || null,
+      payload.cta_label?.trim() || null,
+      payload.cta_url?.trim() || null,
+      payload.cta_disclosure?.trim() || null,
       payload.seo_title?.trim() || null,
       payload.seo_description?.trim() || null,
       status,
@@ -219,6 +223,9 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
          content = ?,
          cover_image_key = ?,
          cover_image_alt = ?,
+         cta_label = ?,
+         cta_url = ?,
+         cta_disclosure = ?,
          seo_title = ?,
          seo_description = ?,
          status = ?,
@@ -236,6 +243,11 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
       payload.cover_image_alt === undefined
         ? current.cover_image_alt
         : payload.cover_image_alt?.trim() || null,
+      payload.cta_label === undefined ? current.cta_label : payload.cta_label?.trim() || null,
+      payload.cta_url === undefined ? current.cta_url : payload.cta_url?.trim() || null,
+      payload.cta_disclosure === undefined
+        ? current.cta_disclosure
+        : payload.cta_disclosure?.trim() || null,
       payload.seo_title === undefined ? current.seo_title : payload.seo_title?.trim() || null,
       payload.seo_description === undefined
         ? current.seo_description

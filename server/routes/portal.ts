@@ -503,25 +503,6 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
   const body = c.req.valid('json');
 
   try {
-    const existingPortalTag = await c.env.DB.prepare(
-      `SELECT id
-       FROM tracking_ids
-       WHERE agent_id = ?
-         AND marketplace = ?
-         AND is_active = 1
-         AND is_portal_editable = 1
-       LIMIT 1`
-    )
-      .bind(agentId, body.marketplace)
-      .first<{ id: number }>();
-
-    if (existingPortalTag) {
-      throw new HTTPException(409, {
-        message:
-          'You already have a tag for this marketplace. Ask admin if you need extra same-country tags for sub-agents.',
-      });
-    }
-
     const marketplaceTagCount = await c.env.DB.prepare(
       `SELECT COUNT(*) AS count
        FROM tracking_ids

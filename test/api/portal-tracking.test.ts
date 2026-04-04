@@ -17,7 +17,7 @@ describe("Portal Tracking API", () => {
     vi.restoreAllMocks();
   });
 
-  it("allows only one portal-managed tag per marketplace", async () => {
+  it("allows multiple portal-managed tags per marketplace", async () => {
     await DbFactory.seedAgent(env.DB, 22, "multi-tag-agent", "Multi Tag Agent");
     const token = await generateAgentToken(22, "multi-tag-agent", env.JWT_SECRET || "test-secret");
     const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
@@ -59,7 +59,7 @@ describe("Portal Tracking API", () => {
     );
 
     expect(firstResponse.status).toBe(201);
-    expect(secondResponse.status).toBe(409);
+    expect(secondResponse.status).toBe(201);
 
     const { results } = await env.DB.prepare(
       `SELECT tag, marketplace, is_default
@@ -70,9 +70,11 @@ describe("Portal Tracking API", () => {
       .bind(22)
       .all<{ tag: string; marketplace: string; is_default: number }>();
 
-    expect(results).toHaveLength(1);
+    expect(results).toHaveLength(2);
     expect(results.every((row) => row.marketplace === "US")).toBe(true);
     expect(results.filter((row) => row.is_default === 1)).toHaveLength(1);
+    expect(results[0]?.tag).toBe("agent-us-primary-20");
+    expect(results[1]?.tag).toBe("agent-us-secondary-20");
   });
 
   it("returns live import capabilities for the portal products page", async () => {

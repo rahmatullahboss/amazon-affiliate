@@ -1,7 +1,12 @@
 import type { Route } from "./+types/blog-post";
 import { Link } from "react-router";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
-import { BROWSE_PICKS_LABEL } from "../utils/affiliate-copy";
+import {
+  AMAZON_DESTINATION_NOTE,
+  AMAZON_PRIMARY_CTA_LABEL,
+  BROWSE_PICKS_LABEL,
+  INLINE_AFFILIATE_DISCLOSURE,
+} from "../utils/affiliate-copy";
 import { buildCanonicalUrl, PUBLIC_SITE_URL } from "../utils/seo";
 import { formatBlogDate, splitBlogContent } from "../utils/blog";
 
@@ -14,6 +19,9 @@ interface BlogPostData {
   content: string;
   cover_image_url: string | null;
   cover_image_alt: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  cta_disclosure: string | null;
   seo_title: string | null;
   seo_description: string | null;
   published_at: string | null;
@@ -77,6 +85,9 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       content: string;
       cover_image_key: string | null;
       cover_image_alt: string | null;
+      cta_label: string | null;
+      cta_url: string | null;
+      cta_disclosure: string | null;
       seo_title: string | null;
       seo_description: string | null;
       published_at: string | null;
@@ -168,6 +179,27 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             ))}
           </div>
         </div>
+
+        {post.cta_url ? (
+          <div className="mt-8 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6">
+            <h2 className="text-2xl font-black text-gray-950">Ready to check this on Amazon?</h2>
+            <p className="mt-3 text-sm leading-7 text-gray-600">
+              {AMAZON_DESTINATION_NOTE}
+            </p>
+            <div className="mt-5 flex flex-wrap items-center gap-3">
+              <a
+                href={post.cta_url}
+                rel="nofollow sponsored"
+                className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+              >
+                {post.cta_label || AMAZON_PRIMARY_CTA_LABEL}
+              </a>
+            </div>
+            <p className="mt-3 text-xs leading-6 text-gray-500">
+              {post.cta_disclosure || INLINE_AFFILIATE_DISCLOSURE}
+            </p>
+          </div>
+        ) : null}
 
         <div className="mt-10 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6">
           <h2 className="text-2xl font-black text-gray-950">Browse more smart picks</h2>

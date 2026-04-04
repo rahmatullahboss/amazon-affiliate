@@ -156,7 +156,7 @@ export default function PortalTrackingPage() {
         <h1 className="m-0 mb-3 text-xl font-bold text-gray-50">Tags</h1>
         <p className="m-0 mb-2 text-slate-300 leading-relaxed">
           {canCreate
-            ? "Add the tag the client gave you for each marketplace. Once a marketplace has a saved tag, you can paste an ASIN and generate your link automatically."
+            ? "Add the tags the client gave you for each marketplace. Once a marketplace has at least one saved tag, you can paste an ASIN and generate your link automatically."
             : "Admin view can review and edit existing tags here. Creating a new tag still requires an agent-specific context."}
         </p>
         {canCreate ? (
