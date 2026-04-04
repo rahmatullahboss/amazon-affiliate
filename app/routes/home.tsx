@@ -10,7 +10,11 @@ import {
   HOME_HERO_EYEBROW,
   HOME_HERO_TITLE,
 } from "../utils/affiliate-copy";
-import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
+import {
+  resolveMarketplaceContext,
+  type MarketplaceSelectionSource,
+  type PublicMarketplace,
+} from "../utils/marketplace";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
 import type { BlogPostSummary } from "../utils/blog";
 
@@ -28,6 +32,8 @@ interface HomeLoaderData {
   products: ProductRow[];
   posts: BlogPostSummary[];
   selectedMarketplace: PublicMarketplace;
+  selectionSource: MarketplaceSelectionSource;
+  detectedMarketplace: PublicMarketplace | null;
   siteBranding: {
     og_site_name: string;
     og_description: string;
@@ -51,11 +57,12 @@ export function meta({ data }: Route.MetaArgs) {
 export async function loader({ request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const url = new URL(request.url);
-  const selectedMarketplace = resolvePreferredMarketplace({
+  const marketplaceContext = resolveMarketplaceContext({
     searchParams: url.searchParams,
     cookieHeader: request.headers.get("cookie"),
     countryHeader: request.headers.get("cf-ipcountry"),
   });
+  const selectedMarketplace = marketplaceContext.marketplace;
 
   const [productsResult, postsResult] = await Promise.all([
     env.DB.prepare(
@@ -97,6 +104,8 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     products: productsResult.results || [],
     posts,
     selectedMarketplace,
+    selectionSource: marketplaceContext.source,
+    detectedMarketplace: marketplaceContext.detectedMarketplace,
     siteBranding,
   } satisfies HomeLoaderData;
 }
@@ -120,10 +129,36 @@ const editorialHighlights = [
 
 const marketplaceLabels = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 
+function getMarketplaceStatusCopy(
+  source: MarketplaceSelectionSource,
+  selectedMarketplace: PublicMarketplace,
+  detectedMarketplace: PublicMarketplace | null
+) {
+  if (source === "query") {
+    return `Showing ${selectedMarketplace} because you selected it on this page.`;
+  }
+
+  if (source === "cookie") {
+    return `Showing ${selectedMarketplace} from your last saved marketplace choice.`;
+  }
+
+  if (source === "geo" && detectedMarketplace) {
+    return `We detected ${detectedMarketplace} from your location and selected it automatically.`;
+  }
+
+  return `Showing ${selectedMarketplace} as the default marketplace for this visit.`;
+}
+
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products, posts, selectedMarketplace } = loaderData as HomeLoaderData;
+  const { products, posts, selectedMarketplace, selectionSource, detectedMarketplace } =
+    loaderData as HomeLoaderData;
   const featuredProducts = products.slice(0, 6);
   const latestProducts = products.slice(6, 12);
+  const statusCopy = getMarketplaceStatusCopy(
+    selectionSource,
+    selectedMarketplace,
+    detectedMarketplace
+  );
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_34%,#f4f6f6_100%)]">
@@ -176,24 +211,54 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <Link
                   key={label}
                   to={`/?market=${label}`}
-                  className={`rounded-2xl border px-4 py-4 ${
+                  onClick={() => {
+                    document.cookie = `preferred_marketplace=${encodeURIComponent(label)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+                  }}
+                  className={`group rounded-2xl border px-4 py-4 transition-all ${
                     label === selectedMarketplace
-                      ? "border-primary/50 bg-primary/15"
+                      ? "border-primary bg-primary/20 shadow-[0_18px_45px_-28px_rgba(255,153,0,0.65)]"
                       : "border-white/10 bg-white/5 hover:border-primary/35 hover:bg-white/10"
                   }`}
                 >
-                  <p className="text-xs uppercase tracking-[0.25em] text-white/50">
-                    Marketplace
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.25em] text-white/50">
+                        Marketplace
+                      </p>
+                      <p className="mt-2 text-xl font-bold">{label}</p>
+                    </div>
+                    {label === selectedMarketplace ? (
+                      <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-black">
+                        Selected
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-3 text-sm text-white/70">
+                    {label === selectedMarketplace
+                      ? "This marketplace is currently active across the homepage feed."
+                      : "Switch the page to this country’s storefront picks."}
                   </p>
-                  <p className="mt-2 text-xl font-bold">{label}</p>
+                  {detectedMarketplace === label && label !== selectedMarketplace ? (
+                    <div className="mt-3 inline-flex rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-200">
+                      Suggested for your location
+                    </div>
+                  ) : null}
+                  {detectedMarketplace === label && label === selectedMarketplace && selectionSource === "geo" ? (
+                    <div className="mt-3 inline-flex rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-200">
+                      Auto-selected for you
+                    </div>
+                  ) : null}
                 </Link>
               ))}
             </div>
 
             <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
               <p className="text-sm leading-6 text-white/85">
-                Select a country above to show only that marketplace's products
-                across DealsRky before you continue to Amazon.
+                {statusCopy}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-white/65">
+                Choose any country card above to instantly switch the homepage feed,
+                then continue through the matching marketplace when you open a product.
               </p>
             </div>
           </div>

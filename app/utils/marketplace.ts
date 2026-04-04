@@ -1,5 +1,6 @@
 export const PUBLIC_MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
 export type PublicMarketplace = (typeof PUBLIC_MARKETPLACES)[number];
+export type MarketplaceSelectionSource = "query" | "cookie" | "geo" | "fallback";
 
 const CLOUDFLARE_COUNTRY_TO_MARKETPLACE: Record<string, PublicMarketplace> = {
   US: "US",
@@ -64,4 +65,41 @@ export function resolvePreferredMarketplace(input: {
   }
 
   return inferMarketplaceFromCountry(input.countryHeader, fallback);
+}
+
+export function resolveMarketplaceContext(input: {
+  searchParams: URLSearchParams;
+  cookieHeader?: string | null;
+  countryHeader?: string | null;
+  fallback?: PublicMarketplace;
+}): {
+  marketplace: PublicMarketplace;
+  source: MarketplaceSelectionSource;
+  detectedMarketplace: PublicMarketplace | null;
+} {
+  const fallback = input.fallback || "US";
+  const fromQuery = input.searchParams.get("market");
+  if (isPublicMarketplace(fromQuery)) {
+    return {
+      marketplace: fromQuery,
+      source: "query",
+      detectedMarketplace: inferMarketplaceFromCountry(input.countryHeader, fallback),
+    };
+  }
+
+  const fromCookie = getMarketplaceCookieValue(input.cookieHeader);
+  if (isPublicMarketplace(fromCookie)) {
+    return {
+      marketplace: fromCookie,
+      source: "cookie",
+      detectedMarketplace: inferMarketplaceFromCountry(input.countryHeader, fallback),
+    };
+  }
+
+  const detectedMarketplace = inferMarketplaceFromCountry(input.countryHeader, fallback);
+  return {
+    marketplace: detectedMarketplace,
+    source: input.countryHeader ? "geo" : "fallback",
+    detectedMarketplace,
+  };
 }

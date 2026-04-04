@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getMarketplaceCookieValue,
   inferMarketplaceFromCountry,
+  resolveMarketplaceContext,
   resolvePreferredMarketplace,
 } from "../../app/utils/marketplace";
 
@@ -35,5 +36,33 @@ describe("marketplace utils", () => {
   it("extracts marketplace cookie values safely", () => {
     expect(getMarketplaceCookieValue("foo=1; preferred_marketplace=IT; bar=2")).toBe("IT");
     expect(getMarketplaceCookieValue("foo=1")).toBeNull();
+  });
+
+  it("reports when the selected marketplace comes from geo detection", () => {
+    const context = resolveMarketplaceContext({
+      searchParams: new URLSearchParams(),
+      cookieHeader: null,
+      countryHeader: "GB",
+    });
+
+    expect(context).toEqual({
+      marketplace: "UK",
+      source: "geo",
+      detectedMarketplace: "UK",
+    });
+  });
+
+  it("preserves the selected marketplace source while still exposing the detected suggestion", () => {
+    const context = resolveMarketplaceContext({
+      searchParams: new URLSearchParams("market=DE"),
+      cookieHeader: "preferred_marketplace=FR",
+      countryHeader: "US",
+    });
+
+    expect(context).toEqual({
+      marketplace: "DE",
+      source: "query",
+      detectedMarketplace: "US",
+    });
   });
 });
