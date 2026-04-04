@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { createTrackingIdSchema } from '../schemas';
+import { createTrackingIdSchema, updateTrackingIdSchema } from '../schemas';
 import { ensurePublicSlugAlias } from '../services/public-slugs';
 
 const tracking = new Hono<AppEnv>();
@@ -100,17 +100,11 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
 /**
  * PUT /api/tracking/:id — Update tag
  */
-tracking.put('/:id', async (c) => {
+tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
-  const body = await c.req.json<{
-    label?: string;
-    is_default?: boolean;
-    is_active?: boolean;
-    is_portal_editable?: boolean;
-    alias_slug?: string | null;
-  }>();
+  const body = c.req.valid('json');
 
   const current = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?')
     .bind(id)
@@ -128,6 +122,7 @@ tracking.put('/:id', async (c) => {
   const updates: string[] = [];
   const values: (string | number | null)[] = [];
 
+  if (body.tag !== undefined) { updates.push('tag = ?'); values.push(body.tag); }
   if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
   if (body.is_default !== undefined) { updates.push('is_default = ?'); values.push(body.is_default ? 1 : 0); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }

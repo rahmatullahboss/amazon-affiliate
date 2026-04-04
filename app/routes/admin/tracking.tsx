@@ -124,7 +124,21 @@ export default function TrackingPage() {
       const res = await fetch(editingId ? `/api/tracking/${editingId}` : "/api/tracking", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-        body: JSON.stringify({ ...form, agent_id: Number(form.agent_id), alias_slug: form.alias_slug || null }),
+        body: JSON.stringify({
+          ...(editingId
+            ? {
+                tag: form.tag,
+                label: form.label || null,
+                is_default: form.is_default,
+                is_portal_editable: form.is_portal_editable,
+                alias_slug: form.alias_slug || null,
+              }
+            : {
+                ...form,
+                agent_id: Number(form.agent_id),
+                alias_slug: form.alias_slug || null,
+              }),
+        }),
       });
       if (!res.ok) {
         const data = (await res.json()) as unknown;
@@ -221,7 +235,7 @@ export default function TrackingPage() {
             </div>
             <div>
               <label className="block text-sm text-[#a0a0b8] mb-1.5">Tag*</label>
-              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.tag} onChange={e => setForm({...form, tag: e.target.value})} required placeholder="agent-name-20 or ?tag=agent-name-20" disabled={editingId !== null} />
+              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.tag} onChange={e => setForm({...form, tag: e.target.value})} required placeholder="agent-name-20 or ?tag=agent-name-20" />
               <p className="mt-2 text-xs text-[#8b8ba7] leading-relaxed m-0">
                 You can paste only the tag or the full tag format. The system stores the clean tag automatically.
               </p>

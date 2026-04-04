@@ -381,6 +381,7 @@ export default function AgentsPage() {
           body: JSON.stringify(
             tagFormMode?.type === "edit"
               ? {
+                  tag: tagForm.tag,
                   label: tagForm.label || null,
                   is_default: tagForm.is_default,
                   is_active: tagForm.is_active,
@@ -843,8 +844,7 @@ export default function AgentsPage() {
                               className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] disabled:opacity-60"
                               value={tagForm.tag}
                               onChange={(event) => setTagForm((current) => ({ ...current, tag: event.target.value }))}
-                              disabled={tagFormMode.type === "edit"}
-                              required={tagFormMode.type === "create"}
+                              required
                               placeholder="agent-name-20 or ?tag=agent-name-20"
                             />
                           </div>

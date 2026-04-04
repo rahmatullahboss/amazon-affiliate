@@ -537,6 +537,59 @@ describe("Portal Tracking API", () => {
     expect(updatedTracking?.is_portal_editable).toBe(1);
   });
 
+  it("lets admin replace the tracking tag while keeping the existing slug alias", async () => {
+    await DbFactory.seedAgent(env.DB, 35, "edit-tag-agent", "Edit Tag Agent");
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active, is_portal_editable)
+       VALUES (710, 35, 'old-edit-tag-20', 'US', 1, 1, 0)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
+       VALUES (35, 710, 'US', 'mahin', 1)`
+    ).run();
+
+    const adminToken = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/710", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          tag: "new-edit-tag-20",
+          alias_slug: "mahin",
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(response.status).toBe(200);
+
+    const updatedTracking = await env.DB.prepare(
+      `SELECT tag
+       FROM tracking_ids
+       WHERE id = ?`
+    )
+      .bind(710)
+      .first<{ tag: string }>();
+
+    const updatedAlias = await env.DB.prepare(
+      `SELECT slug
+       FROM agent_slug_aliases
+       WHERE tracking_id = ? AND marketplace = ?`
+    )
+      .bind(710, "US")
+      .first<{ slug: string }>();
+
+    expect(updatedTracking?.tag).toBe("new-edit-tag-20");
+    expect(updatedAlias?.slug).toBe("mahin");
+  });
+
   it("returns canonical country-coded links from the mappings links endpoint", async () => {
     await DbFactory.seedAgent(env.DB, 27, "mappings-agent", "Mappings Agent");
     await env.DB.prepare(
