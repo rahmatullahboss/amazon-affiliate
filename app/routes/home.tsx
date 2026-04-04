@@ -2,7 +2,6 @@ import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
 import { BlogCard } from "../components/blog/BlogCard";
-import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import {
   buildSeoMeta,
   toSiteBrandingMeta,
@@ -157,12 +156,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Read affiliate disclosure
               </Link>
             </div>
-            <div className="mt-5">
-              <MarketplaceSelector
-                selectedMarketplace={selectedMarketplace}
-                label="Showing products for"
-              />
-            </div>
           </div>
 
           <div className="w-full max-w-xl rounded-[2rem] border border-white/60 bg-[#0d1e1e] p-6 text-white shadow-[0_30px_80px_-35px_rgba(8,102,102,0.45)]">
@@ -180,26 +173,27 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {marketplaceLabels.map((label) => (
-               <div
+                <Link
                   key={label}
+                  to={`/?market=${label}`}
                   className={`rounded-2xl border px-4 py-4 ${
                     label === selectedMarketplace
                       ? "border-primary/50 bg-primary/15"
-                      : "border-white/10 bg-white/5"
+                      : "border-white/10 bg-white/5 hover:border-primary/35 hover:bg-white/10"
                   }`}
                 >
                   <p className="text-xs uppercase tracking-[0.25em] text-white/50">
                     Marketplace
                   </p>
                   <p className="mt-2 text-xl font-bold">{label}</p>
-                </div>
+                </Link>
               ))}
             </div>
 
             <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
               <p className="text-sm leading-6 text-white/85">
-                Use DealsRky to review product context and compare marketplace
-                availability before you continue to Amazon.
+                Select a country above to show only that marketplace's products
+                across DealsRky before you continue to Amazon.
               </p>
             </div>
           </div>
