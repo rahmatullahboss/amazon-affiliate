@@ -14,6 +14,15 @@ interface PublicSlugRow {
   marketplace: string | null;
 }
 
+function normalizePublicSlugValue(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export async function resolvePublicSlug(
   db: D1Database,
   slug: string
@@ -103,4 +112,86 @@ export async function getPublicSlugForTracking(input: {
     .first<{ slug: string }>();
 
   return alias?.slug ?? input.fallbackSlug;
+}
+
+export async function ensurePublicSlugAlias(input: {
+  db: D1Database;
+  agentId: number;
+  trackingId: number;
+  marketplace: string;
+  fallbackSlug: string;
+  preferredAlias?: string | null;
+}): Promise<string> {
+  const existingAlias = await input.db
+    .prepare(
+      `SELECT slug
+       FROM agent_slug_aliases
+       WHERE tracking_id = ? AND marketplace = ?
+       LIMIT 1`
+    )
+    .bind(input.trackingId, input.marketplace)
+    .first<{ slug: string }>();
+
+  if (existingAlias?.slug) {
+    return existingAlias.slug;
+  }
+
+  const normalizedPreferredAlias = input.preferredAlias
+    ? normalizePublicSlugValue(input.preferredAlias)
+    : "";
+  const normalizedFallbackSlug = normalizePublicSlugValue(input.fallbackSlug);
+  const marketplaceSuffix = input.marketplace.trim().toLowerCase();
+  const baseAlias =
+    normalizedPreferredAlias || `${normalizedFallbackSlug}-${marketplaceSuffix}`;
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const candidate = attempt === 0 ? baseAlias : `${baseAlias}-${attempt + 1}`;
+    if (!candidate) {
+      continue;
+    }
+
+    const conflictingAlias = await input.db
+      .prepare(
+        `SELECT tracking_id
+         FROM agent_slug_aliases
+         WHERE slug = ?
+         LIMIT 1`
+      )
+      .bind(candidate)
+      .first<{ tracking_id: number }>();
+
+    if (conflictingAlias && conflictingAlias.tracking_id !== input.trackingId) {
+      continue;
+    }
+
+    const conflictingAgent = await input.db
+      .prepare(
+        `SELECT id
+         FROM agents
+         WHERE slug = ? AND id != ?
+         LIMIT 1`
+      )
+      .bind(candidate, input.agentId)
+      .first<{ id: number }>();
+
+    if (conflictingAgent) {
+      continue;
+    }
+
+    await input.db
+      .prepare(
+        `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
+         VALUES (?, ?, ?, ?, 1)
+         ON CONFLICT(tracking_id, marketplace) DO UPDATE SET
+           slug = excluded.slug,
+           is_active = 1,
+           updated_at = CURRENT_TIMESTAMP`
+      )
+      .bind(input.agentId, input.trackingId, input.marketplace, candidate)
+      .run();
+
+    return candidate;
+  }
+
+  return input.fallbackSlug;
 }

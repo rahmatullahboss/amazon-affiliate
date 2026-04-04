@@ -77,6 +77,50 @@ describe("Portal Tracking API", () => {
     expect(results[1]?.tag).toBe("agent-us-secondary-20");
   });
 
+  it("creates a marketplace slug alias automatically for portal-managed tags", async () => {
+    await DbFactory.seedAgent(env.DB, 23, "alias-agent", "Alias Agent");
+    const token = await generateAgentToken(23, "alias-agent", env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/portal/tracking", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          tag: "alias-agent-uk-21",
+          label: "UK",
+          marketplace: "UK",
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(response.status).toBe(201);
+
+    const tracking = await env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE agent_id = ? AND marketplace = ? AND tag = ?`
+    )
+      .bind(23, "UK", "alias-agent-uk-21")
+      .first<{ id: number }>();
+
+    const alias = await env.DB.prepare(
+      `SELECT slug
+       FROM agent_slug_aliases
+       WHERE tracking_id = ? AND marketplace = ?`
+    )
+      .bind(tracking?.id ?? 0, "UK")
+      .first<{ slug: string }>();
+
+    expect(alias?.slug).toBe("alias-agent-uk");
+  });
+
   it("returns live import capabilities for the portal products page", async () => {
     await DbFactory.seedAgent(env.DB, 25, "portal-cap-agent", "Portal Capability Agent");
     const token = await generateAgentToken(25, "portal-cap-agent", env.JWT_SECRET || "test-secret");

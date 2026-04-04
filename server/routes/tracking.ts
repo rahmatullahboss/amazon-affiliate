@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createTrackingIdSchema } from '../schemas';
+import { ensurePublicSlugAlias } from '../services/public-slugs';
 
 const tracking = new Hono<AppEnv>();
 
@@ -62,13 +63,25 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
       .bind(data.tag)
       .first<{ id: number; agent_id: number; marketplace: string }>();
 
-    if (trackingId && data.alias_slug) {
-      await c.env.DB.prepare(
-        `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
-         VALUES (?, ?, ?, ?, 1)`
+    if (trackingId) {
+      const agentDetails = await c.env.DB.prepare(
+        `SELECT slug
+         FROM agents
+         WHERE id = ?`
       )
-        .bind(trackingId.agent_id, trackingId.id, trackingId.marketplace, data.alias_slug)
-        .run();
+        .bind(trackingId.agent_id)
+        .first<{ slug: string }>();
+
+      if (agentDetails?.slug) {
+        await ensurePublicSlugAlias({
+          db: c.env.DB,
+          agentId: trackingId.agent_id,
+          trackingId: trackingId.id,
+          marketplace: trackingId.marketplace,
+          fallbackSlug: agentDetails.slug,
+          preferredAlias: data.alias_slug || null,
+        });
+      }
     }
 
     return c.json({ trackingId, message: 'Tag created' }, 201);

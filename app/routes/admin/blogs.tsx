@@ -39,7 +39,7 @@ const emptyForm: BlogFormState = {
   cta_disclosure: "",
   seo_title: "",
   seo_description: "",
-  status: "draft",
+  status: "published",
   is_featured: false,
 };
 

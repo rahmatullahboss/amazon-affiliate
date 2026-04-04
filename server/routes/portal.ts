@@ -19,7 +19,7 @@ import {
   buildCanonicalRedirectUrl,
   getPublicAppOrigin,
 } from '../utils/url';
-import { getPublicSlugForTracking } from '../services/public-slugs';
+import { ensurePublicSlugAlias, getPublicSlugForTracking } from '../services/public-slugs';
 
 const portal = new Hono<AppEnv>();
 
@@ -523,6 +523,26 @@ portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c
     const trackingIdValue = Number(insertResult.meta.last_row_id);
     if (shouldBeDefault && Number.isFinite(trackingIdValue)) {
       await ensureMarketplaceDefaultTag(c.env.DB, agentId, body.marketplace, trackingIdValue);
+    }
+
+    if (Number.isFinite(trackingIdValue)) {
+      const agent = await c.env.DB.prepare(
+        `SELECT slug
+         FROM agents
+         WHERE id = ?`
+      )
+        .bind(agentId)
+        .first<{ slug: string }>();
+
+      if (agent?.slug) {
+        await ensurePublicSlugAlias({
+          db: c.env.DB,
+          agentId,
+          trackingId: trackingIdValue,
+          marketplace: body.marketplace,
+          fallbackSlug: agent.slug,
+        });
+      }
     }
 
     const trackingId = await c.env.DB.prepare(
