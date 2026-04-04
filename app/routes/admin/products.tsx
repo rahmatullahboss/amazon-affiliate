@@ -5,6 +5,7 @@ import {
   BATCH_ASIN_IMPORT_ENABLED,
   BATCH_ASIN_IMPORT_PAUSED_DETAIL,
 } from "../../utils/asin-import";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 import { getAuthToken, getAuthUser } from "../../utils/auth-session";
 import { compressImageFile } from "../../utils/image-compression";
 
@@ -323,8 +324,8 @@ export default function ProductsPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error: string };
-        throw new Error(data.error);
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to fetch ASIN"));
       }
 
       setShowForm(false);
@@ -352,10 +353,10 @@ export default function ProductsPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
 
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(payload.error || payload.message || "Failed to refresh product");
+        throw new Error(extractApiErrorMessage(payload, "Failed to refresh product"));
       }
 
       await fetchProducts(productPagination.page);
@@ -384,10 +385,10 @@ export default function ProductsPage() {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
 
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(payload.error || payload.message || "Failed to remove product");
+        throw new Error(extractApiErrorMessage(payload, "Failed to remove product"));
       }
 
       await fetchProducts(productPagination.page);
@@ -435,9 +436,9 @@ export default function ProductsPage() {
         }),
       });
 
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
       if (!response.ok) {
-        throw new Error(payload.error || payload.message || "Failed to save product content");
+        throw new Error(extractApiErrorMessage(payload, "Failed to save product content"));
       }
 
       setSheetMessage("Product content updated.");
@@ -475,14 +476,10 @@ export default function ProductsPage() {
         body: formData,
       });
 
-      const payload = (await response.json()) as {
-        url?: string;
-        error?: string;
-        message?: string;
-      };
+      const payload = (await response.json()) as { url?: string } & Record<string, unknown>;
 
       if (!response.ok || !payload.url) {
-        throw new Error(payload.error || payload.message || "Failed to upload product image");
+        throw new Error(extractApiErrorMessage(payload, "Failed to upload product image"));
       }
 
       setEditorForm((current) => ({
@@ -515,10 +512,10 @@ export default function ProductsPage() {
         },
       });
 
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(payload.error || payload.message || "Failed to regenerate content");
+        throw new Error(extractApiErrorMessage(payload, "Failed to regenerate content"));
       }
 
       setSheetMessage(payload.message || "Product content regenerated.");
@@ -565,10 +562,10 @@ export default function ProductsPage() {
         ),
       });
 
-      const payload = (await response.json()) as { error?: string; message?: string };
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(payload.error || payload.message || "Failed to regenerate selected products");
+        throw new Error(extractApiErrorMessage(payload, "Failed to regenerate selected products"));
       }
 
       setSheetMessage(
@@ -619,8 +616,8 @@ export default function ProductsPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error: string };
-        throw new Error(data.error);
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to save sheet config"));
       }
 
       setShowForm(false);
@@ -683,8 +680,8 @@ export default function ProductsPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error: string };
-        throw new Error(data.error);
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to import sheet data"));
       }
 
       const data = (await response.json()) as {
@@ -746,8 +743,8 @@ export default function ProductsPage() {
       });
 
       if (!response.ok) {
-        const data = (await response.json()) as { error: string };
-        throw new Error(data.error);
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to export DB to sheet"));
       }
 
       setSheetMessage("Sheet sync configuration saved.");

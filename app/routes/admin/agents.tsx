@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { getAuthToken } from "../../utils/auth-session";
 import { buildAgentFormValues, isInlineEditingAgent } from "../../utils/agents";
@@ -300,8 +301,8 @@ export default function AgentsPage() {
       );
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Failed to save agent");
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to save agent"));
       }
 
       setShowCreateAgentForm(false);
@@ -400,8 +401,8 @@ export default function AgentsPage() {
       );
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Failed to save tag");
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to save tag"));
       }
 
       closeTagForm();
@@ -422,8 +423,8 @@ export default function AgentsPage() {
     });
 
     if (!response.ok) {
-      const data = (await response.json()) as { error?: string };
-      setTagError(data.error || "Failed to delete tag");
+      const data = (await response.json()) as unknown;
+      setTagError(extractApiErrorMessage(data, "Failed to delete tag"));
       return;
     }
 
@@ -489,8 +490,8 @@ export default function AgentsPage() {
       );
 
       if (!response.ok) {
-        const data = (await response.json()) as { error?: string };
-        throw new Error(data.error || "Failed to save login");
+        const data = (await response.json()) as unknown;
+        throw new Error(extractApiErrorMessage(data, "Failed to save login"));
       }
 
       closeUserForm();

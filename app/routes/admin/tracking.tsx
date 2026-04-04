@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
+import { extractApiErrorMessage } from "../../utils/api-errors";
 
 const getToken = () => getAuthToken();
 
@@ -125,7 +126,12 @@ export default function TrackingPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ ...form, agent_id: Number(form.agent_id), alias_slug: form.alias_slug || null }),
       });
-      if (!res.ok) { const d = await res.json() as { error: string }; throw new Error(d.error); }
+      if (!res.ok) {
+        const data = (await res.json()) as unknown;
+        throw new Error(
+          extractApiErrorMessage(data, editingId ? "Failed to update tag" : "Failed to save tag")
+        );
+      }
       setShowForm(false); setEditingId(null); setForm({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false, is_portal_editable: false, alias_slug: "" });
       fetchAll();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
