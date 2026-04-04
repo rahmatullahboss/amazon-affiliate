@@ -1,6 +1,9 @@
 import type { Route } from "./+types/agent-storefront";
 import { Link } from "react-router";
+import { resolvePublicSlug } from "../../server/services/public-slugs";
+import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import { ProductCard } from "../components/home/ProductCard";
+import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildSeoMeta } from "../utils/seo";
 
 interface StorefrontProduct {
@@ -16,7 +19,9 @@ interface AgentStorefrontData {
   agent: {
     name: string;
     slug: string;
+    publicSlug: string;
   };
+  selectedMarketplace: PublicMarketplace;
   products: StorefrontProduct[];
 }
 
@@ -32,21 +37,35 @@ export function meta({ data, params }: Route.MetaArgs) {
   });
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const agentSlug = (params.agent || "").trim();
+  const url = new URL(request.url);
 
   if (!agentSlug) {
     throw new Response("Agent not found", { status: 404 });
   }
 
+  const resolvedSlug = await resolvePublicSlug(env.DB, agentSlug);
+  if (!resolvedSlug) {
+    throw new Response("Agent storefront not found", { status: 404 });
+  }
+
+  const selectedMarketplace = resolvePreferredMarketplace({
+    searchParams: url.searchParams,
+    cookieHeader: request.headers.get("cookie"),
+    countryHeader: request.headers.get("cf-ipcountry"),
+    fallback: (resolvedSlug.marketplace as PublicMarketplace | null) || "US",
+  });
+  const effectiveMarketplace = resolvedSlug.marketplace || selectedMarketplace;
+
   const agent = await env.DB.prepare(
     `SELECT id, name, slug
      FROM agents
-     WHERE slug = ? AND is_active = 1
+     WHERE id = ? AND is_active = 1
      LIMIT 1`
   )
-    .bind(agentSlug)
+    .bind(resolvedSlug.agentId)
     .first<{ id: number; name: string; slug: string }>();
 
   if (!agent) {
@@ -65,20 +84,23 @@ export async function loader({ params, context }: Route.LoaderArgs) {
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
      WHERE ap.agent_id = ?
+       AND t.marketplace = ?
        AND ap.is_active = 1
        AND p.is_active = 1
        AND p.status = 'active'
        AND t.is_active = 1
      ORDER BY ap.updated_at DESC, ap.id DESC`
   )
-    .bind(agent.id)
+    .bind(agent.id, effectiveMarketplace)
     .all<StorefrontProduct>();
 
   return {
     agent: {
       name: agent.name,
       slug: agent.slug,
+      publicSlug: resolvedSlug.publicSlug,
     },
+    selectedMarketplace: effectiveMarketplace as PublicMarketplace,
     products: results || [],
   } satisfies AgentStorefrontData;
 }
@@ -106,8 +128,11 @@ export default function AgentStorefrontPage({ loaderData }: Route.ComponentProps
             its tracked landing page before going to Amazon.
           </p>
           <p className="mt-4 text-sm font-medium text-primary">
-            {data.products.length} product{data.products.length !== 1 ? "s" : ""} available
+            {data.products.length} product{data.products.length !== 1 ? "s" : ""} available in {data.selectedMarketplace}
           </p>
+          <div className="mt-5 flex justify-center">
+            <MarketplaceSelector selectedMarketplace={data.selectedMarketplace} label="Showing only" />
+          </div>
         </div>
       </div>
 
@@ -116,9 +141,9 @@ export default function AgentStorefrontPage({ loaderData }: Route.ComponentProps
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {data.products.map((product) => (
               <ProductCard
-                key={`${data.agent.slug}-${product.asin}`}
+                key={`${data.agent.publicSlug}-${product.asin}`}
                 item={product}
-                href={`/${data.agent.slug}/${product.asin}`}
+                href={`/${data.agent.publicSlug}/${product.marketplace.toLowerCase()}/${product.asin}`}
               />
             ))}
           </div>

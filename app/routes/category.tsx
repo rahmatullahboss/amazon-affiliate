@@ -1,6 +1,8 @@
 import type { Route } from "./+types/category";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
+import { MarketplaceSelector } from "../components/MarketplaceSelector";
+import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildSeoMeta } from "../utils/seo";
 
 interface CategoryProduct {
@@ -18,6 +20,7 @@ interface CategoryProduct {
 interface CategoryPageData {
   categoryName: string;
   categorySlug: string;
+  selectedMarketplace: PublicMarketplace;
   products: CategoryProduct[];
 }
 
@@ -33,9 +36,15 @@ export function meta({ data }: Route.MetaArgs) {
   });
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const slug = params.slug;
+  const url = new URL(request.url);
+  const selectedMarketplace = resolvePreferredMarketplace({
+    searchParams: url.searchParams,
+    cookieHeader: request.headers.get("cookie"),
+    countryHeader: request.headers.get("cf-ipcountry"),
+  });
 
   // NOTE: categories table does NOT have a `description` column — only name, slug, icon, image_url, etc.
   const category = await env.DB.prepare(`
@@ -49,13 +58,14 @@ export async function loader({ params, context }: Route.LoaderArgs) {
   const { results: products } = await env.DB.prepare(`
     SELECT id, asin, title, image_url, category, description, price, original_price, rating
     FROM products
-    WHERE category = ? AND is_active = 1 AND status = 'active'
+    WHERE category = ? AND marketplace = ? AND is_active = 1 AND status = 'active'
     ORDER BY created_at DESC
-  `).bind(category.name).all<CategoryProduct>();
+  `).bind(category.name, selectedMarketplace).all<CategoryProduct>();
 
   return {
     categoryName: category.name,
     categorySlug: category.slug,
+    selectedMarketplace,
     products: products || []
   } satisfies CategoryPageData;
 }
@@ -78,7 +88,10 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
           </nav>
 
           <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">{data.categoryName} Picks</h1>
-          <p className="text-primary font-medium text-sm">{data.products.length} product{data.products.length !== 1 ? 's' : ''} available</p>
+          <p className="text-primary font-medium text-sm">{data.products.length} product{data.products.length !== 1 ? 's' : ''} available in {data.selectedMarketplace}</p>
+          <div className="mt-5 flex justify-center">
+            <MarketplaceSelector selectedMarketplace={data.selectedMarketplace} label="Showing only" />
+          </div>
         </div>
       </div>
 
@@ -93,7 +106,7 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
             <h3 className="text-lg font-bold text-gray-800">No Products Yet</h3>
             <p className="text-gray-500 text-sm mb-6">We are reviewing the next batch of curated picks for this category. Check back soon.</p>
             <Link
-              to="/deals"
+              to={`/deals?market=${data.selectedMarketplace}`}
               className="inline-flex items-center bg-gray-100 hover:bg-primary text-gray-700 hover:text-white font-semibold py-3 px-8 rounded-full border border-gray-200 transition-colors"
             >
               Back to All Picks

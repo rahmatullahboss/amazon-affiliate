@@ -2,6 +2,7 @@ import type { Route } from "./+types/home";
 import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
 import { BlogCard } from "../components/blog/BlogCard";
+import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import {
   buildSeoMeta,
   toSiteBrandingMeta,
@@ -10,6 +11,7 @@ import {
   HOME_HERO_EYEBROW,
   HOME_HERO_TITLE,
 } from "../utils/affiliate-copy";
+import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
 import type { BlogPostSummary } from "../utils/blog";
 
@@ -26,6 +28,7 @@ interface ProductRow {
 interface HomeLoaderData {
   products: ProductRow[];
   posts: BlogPostSummary[];
+  selectedMarketplace: PublicMarketplace;
   siteBranding: {
     og_site_name: string;
     og_description: string;
@@ -46,19 +49,25 @@ export function meta({ data }: Route.MetaArgs) {
   });
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
+  const url = new URL(request.url);
+  const selectedMarketplace = resolvePreferredMarketplace({
+    searchParams: url.searchParams,
+    cookieHeader: request.headers.get("cookie"),
+    countryHeader: request.headers.get("cf-ipcountry"),
+  });
 
   const [productsResult, postsResult] = await Promise.all([
     env.DB.prepare(
       `
         SELECT id, asin, title, image_url, category, marketplace, created_at
         FROM products
-        WHERE is_active = 1 AND status = 'active'
+        WHERE is_active = 1 AND status = 'active' AND marketplace = ?
         ORDER BY created_at DESC
         LIMIT 36
       `
-    ).all<ProductRow>(),
+    ).bind(selectedMarketplace).all<ProductRow>(),
     env.DB.prepare(
       `SELECT *
        FROM blog_posts
@@ -88,6 +97,7 @@ export async function loader({ context }: Route.LoaderArgs) {
   return {
     products: productsResult.results || [],
     posts,
+    selectedMarketplace,
     siteBranding,
   } satisfies HomeLoaderData;
 }
@@ -112,7 +122,7 @@ const editorialHighlights = [
 const marketplaceLabels = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products, posts } = loaderData as HomeLoaderData;
+  const { products, posts, selectedMarketplace } = loaderData as HomeLoaderData;
   const featuredProducts = products.slice(0, 6);
   const latestProducts = products.slice(6, 12);
 
@@ -147,6 +157,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Read affiliate disclosure
               </Link>
             </div>
+            <div className="mt-5">
+              <MarketplaceSelector
+                selectedMarketplace={selectedMarketplace}
+                label="Showing products for"
+              />
+            </div>
           </div>
 
           <div className="w-full max-w-xl rounded-[2rem] border border-white/60 bg-[#0d1e1e] p-6 text-white shadow-[0_30px_80px_-35px_rgba(8,102,102,0.45)]">
@@ -164,9 +180,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-6 grid gap-4 sm:grid-cols-2">
               {marketplaceLabels.map((label) => (
-                <div
+               <div
                   key={label}
-                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4"
+                  className={`rounded-2xl border px-4 py-4 ${
+                    label === selectedMarketplace
+                      ? "border-primary/50 bg-primary/15"
+                      : "border-white/10 bg-white/5"
+                  }`}
                 >
                   <p className="text-xs uppercase tracking-[0.25em] text-white/50">
                     Marketplace
