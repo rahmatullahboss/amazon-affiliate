@@ -132,6 +132,11 @@ export const bulkMappingSchema = z.object({
   mappings: z.array(createMappingSchema).min(1).max(100),
 });
 
+export const updateMappingSchema = z.object({
+  tracking_id: z.number().int().positive().optional(),
+  custom_title: z.string().max(500).optional().nullable(),
+});
+
 // ─── Auth Schemas ──────────────────────────────────────
 export const loginSchema = z.object({
   username: z.string().min(1),

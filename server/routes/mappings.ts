@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
-import { createMappingSchema, bulkMappingSchema } from '../schemas';
+import { createMappingSchema, bulkMappingSchema, updateMappingSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import {
   buildCanonicalBridgeUrl,
@@ -20,7 +20,9 @@ mappings.get('/', async (c) => {
     `SELECT ap.*,
        a.name as agent_name, a.slug as agent_slug,
        p.asin, p.title as product_title, p.image_url,
-       t.tag as tracking_tag
+       t.tag as tracking_tag,
+       t.is_active as tracking_is_active,
+       t.marketplace as tracking_marketplace
      FROM agent_products ap
      JOIN agents a ON a.id = ap.agent_id
      JOIN products p ON p.id = ap.product_id
@@ -124,6 +126,89 @@ mappings.post('/bulk', zValidator('json', bulkMappingSchema), async (c) => {
       failed: results.filter((r) => r.status === 'failed').length,
     },
   });
+});
+
+mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid mapping ID' });
+
+  const data = c.req.valid('json');
+  const current = await c.env.DB.prepare(
+    `SELECT ap.id, ap.agent_id, ap.product_id, ap.tracking_id, ap.custom_title,
+            a.slug as agent_slug, p.asin, p.marketplace
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     JOIN products p ON p.id = ap.product_id
+     WHERE ap.id = ?`
+  )
+    .bind(id)
+    .first<{
+      id: number;
+      agent_id: number;
+      product_id: number;
+      tracking_id: number;
+      custom_title: string | null;
+      agent_slug: string;
+      asin: string;
+      marketplace: string;
+    }>();
+
+  if (!current) {
+    throw new HTTPException(404, { message: 'Mapping not found' });
+  }
+
+  let nextTrackingId = current.tracking_id;
+  if (data.tracking_id !== undefined) {
+    const tracking = await c.env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE id = ? AND agent_id = ? AND is_active = 1`
+    )
+      .bind(data.tracking_id, current.agent_id)
+      .first<{ id: number }>();
+
+    if (!tracking) {
+      throw new HTTPException(404, { message: 'Selected tracking tag not found or inactive' });
+    }
+
+    nextTrackingId = tracking.id;
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE agent_products
+     SET tracking_id = ?,
+         custom_title = ?,
+         is_active = 1
+     WHERE id = ?`
+  )
+    .bind(
+      nextTrackingId,
+      data.custom_title === undefined ? current.custom_title : data.custom_title || null,
+      id
+    )
+    .run();
+
+  const cache = new CacheService(c.env.KV);
+  c.executionCtx.waitUntil(cache.deleteRedirectUrl(current.agent_slug, current.asin, current.marketplace));
+  c.executionCtx.waitUntil(cache.deletePageData(current.agent_slug, current.asin, current.marketplace));
+
+  const mapping = await c.env.DB.prepare(
+    `SELECT ap.*,
+       a.name as agent_name, a.slug as agent_slug,
+       p.asin, p.title as product_title, p.image_url,
+       t.tag as tracking_tag,
+       t.is_active as tracking_is_active,
+       t.marketplace as tracking_marketplace
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     JOIN products p ON p.id = ap.product_id
+     JOIN tracking_ids t ON t.id = ap.tracking_id
+     WHERE ap.id = ?`
+  )
+    .bind(id)
+    .first();
+
+  return c.json({ mapping, message: 'Mapping updated successfully' });
 });
 
 /**

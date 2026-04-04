@@ -25,6 +25,34 @@ interface Product {
   total_clicks: number;
 }
 
+interface ProductMapping {
+  id: number;
+  agent_id: number;
+  product_id: number;
+  tracking_id: number;
+  agent_name: string;
+  agent_slug: string;
+  tracking_tag: string;
+  tracking_is_active: number;
+  tracking_marketplace: string;
+  custom_title: string | null;
+}
+
+interface TrackingOption {
+  id: number;
+  agent_id: number;
+  tag: string;
+  label: string | null;
+  marketplace: string;
+  is_active: number;
+}
+
+interface AgentOption {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 interface ProductPagination {
   page: number;
   pageSize: number;
@@ -167,6 +195,14 @@ export default function ProductsPage() {
   });
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
+  const [productMappings, setProductMappings] = useState<ProductMapping[]>([]);
+  const [trackingOptions, setTrackingOptions] = useState<TrackingOption[]>([]);
+  const [agentOptions, setAgentOptions] = useState<AgentOption[]>([]);
+  const [changingMappingId, setChangingMappingId] = useState<number | null>(null);
+  const [mappingTagSelection, setMappingTagSelection] = useState<Record<number, number>>({});
+  const [addingMappingProductId, setAddingMappingProductId] = useState<number | null>(null);
+  const [mappingDraft, setMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
+  const [removingMappingId, setRemovingMappingId] = useState<number | null>(null);
 
   const [bulkAsins, setBulkAsins] = useState("");
   const [bulkMarketplace, setBulkMarketplace] = useState("US");
@@ -246,8 +282,47 @@ export default function ProductsPage() {
   }
 
   useEffect(() => {
-    void Promise.all([fetchProducts(1), fetchSheetConfig()]);
+    if (isEditor) {
+      void Promise.all([fetchProducts(1), fetchSheetConfig()]);
+      return;
+    }
+
+    void Promise.all([fetchProducts(1), fetchSheetConfig(), fetchMappingAdminData()]);
   }, []);
+
+  async function fetchMappingAdminData() {
+    if (isEditor) {
+      return;
+    }
+
+    try {
+      const headers = { Authorization: `Bearer ${getToken()}` };
+      const [mappingsResponse, trackingResponse, agentsResponse] = await Promise.all([
+        fetch("/api/mappings", { headers }),
+        fetch("/api/tracking", { headers }),
+        fetch("/api/agents", { headers }),
+      ]);
+
+      if (mappingsResponse.ok) {
+        const data = (await mappingsResponse.json()) as { mappings: ProductMapping[] };
+        setProductMappings(data.mappings || []);
+      }
+
+      if (trackingResponse.ok) {
+        const data = (await trackingResponse.json()) as { trackingIds: TrackingOption[] };
+        setTrackingOptions(
+          (data.trackingIds || []).filter((item) => item.is_active === 1)
+        );
+      }
+
+      if (agentsResponse.ok) {
+        const data = (await agentsResponse.json()) as { agents: AgentOption[] };
+        setAgentOptions(data.agents || []);
+      }
+    } catch (requestError) {
+      console.error(requestError);
+    }
+  }
 
   async function fetchProducts(
     page = productPagination.page,
@@ -452,6 +527,130 @@ export default function ProductsPage() {
       );
     } finally {
       setSavingProductId(null);
+    }
+  }
+
+  function getMappingsForProduct(productId: number) {
+    return productMappings.filter((mapping) => mapping.product_id === productId);
+  }
+
+  function getTrackingOptionsForAgent(agentId: number, marketplace: string) {
+    return trackingOptions.filter(
+      (tracking) =>
+        tracking.agent_id === agentId &&
+        tracking.marketplace === marketplace &&
+        tracking.is_active === 1
+    );
+  }
+
+  async function handleMappingUpdate(mappingId: number) {
+    const nextTrackingId = mappingTagSelection[mappingId];
+    if (!nextTrackingId) {
+      setError("Choose a replacement tracking tag first.");
+      return;
+    }
+
+    setChangingMappingId(mappingId);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const response = await fetch(`/api/mappings/${mappingId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ tracking_id: nextTrackingId }),
+      });
+
+      const payload = (await response.json()) as unknown;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to change tracking tag"));
+      }
+
+      setSheetMessage("Tracking tag updated for this product.");
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+      setChangingMappingId(null);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to change tracking tag"
+      );
+      setChangingMappingId(null);
+    }
+  }
+
+  async function handleMappingRemove(mappingId: number) {
+    if (!window.confirm("Remove this product tracking mapping?")) {
+      return;
+    }
+
+    setRemovingMappingId(mappingId);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const response = await fetch(`/api/mappings/${mappingId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      const payload = (await response.json()) as unknown;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to remove mapping"));
+      }
+
+      setSheetMessage("Product tracking mapping removed.");
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to remove mapping");
+    } finally {
+      setRemovingMappingId(null);
+    }
+  }
+
+  async function handleMappingCreate(product: Product) {
+    if (!mappingDraft.agent_id || !mappingDraft.tracking_id) {
+      setError("Select an agent and a tracking tag first.");
+      return;
+    }
+
+    setError("");
+    setSheetMessage("");
+    setAddingMappingProductId(product.id);
+
+    try {
+      const response = await fetch("/api/mappings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          agent_id: mappingDraft.agent_id,
+          product_id: product.id,
+          tracking_id: mappingDraft.tracking_id,
+          custom_title: null,
+        }),
+      });
+
+      const payload = (await response.json()) as unknown;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to add tracking mapping"));
+      }
+
+      setSheetMessage("Tracking tag added to this product.");
+      setAddingMappingProductId(null);
+      setMappingDraft({ agent_id: 0, tracking_id: 0 });
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error ? requestError.message : "Failed to add tracking mapping"
+      );
+      setAddingMappingProductId(null);
     }
   }
 
@@ -1520,6 +1719,13 @@ export default function ProductsPage() {
                 key={product.id}
                 className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-6 flex flex-col gap-3"
               >
+                {(() => {
+                  const mappingsForProduct = getMappingsForProduct(product.id);
+                  const hasDeadTag = mappingsForProduct.some((mapping) => mapping.tracking_is_active !== 1);
+                  const hasMultipleMappings = mappingsForProduct.length > 1;
+
+                  return (
+                    <>
                 {!isEditor ? (
                   <label className="inline-flex items-center gap-2 text-xs text-[#a0a0b8]">
                     <input
@@ -1565,6 +1771,186 @@ export default function ProductsPage() {
                   <p className="text-xs text-[#8d8da6] mt-2 m-0 leading-relaxed">
                     Regenerate updates only the editorial summary shown on the public page.
                   </p>
+                  {!isEditor ? (
+                    <div className="mt-3 rounded-xl border border-white/10 bg-[#0f172a]/80 p-3">
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <span className="text-[0.68rem] uppercase tracking-[0.16em] text-[#8d8da6]">
+                          Tracking Status
+                        </span>
+                        {mappingsForProduct.length === 0 ? (
+                          <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-bold text-red-300">
+                            Missing tracking
+                          </span>
+                        ) : null}
+                        {hasDeadTag ? (
+                          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-300">
+                            Dead tag linked
+                          </span>
+                        ) : null}
+                        {hasMultipleMappings ? (
+                          <span className="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-bold text-sky-300">
+                            Multiple mappings
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {mappingsForProduct.length > 0 ? (
+                        <div className="space-y-3">
+                          {mappingsForProduct.map((mapping) => {
+                            const trackingChoices = getTrackingOptionsForAgent(
+                              mapping.agent_id,
+                              product.marketplace
+                            );
+                            const selectedTrackingId =
+                              mappingTagSelection[mapping.id] ?? mapping.tracking_id;
+
+                            return (
+                              <div
+                                key={mapping.id}
+                                className="rounded-xl border border-white/8 bg-white/5 p-3"
+                              >
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-semibold text-[#f0f0f5]">
+                                    {mapping.agent_name}
+                                  </span>
+                                  <code className="rounded bg-[#ff9900]/10 px-2 py-0.5 text-xs font-semibold text-[#ffcf8a]">
+                                    {mapping.tracking_tag}
+                                  </code>
+                                </div>
+                                <p className="mt-2 text-xs text-[#8d8da6] m-0">
+                                  /{mapping.agent_slug} · {mapping.tracking_marketplace}
+                                </p>
+                                <div className="mt-3 flex flex-col gap-2">
+                                  <select
+                                    value={selectedTrackingId}
+                                    onChange={(event) =>
+                                      setMappingTagSelection((current) => ({
+                                        ...current,
+                                        [mapping.id]: Number(event.target.value),
+                                      }))
+                                    }
+                                    className="w-full rounded-lg border border-white/10 bg-[#111827] px-3 py-2 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+                                  >
+                                    {trackingChoices.map((tracking) => (
+                                      <option key={tracking.id} value={tracking.id}>
+                                        {tracking.tag}
+                                        {tracking.label ? ` (${tracking.label})` : ""}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => void handleMappingUpdate(mapping.id)}
+                                      disabled={
+                                        changingMappingId === mapping.id ||
+                                        selectedTrackingId === mapping.tracking_id
+                                      }
+                                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                        changingMappingId === mapping.id ||
+                                        selectedTrackingId === mapping.tracking_id
+                                          ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                                          : "border-indigo-500/30 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/20"
+                                      }`}
+                                    >
+                                      {changingMappingId === mapping.id ? "Saving..." : "Change Tag"}
+                                    </button>
+                                    <button
+                                      onClick={() => void handleMappingRemove(mapping.id)}
+                                      disabled={removingMappingId === mapping.id}
+                                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                        removingMappingId === mapping.id
+                                          ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                                          : "border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                                      }`}
+                                    >
+                                      {removingMappingId === mapping.id ? "Removing..." : "Remove"}
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+
+                      {addingMappingProductId === product.id ? (
+                        <div className="mt-3 rounded-xl border border-[#ff9900]/15 bg-[#111827] p-3">
+                          <div className="grid grid-cols-1 gap-3">
+                            <select
+                              value={mappingDraft.agent_id}
+                              onChange={(event) =>
+                                setMappingDraft({
+                                  agent_id: Number(event.target.value),
+                                  tracking_id: 0,
+                                })
+                              }
+                              className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+                            >
+                              <option value={0}>Select agent</option>
+                              {agentOptions.map((agent) => (
+                                <option key={agent.id} value={agent.id}>
+                                  {agent.name} (/{agent.slug})
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={mappingDraft.tracking_id}
+                              onChange={(event) =>
+                                setMappingDraft((current) => ({
+                                  ...current,
+                                  tracking_id: Number(event.target.value),
+                                }))
+                              }
+                              className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
+                            >
+                              <option value={0}>Select tracking tag</option>
+                              {getTrackingOptionsForAgent(
+                                mappingDraft.agent_id,
+                                product.marketplace
+                              ).map((tracking) => (
+                                <option key={tracking.id} value={tracking.id}>
+                                  {tracking.tag}
+                                  {tracking.label ? ` (${tracking.label})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => void handleMappingCreate(product)}
+                                disabled={!mappingDraft.agent_id || !mappingDraft.tracking_id}
+                                className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                  !mappingDraft.agent_id || !mappingDraft.tracking_id
+                                    ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                                    : "border-[#ff9900]/30 bg-[#ff9900]/10 text-[#ffcf8a] hover:bg-[#ff9900]/20"
+                                }`}
+                              >
+                                Add Tag Mapping
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setAddingMappingProductId(null);
+                                  setMappingDraft({ agent_id: 0, tracking_id: 0 });
+                                }}
+                                className="flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-[#d4d4e4] hover:bg-white/10"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setAddingMappingProductId(product.id);
+                            setMappingDraft({ agent_id: 0, tracking_id: 0 });
+                          }}
+                          className="mt-3 w-full rounded-lg border border-[#ff9900]/30 bg-[#ff9900]/10 px-3 py-2 text-xs font-semibold text-[#ffcf8a] hover:bg-[#ff9900]/20"
+                        >
+                          {mappingsForProduct.length === 0 ? "Add Missing Tracking" : "Add Another Tag Mapping"}
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="mt-auto grid grid-cols-1 gap-2">
                   <button
@@ -1628,6 +2014,9 @@ export default function ProductsPage() {
                     </>
                   ) : null}
                 </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
             {products.length === 0 ? (
