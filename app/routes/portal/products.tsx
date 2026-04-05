@@ -4,6 +4,7 @@ import type { Route } from "./+types/products";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
+import { getPortalProductLinkTargets } from "../../utils/portal-product-links";
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -59,7 +60,7 @@ export default function PortalProductsPage() {
   const [customTitle, setCustomTitle] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SubmissionResponse | null>(null);
-  const [copied, setCopied] = useState(false);
+  const [copiedKey, setCopiedKey] = useState("");
   const [copiedProductKey, setCopiedProductKey] = useState("");
   const [lastPayload, setLastPayload] = useState<ProductSubmissionPayload | null>(null);
   const [importCapabilities, setImportCapabilities] = useState<ImportCapabilities>({
@@ -100,7 +101,7 @@ export default function PortalProductsPage() {
     setSubmitting(true);
     setError("");
     setSuccess(null);
-    setCopied(false);
+    setCopiedKey("");
     setLastPayload(payload);
 
     try {
@@ -150,30 +151,16 @@ export default function PortalProductsPage() {
     await submitProduct(lastPayload);
   };
 
-  const handleCopy = async () => {
-    if (!success) return;
-
-    const copyOk = await copyTextToClipboard(success.link);
+  const handleCopy = async (copyKey: string, text: string) => {
+    const copyOk = await copyTextToClipboard(text);
     if (!copyOk) {
       setError("Could not copy the full link. Please try again.");
       return;
     }
 
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleProductCopy = async (product: PortalProduct) => {
-    const copiedOk = await copyTextToClipboard(product.bridge_page_url);
-    if (!copiedOk) {
-      setError("Could not copy the full link. Please try again.");
-      return;
-    }
-
-    const copyKey = `${product.id}`;
-    setCopiedProductKey(copyKey);
+    setCopiedKey(copyKey);
     window.setTimeout(() => {
-      setCopiedProductKey((current) => (current === copyKey ? "" : current));
+      setCopiedKey((current) => (current === copyKey ? "" : current));
     }, 2000);
   };
 
@@ -249,15 +236,44 @@ export default function PortalProductsPage() {
             <p className="m-0 mb-2 text-slate-300 leading-relaxed text-sm">
               {success.product.asin} · {success.product.marketplace}
             </p>
-            <div className="flex flex-col sm:flex-row gap-3 mt-4">
-              <input className="flex-1 rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none text-sm" readOnly value={success.link} />
-              <button
-                className="border-none rounded-xl bg-amber-500 text-gray-900 font-bold px-6 py-3 cursor-pointer hover:bg-amber-400 transition-colors whitespace-nowrap"
-                type="button"
-                onClick={() => void handleCopy()}
-              >
-                {copied ? "Copied" : "Copy"}
-              </button>
+            <div className="mt-4 grid gap-3">
+              {getPortalProductLinkTargets({
+                storefrontUrl: success.link,
+                redirectUrl: success.redirectLink,
+              }).map((target) => (
+                <div
+                  key={target.key}
+                  className="rounded-xl border border-white/10 bg-white/[0.03] p-3"
+                >
+                  <p className="m-0 mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    {target.label}
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <input
+                      className="flex-1 rounded-xl border border-white/10 bg-gray-800 text-gray-50 px-4 py-3 focus:outline-none text-sm"
+                      readOnly
+                      value={target.url}
+                    />
+                    <div className="flex gap-2 sm:flex-col">
+                      <button
+                        className="border-none rounded-xl bg-amber-500 text-gray-900 font-bold px-4 py-3 cursor-pointer hover:bg-amber-400 transition-colors whitespace-nowrap"
+                        type="button"
+                        onClick={() => void handleCopy(`success-${target.key}`, target.url)}
+                      >
+                        {copiedKey === `success-${target.key}` ? "Copied" : target.actionLabel}
+                      </button>
+                      <a
+                        href={target.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-xl border border-white/15 px-4 py-3 text-center text-sm font-semibold text-slate-200 no-underline transition-colors hover:bg-white/5 whitespace-nowrap"
+                      >
+                        {target.openLabel}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         ) : null}
@@ -305,22 +321,41 @@ export default function PortalProductsPage() {
                 >
                   Status: {product.status.replace("_", " ")}
                 </p>
-                <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                  <button
-                    type="button"
-                    className="w-full sm:w-auto rounded-lg bg-amber-500 px-3 py-2 text-sm font-bold text-gray-900 transition-colors hover:bg-amber-400"
-                    onClick={() => void handleProductCopy(product)}
-                  >
-                    {copiedProductKey === String(product.id) ? "Copied" : "Copy Link"}
-                  </button>
-                  <a
-                    href={product.bridge_page_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full sm:w-auto rounded-lg border border-white/15 px-3 py-2 text-center text-sm font-semibold text-slate-200 no-underline transition-colors hover:bg-white/5"
-                  >
-                    Open
-                  </a>
+                <div className="mt-3 grid gap-2">
+                  {getPortalProductLinkTargets({
+                    storefrontUrl: product.bridge_page_url,
+                    redirectUrl: product.redirect_url,
+                  }).map((target) => (
+                    <div
+                      key={`${product.id}-${target.key}`}
+                      className="rounded-lg border border-white/10 bg-black/10 p-2.5"
+                    >
+                      <p className="m-0 mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        {target.label}
+                      </p>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          className="w-full sm:w-auto rounded-lg bg-amber-500 px-3 py-2 text-sm font-bold text-gray-900 transition-colors hover:bg-amber-400"
+                          onClick={() =>
+                            void handleCopy(`${product.id}-${target.key}`, target.url)
+                          }
+                        >
+                          {copiedKey === `${product.id}-${target.key}`
+                            ? "Copied"
+                            : target.actionLabel}
+                        </button>
+                        <a
+                          href={target.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-full sm:w-auto rounded-lg border border-white/15 px-3 py-2 text-center text-sm font-semibold text-slate-200 no-underline transition-colors hover:bg-white/5"
+                        >
+                          {target.openLabel}
+                        </a>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
