@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 2367 notes | Score threshold: >40
+> 143 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,49 +20,43 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed** — - > 2351 notes | Score threshold: >40
-+ > 2358 notes | Score threshold
-- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Optimized Score
-+ - ⚠️ GOTCHA: Optimized GOTCHA
-- - ⚠️ 
-- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Patched security issue Patched
-+ - ⚠️ GOTCHA: Optimized
-- **⚠️ GOTCHA: Optimized Score** — - > 2287 notes | Score threshold: >40
-+ > 2351 notes | Score threshold
-- **⚠️ GOTCHA: Patched security issue Patched** — - - Patched security issue UeIDDQ
-+ - Patched security issue Patched
--
-- **⚠️ GOTCHA: Patched security issue Fixed** — - - Fixed null crash in MarketplaceSelectionSource — protects against 
+- **sys_03 in shared-context.json** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "071d0ead17d675a1",
++
+- **sys_03 in agent-rules.md** — File updated (external): .bsync_core/agent-rules.md
+
+Content summary (
+- **sys_03 in agent-rules.md** — File updated (external): .bsync_core/agent-rules.md
+
+Content summary (
 
 ## Project Standards
 
-- what-changed in brainsync_auto.md — confirmed 3x
-- discovery in blog-post.tsx — confirmed 3x
-- what-changed in shared-context.json — confirmed 3x
-- what-changed in shared-context.json — confirmed 8x
-- Patched security issue Patched — confirmed 3x
-- what-changed in sheet-control.ts — confirmed 3x
-- what-changed in products.ts — confirmed 4x
-- what-changed in login.ts — confirmed 4x
-
-## Known Fixes
-
-- ❌ deferredStatusError: DynamicLinkResolutionError | null = null; → ✅ Fixed null crash in DynamicLinkResolutionError — prevents null/undefined runt...
-- ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
-- ❌ - - Fixed null crash in GenerationProductCandidate — offloads heavy computation o... → ✅ problem-fix in agent-rules.md
-- ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
-- ❌ -     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' }) → ✅ Fixed null crash in Hono — prevents brute-force and DoS attacks
+- Strengthened types Recent
+- Optimized Score — confirmed 3x
+- sys_01 in shared-context.json — confirmed 4x
+- Optimized Optimized — confirmed 3x
+- Strengthened types Patched
+- Optimized Score — confirmed 3x
+- sys_01 in shared-context.json — confirmed 3x
+- sys_01 in shared-context.json — confirmed 4x
 
 ## Recent Decisions
 
 - Optimized Score — parallelizes async operations for speed
-- decision in shared-context.json
+- Optimized Score — parallelizes async operations for speed
+- Optimized Score — parallelizes async operations for speed
+- Optimized Score — avoids unnecessary re-renders in React
 
 ## Learned Patterns
 
-- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 15x (seen 2x)
-- Decision: Optimized Argument — offloads heavy computation off the main thread (seen 2x)
-- Always: what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 12x (seen 3x)
+- Decision: Optimized Score — parallelizes async operations for speed (seen 2x)
+- Always: Optimized Optimized — confirmed 3x (seen 2x)
+- Always: Optimized Score — confirmed 3x (seen 3x)
 - Agent generates new migration for every change (squash related changes)
 - Agent installs packages without checking if already installed
 
@@ -348,6 +342,6 @@ Reference these guidelines when:
 
 
 ## Available Tools (ON-DEMAND only)
-- `sys_core_01(q)` — Deep search when stuck
-- `sys_core_05(query)` — Full-text lookup
-> Context above IS your context. Do NOT call sys_core_14() at startup.
+- `query(q)` — Deep search when stuck
+- `find(query)` — Full-text lookup
+> Context above IS your context. Do NOT call load() at startup.

@@ -6,6 +6,9 @@
   "workers_dev": true,
   "main": "./workers/app.ts",
   "observability": { "enabled": true },
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
 
   // D1 Database
   "d1_databases": [
@@ -29,6 +32,9 @@
       "bucket_name": "dealsrky-blog-images"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
 
   // Environment Variables
   "vars": {
@@ -43,11 +49,18 @@
     "DEFAULT_AMAZON_TAG_FR": "rky3006-21",
     "DEFAULT_AMAZON_TAG_ES": "rky3004-21",
     "DEFAULT_AMAZON_TAG_IT": "rky3005-21",
-    "BLOG_IMAGES_PUBLIC_BASE_URL": ""
+    "BLOG_IMAGES_PUBLIC_BASE_URL": "",
+    "BLOG_AI_PRIMARY_MODEL": "",
+    "BLOG_AI_NEURON_DAILY_LIMIT": "10000",
+    "OLLAMA_CLOUD_BASE_URL": "https://api.ollama.com",
+    "OLLAMA_CLOUD_MODEL": "minimax-m2.7:cloud"
   },
 
   // Secrets (set via `wrangler secret put`):
   // - JWT_SECRET
   // - AMAZON_API_KEY (optional)
   // - AMAZON_API_KEY_FALLBACK (optional)
+  // - OLLAMA_CLOUD_BASE_URL (optional fallback)
+  // - OLLAMA_CLOUD_API_KEY (optional fallback)
+  // - OLLAMA_CLOUD_MODEL (optional fallback)
 }

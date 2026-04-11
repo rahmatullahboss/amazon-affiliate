@@ -3,15 +3,13 @@
     "brainsync": {
       "command": "node",
       "args": [
-        "/Users/rahmatullahzisan/.antigravity/extensions/dawoodahmad.brainsync-2.2.6-universal/dist/mcp-server.js",
+        "/Users/rahmatullahzisan/.antigravity/extensions/dawoodahmad.brainsync-3.0.5-universal/dist/mcp-server.js",
         "--db",
-        "/Users/rahmatullahzisan/.brainsync/amazon-affiliate/memory.db"
+        "/Users/rahmatullahzisan/.brainsync/amazon-affiliate/state.dat"
       ],
       "type": "stdio",
       "env": {
-        "NEMOTRON_API_KEY": "",
-        "NEMOTRON_ENDPOINT": "https://api.ollama.com",
-        "NEMOTRON_MODEL": "nemotron-3-super:cloud"
+        "BRAINSYNC_ENV_FILE": "/Users/rahmatullahzisan/.brainsync/amazon-affiliate/mcp-secret-env.json"
       }
     }
   }

@@ -20,6 +20,7 @@ import {
   buildCanonicalRedirectPath,
   normalizeMarketplaceHint,
 } from "../../server/utils/url";
+import { buildAmazonUrl } from "../../server/utils/types";
 import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
 import {
   buildCanonicalUrl,
@@ -40,6 +41,7 @@ interface BridgeData {
     aplusImages?: string[];
   };
   redirectUrl: string;
+  amazonUrl: string;
   marketplace: string;
 }
 
@@ -222,6 +224,7 @@ const loadBridgeResolution = async () => {
       aplusImages: parseJsonArray(row.aplus_images),
     },
     redirectUrl: buildCanonicalRedirectPath(row.agent_slug, row.asin, row.marketplace),
+    amazonUrl: buildAmazonUrl(row.asin, row.tracking_tag, row.marketplace),
     marketplace: row.marketplace,
   };
 
@@ -314,7 +317,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
         }
 
         hasNavigated = true;
-        window.location.assign(data.redirectUrl);
+        window.location.assign(data.amazonUrl);
       };
 
       const fallbackTimer = window.setTimeout(navigateToAmazon, 150);
@@ -408,7 +411,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <a
-                href={data.redirectUrl}
+                href={data.amazonUrl}
                 rel="nofollow sponsored"
                 onClick={handleAmazonClick("primary")}
                 className="hidden items-center justify-center rounded-full bg-primary px-6 py-3.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover sm:inline-flex"
@@ -416,7 +419,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
                 {AMAZON_PRIMARY_CTA_LABEL}
               </a>
               <a
-                href={data.redirectUrl}
+                href={data.amazonUrl}
                 rel="nofollow sponsored"
                 onClick={handleAmazonClick("secondary")}
                 className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
@@ -446,7 +449,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
 
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-4 py-3 shadow-[0_-12px_30px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
         <a
-          href={data.redirectUrl}
+          href={data.amazonUrl}
           rel="nofollow sponsored"
           onClick={handleAmazonClick("mobile")}
           className="inline-flex w-full items-center justify-center rounded-full bg-primary px-6 py-4 text-sm font-bold text-white transition-colors hover:bg-primary-hover"

@@ -1,6 +1,6 @@
 ---
 name: config
-description: "Config for amazon-affiliate. 4 conventions."
+description: "Config for amazon-affiliate. 12 gotchas, 30 conventions, 11 fixes."
 domain: config
 triggers:
   - glob: "**/*.yaml"
@@ -13,95 +13,367 @@ enabled: true
 
 # Config
 
-Auto-compiled from **29 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on config files.
+Auto-compiled from **163 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on config files.
+
+## ⚠️ Anti-Patterns & Gotchas
+
+> **CRITICAL:** These are real gotchas from this project. Ignoring them WILL cause bugs.
+
+| ❌ Don't | Details |
+|----------|----------|
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "aa07cda2f7191b57", +       "ts": "2026-04-11T08:13 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "4e0720cd54123778", +       "ts": "2026-04-11T01:45 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "14a6117fe84e357c", +       "ts": "2026-04-11T01:15 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "c36937cea245deb0", +       "ts": "2026-04-07T13:13 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "0c7b7d2c189ad34a", +       "ts": "2026-04-07T01:27 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "3381552af1fa5396", +       "ts": "2026-04-07T01:26 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "f15da3c78f40c78f", +       "ts": "2026-04-07T01:07 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "b85f8b2362aa3f2d", +       "ts": "2026-04-07T01:07 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "3458f57de813b694", +       "ts": "2026-04-07T00:47 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "cfbc9760f717d3d1", +       "ts": "2026-04-07T00:36 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "35731cb010b9018b", +       "ts": "2026-04-07T00:36 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "ceb8aecf0f80dfba", +       "ts": "2026-04-07T00:12 |
+
+## 🔧 Problem Playbooks
+
+### Patched security issue UeIDDQ
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "07b1872ee1ea1a59",
++       "ts": "2026-04-11T08:26:34.433Z",
++       "by": "rahmatullahzisan",
++       "data": "+EcnIHKc5mzDtPacJvJ4QhWugcLDynjuO8Ozg4KjMEJRT9/PbMs6A/SiydMf1EP44iyXf+/S8rThPbLNqMVqWNi89k6zXgppYZLgZg2MDuae+Kk9nOWJbuMqi+wIsGUb4N9cYSlspOhUwkxQCb3HAAm3ghP0C3qzcfKQZ6w8gf1L/6kogWXt1qNBh4V6btedQq8uvh8QMZItwoajInlW4VPSVWsy2joqJcV6iR7Mv3VQum
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: UeIDDQ
+3. identifier: URFVv
+
+### Patched security issue TZwmr
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "6f6a0f4580b827f7",
++       "ts": "2026-04-11T01:05:49.649Z",
++       "by": "rahmatullahzisan",
++       "data": "/OJl1eSMTdrPtfeA55OeEPifJb4/MoKuJ67n4yqFUfxuUmoFmfjhWyTJZ3mkzIX07o8YGhynuQVm1usNDp9ZE1dOpwZu03zh3086RNsDs9P77LaXjuPiKI6N2+Bk1RbjhM2vltgJe0xn5xZ52q4XdGZ9/AeOERax3ZfFFvOitJmc7TBHzoGU/5CZAwdkQFCgXhzjZ9PoVS7BM9Ernbdj8kqHLh7ic57qkwtU1MT/+CNd31
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: TZwmr
+3. identifier: JpFZOUuJR
+4. identifier: AFDGsLireES
+
+### problem-fix in shared-context.json
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "b61e03ae0ba4f3d5",
++       "ts": "2026-04-07T13:43:50.682Z",
++       "by": "rahmatullahzisan",
++       "data": "tZ+2LIcRHQEbweA/FbHmu6HQcl+Do2WUjbj7WlSMAADSJWzonfhvtmtkWohC0mznNjBG2iXH7AFS8zRVtqvYgtIML6IzkaYCOATMFCN00s8d3KfP/uxwIATZbo6peIx6N24cGW/hPg9GGIlsIuld4Q3qBOXN73+CemWuFR0TNkumJ1RVtiNiZyIwgSdC0lUNeiUfkR6EnvRzZbsg8/uIgfP2HmrOFx53Z2hMHGYjl7ASpV
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Patched security issue KKcp — hardens HTTP security headers
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "53cfd9ea60a19ec2",
++       "ts": "2026-04-07T13:13:50.673Z",
++       "by": "rahmatullahzisan",
++       "data": "5zgb/lG3GQzRdmUp2RzwOvMsn3LKKOsmjOwZUc4phVXeEs/eMdQFJmKURDVm0D/4g2g7M8w97fQ1/2dKU1REhNMT9ujnSYZtO6CeHGEW/+BafRBqckpIB7qOg9ARSpvWKs9kEFdoj706gG58Irqh3ECpmwdUtaFcKEdQG6WSfLjtJjIqFmF3asUCtOTBbDId9RqDHcEw2FmE0WhDciTb3OaQYzKJzQmMAtSlvWZ+bYOHHH
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: KKcp
+3. identifier: KuZ
+4. identifier: BxvcormEELDuK
+5. identifier: ZvDLqDYQ
+
+### problem-fix in shared-context.json
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "c719af7353bd814d",
++       "ts": "2026-04-07T01:37:24.586Z",
++       "by": "rahmatullahzisan",
++       "data": "ere9zpQXD0du97gT41fwQRHbyY7uamyZy0M09b6nh7wdhJEsk8N1kbf6qLIwsNUZo4btwUpvrsE7DQFuNjM1oZDZlkoe+o/maDZy6Cu4VgKFpylS1i8fmmGZCPYxiPJId8Ka06sT82igbdrcCC/2T07nlF0ZuQypk0XjTeV35qniiGBDDQyDk2Qv9D+v9f/hgwXlkFkVu26As+VRj9dtvM3Xcq/cZspSBIiIqwHinDBlsn
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Patched security issue YwAmggGDa
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "a1bc162f0f7afa82",
++       "ts": "2026-04-07T01:37:15.047Z",
++       "by": "rahmatullahzisan",
++       "data": "LEP5gaEK0uO6NMGK+ijpAcqLNUyWJcaqaf2ioZc1CsAUewYS0md5O8bRy/7QaulY5fdCkAL2MgWe/YwAmggGDa/2amnttAFsJZktJpVhZZQnB3knZW08lwet7fSwbrS0WTH8jRxm4D9vDXYjbf+xLQi3R+6q/6naBLMjPwoP5b+X/hgxxX9apotG2YvhtoiWlX+uamuqKzEQSkOaF27tQZZdUCay9YVXrWmqrWGO8VdsGb
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: YwAmggGDa
+
+### Patched security issue JIxAZxJNe
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "101d11996dec8c74",
++       "ts": "2026-04-07T00:47:07.715Z",
++       "by": "rahmatullahzisan",
++       "data": "jiWkqDwYEJD9jbCO0MmZUhH4CWh49i3sNdYs7FPRwnhuX9WvQtHaBE3X/E9axFGnukCgC+b/JIxAZxJNe/euO4pap2cO8zVzDC5EbqzTKWHIpFrKUxnpfCHRrhpgSWJPUsVCETgE92YLSB4vwK9bMnFedyveTUAPKqpVOL5VRdm+fxpXCAsUprY5LEgSvxNqmHs4t1oqJc8lFadyV9oVZHzSYNWL7s9nuCWSRrImIuAGMB
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: JIxAZxJNe
+3. identifier: ILsjwUNfaoI
+4. identifier: LXq
+5. identifier: RbdSruqmHo
+
+### Patched security issue OGcWZXRkk
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "d700d80b0ef3be3a",
++       "ts": "2026-04-07T00:36:06.372Z",
++       "by": "rahmatullahzisan",
++       "data": "cxP4auWwFG9w9c52FHuUJEA2TL5/AvxosxgGkQavXePylfythDcM0YYTtf8It/9QkJAP0Lw3ftJ0QmW0Z7njYXGQJjKtYg+uq792csL/I3cUPspPubzLnQhFjd1M4Z3yjBaKySCbtguwwc+RHL9sqmnmSp+OgRfcw3jefkylpcWL3LVKLhcjXF4aayx1cg+bGng4l1XYWxJAn2D5U+ySmYABcBfrDdFHnxToUB1uaJq9Eq
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: OGcWZXRkk
+3. identifier: InzBaAH
+4. identifier: PoYfx
+
+### Patched security issue ZuKiASvYEzKvkGoIVWd
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "b29107afcdf0e1a3",
++       "ts": "2026-04-06T22:20:18.122Z",
++       "by": "rahmatullahzisan",
++       "data": "9j9ekFz/dzQCcYlOmZJT5HTr7oOs8KcReopYQd94mxOdWqOYN8Q0+idnUOkocYvb+hUfNU5J0sTX+gQyLLG6GqehZTo7w8VwAmdPzE1vAwCxwxxWvxStqq26QeV2s7o+aZcYQN4GzdbWu+c7V1P2FQuqMiU6d8ZLy2iGtPvoVYvbKED9nTZtpoWFm3dfbk2V2g7QY9u4lwK3HzcMMAbwKiacCH6w5SVHvFcWtpRjWwYCvO
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: ZuKiASvYEzKvkGoIVWd
+3. identifier: WlouhhNHyeyEE
+4. identifier: QsXzQE
+5. identifier: ZNDTUiBAR
+
+### Patched security issue KUKB
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "1e4c19a29332fea7",
++       "ts": "2026-04-06T21:36:08.654Z",
++       "by": "rahmatullahzisan",
++       "data": "p+fsaor5lWMyIWwmlj7IzMd3uY/hjIAmQ85i8IXT6RYy+KUKB+2GAWwOH57prekaSxz+jWArghrTj+oAupRxkjz0th3c7SDcDNU0H2QzhdVAH39D6IeK4WQaA320EmlyZI4AgXO5LMU4yVzJaiboMOesSeAVUzxh++wuSQN8IKbzp2yxlCG0xneTaHyhhKxnTUTJcuwrp9vQSKL15ZJNWcdSSjQQXxf5XUFKsVKt9nH03r
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: KUKB
+3. identifier: EnoqergJZOJPlxW
+4. identifier: SVbob
+5. identifier: BWPq
+
+### Patched security issue RhmoEOLZ — hardens HTTP security headers
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "f65081b68fab22f9",
++       "ts": "2026-04-06T18:11:37.873Z",
++       "by": "rahmatullahzisan",
++       "data": "fN6W/Wee8ydAvijJjDeCu2XD9gMxwTBgobW96nAwN+K5QY+7AU8avzrWc+oJ2O2T2LCqtfuiUhyb48o8zg1jVKCvJ3OI80Kc6gX/MIElZZJdV4x5u7RRXyXG8tdobdIIlru5oRSiJqNxOxuJ4x2d81JMtjxUd9OMlPQ0J3EIiukop2kyWPJiIRfWBrCrJpPKBhGzWdoPRkGqUy5TrnYGFksqiTzNw8P7HaDqnlb2RjtOpj
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Zio
+3. identifier: RhmoEOLZ
+4. identifier: YHkoanVftU
 
 ## 📐 Conventions & Best Practices
 
 ### Project Conventions
-- 📐 **what-changed in config.json — confirmed 3x** — File updated (external): .wrangler/deploy/config.json
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "2bf387f1c5d4d6a0",
++       "ts": "2026-04-11T08:33
+- 📐 **what-changed in shared-context.json — confirmed 8x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "5557855783131648",
++       "ts": "2026-04-11T08:26
+- 📐 **discovery in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "b579deede708f0fd",
++       "ts": "2026-04-11T08:15
+- 📐 **what-changed in shared-context.json — confirmed 6x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "dba6bd6703b8bb0e",
++       "ts": "2026-04-11T08:11
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "a01e6d379c5706c6",
++       "ts": "2026-04-11T01:45
+- 📐 **Added JWT tokens authentication — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "796835f613e9f088",
++       "ts": "2026-04-11T01:35
+- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "a874020f2a931649",
++       "ts": "2026-04-11T01:06
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "a179ad23030d248a",
++       "ts": "2026-04-07T13:44
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "f50f9d6ca490c9d7",
++       "ts": "2026-04-07T13:23
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "7b94a79c3923556b",
++       "ts": "2026-04-07T13:03
+- 📐 **what-changed in shared-context.json — confirmed 3x** — File updated (external): .brainsync/shared-context.json
 
-Content summary (1 lines):
-{"configPath":"../
-- 📐 **what-changed in config.json — confirmed 3x** — File updated (external): .wrangler/deploy/config.json
-
-Content summary (1 lines):
-{"configPath":"../
-- 📐 **what-changed in config.json — confirmed 3x** — File updated (external): .wrangler/deploy/config.json
-
-Content summary (1 lines):
-{"configPath":"../
-- 📐 **what-changed in manifest.yaml — confirmed 3x** — - 
-+   - name: wds
-+     version: 0.3.1
-+     installDate: 2026-03-28T07:01:56.916Z
-+     lastUpdate
-
-## 🔵 Architecture
-
-### how-it-works in manifest.yaml
-- modules:
-+ installation:
--   - name: bmm
-+   version: 6.2.2
--     version: 6.2.2
-+   installDate: 2026-03-28T07:02:21.762Z
--     installDate: 2026-03-28T07:01:21.881Z
-+   lastUpdated: 2026-03-28T07:
-
-### how-it-works in manifest.yaml
-- 
-+   - name: tea
-+     version: 1.7.2
-+     installDate: 2026-03-28T07:01:31.674Z
-+     lastUpdated: 2026-03-28T07:01:31.674Z
-+     source: external
-+     npmPackage: bmad-method-test-architecture-e
-
-## 🤔 Decisions & Trade-offs
-
-- **Optimized package — offloads heavy computation off the main thread** — -     "@capacitor/cli": "^8.3.0",
-+     "@capacitor/app": "^8.1.0",
--     "@capacitor/core": "^8.3.0
-- **Optimized Checkout** — - 
-+     env:
--     steps:
-+       ANDROID_VERSION_CODE: ${{ github.run_number }}
--       - name: Ch
-- **decision in tsconfig.cloudflare.json** — -     "types": ["vite/client"],
-+     "types": ["vite/client", "node"],
-
-📌 IDE AST Context: Modifie
-- **Optimized package — offloads heavy computation off the main thread** — -     "@react-router/dev": "^7.9.2",
-+     "@cloudflare/vitest-pool-workers": "^0.13.5",
--     "@typ
-- **decision in tsconfig.json** — File updated (external): apps/web/tsconfig.json
-
-Content summary (47 lines):
+Content summary (3431 lines):
 {
-	"compilerOptions": {
+  "v": 1,
+ 
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "22a8beedefd039ec",
++       "ts": "2026-04-07T01:57
+- 📐 **Patched security issue TVxZD — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "e09ff51e45aea032",
++       "ts": "2026-04-07T01:37
+- 📐 **what-changed in shared-context.json — confirmed 5x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "ea37960564875aa6",
++       "ts": "2026-04-07T01:27
+- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "f4cdb2bde9da40f7",
++       "ts": "2026-04-07T00:47
+- 📐 **what-changed in shared-context.json — confirmed 7x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "539dd83ab7a2dec9",
++       "ts": "2026-04-07T00:36
+- 📐 **Patched security issue CdOSRl — confirmed 4x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "92c2b13a90e1e4f5",
++       "ts": "2026-04-07T00:36
+- 📐 **what-changed in shared-context.json — confirmed 9x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "4230d9a820cfe3d7",
++       "ts": "2026-04-07T00:26
+- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "2a4ce18578955ba8",
++       "ts": "2026-04-07T00:12
+- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "6e8546ff5d8e035b",
++       "ts": "2026-04-06T22:20
+- 📐 **what-changed in shared-context.json — confirmed 7x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "8d7acfc7fae665d8",
++       "ts": "2026-04-06T21:19
+- 📐 **trade-off in shared-context.json — confirmed 3x** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "cf2b1189a92bf494",
++       "ts": "2026-04-06T21:00
+- 📐 **Patched
 
-## 🔧 Tool Patterns
-
-### tool-pattern in build-apk.yml
--         run: npx cap sync android
-+         run: |
-- 
-+           mkdir -p dist
--       - name: Build Release APK
-+           mkdir -p android/app/src/main/assets/public
--         working-directory:
-
-### tool-pattern in package.json
-File updated (external): package.json
-
-Content summary (46 lines):
-{
-  "name": "dealsrky-bridge",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "build": "react-router build",
-    "cf-typeg
-
----
-*Auto-generated by BrainSync 🧠 | 29 patterns | 2026-04-03*
+... [Truncated — see individual observations for full content]

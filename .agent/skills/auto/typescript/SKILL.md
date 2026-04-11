@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 72 gotchas, 189 conventions, 94 fixes."
+description: "Typescript for amazon-affiliate. 80 gotchas, 248 conventions, 107 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **863 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **1107 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -19,6 +19,14 @@ Auto-compiled from **863 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in AppLoadContext — re | - import { createBlogImageResponse } from "../server/services/blog"; + import { syncAgentSheetSource |
+| ⚠️ GOTCHA: Fixed null crash in Explicitly — extern | -           `Sitemap: ${PUBLIC_SITE_URL}/sitemap.xml`, +           "", -         ].join("\n"), +     |
+| ⚠️ GOTCHA: Fixed null crash in Bindings — reduces  | - import { generateScheduledBlogDraft } from "../server/services/blog-generation"; + import { create |
+| ⚠️ GOTCHA: Fixed null crash in CacheService — para | - import { createMappingSchema, bulkMappingSchema, updateMappingSchema } from '../schemas'; + import |
+| ⚠️ GOTCHA: Fixed null crash in FROM — parallelizes | - import { createMappingSchema, bulkMappingSchema } from '../schemas'; + import { createMappingSchem |
+| ⚠️ GOTCHA: Added JWT tokens authentication — preve | -   it("returns canonical country-coded links from the mappings links endpoint", async () => { +   i |
+| ⚠️ GOTCHA: Fixed null crash in Hono — prevents nul | -  + import { generateScheduledBlogDraft } from "../services/blog-generation"; - const blogs = new H |
+| ⚠️ GOTCHA: Optimized DbFactory — parallelizes asyn | -   it("returns live import capabilities for the portal products page", async () => { +   it("create |
 | ⚠️ GOTCHA: Fixed null crash in HTTPException — imp | - router.get("/blog-images/*", async (c) => { + router.get("/blog-images/:key", async (c) => { -   c |
 | ⚠️ GOTCHA: Fixed null crash in Hono — parallelizes | -  + import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog'; - const products = n |
 | ⚠️ GOTCHA: Replaced auth Protected | - // ─── Protected Routes (Admin Only) ─────────────────────── + // ─── Protected Routes ─────────── |
@@ -61,133 +69,113 @@ Auto-compiled from **863 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | -   let deferredStatusError: DynamicLinkResolutionError - null = null; +   const resolutionCandidate |
 | ⚠️ GOTCHA: Fixed null crash in AmazonProductFetchE | -   ensureProductRecord, +   AmazonProductFetchError, -   extractAsinFromInput, +   ensureProductRec |
 | ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | - import { DynamicLinkResolutionError, ensureDynamicLinkByAgentSlug } from '../services/dynamic-link |
-| ⚠️ GOTCHA: Fixed null crash in Landing — prevents  | -  * GET /api/page/:agentSlug/:asin — Landing page data +  * GET /api/page/:agentSlug/:asin and /api |
-| ⚠️ GOTCHA: Optimized Link — parallelizes async ope | - vi.mock('react/jsx-dev-runtime', () => ({ + vi.mock('react-router', () => ({ -   Fragment: Symbol. |
-| ⚠️ GOTCHA: Optimized Fragment — parallelizes async | - vi.mock('react/jsx-dev-runtime', () => ({ + vi.mock('react', () => ({ -   Fragment: Symbol.for('re |
-| ⚠️ GOTCHA: Optimized ImageGallery — parallelizes a | - import { describe, it, expect, beforeEach } from 'vitest'; + import { describe, it, expect, before |
-| ⚠️ GOTCHA: Optimized Redirect — parallelizes async | -  + import { loader as bridgeLoader } from '../../app/routes/bridge'; - describe('Redirect Engine A |
-| ⚠️ GOTCHA: Added JWT tokens authentication — preve | -  + import * as urlHelpers from "../../server/utils/url"; - describe("Portal Tracking API", () => { |
-| ⚠️ GOTCHA: Fixed null crash in Context — offloads  | - import type { AppEnv, LandingPageData } from '../utils/types'; + import type { Context } from 'hon |
-| ⚠️ GOTCHA: Fixed null crash in Hono — parallelizes | - import { appendMarketplaceHint, getPublicAppOrigin } from '../utils/url'; + import { -  +   buildC |
 
 ## 🔧 Problem Playbooks
 
-### Fixed null crash in List — prevents null/undefined runtime crashes
-- import { createTrackingIdSchema, MARKETPLACES, portalTrackingReplaceDeleteSchema } from '../schemas';
-+ import { createTrackingIdSchema } from '../schemas';
-- function normalizeTrackingTag(value: string): string {
-+ /**
--   return value.trim().replace(/^\?/i, '').replace(/^tag=/i, '');
-+  * GET /api/tracking — List all tags with agent info
-- }
-+  */
-- 
-+ tracking.get('/', async (c) => {
-- functi
+### Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
+- function buildTopicLabel(product: GenerationProductCandidate): string {
++ function buildFocusProductCtaUrl(publicAppUrl: string | undefined, focusAsin: string): string {
+-   const normalizedCategory = product.category?.trim();
++   const baseUrl = (publicAppUrl || "https://dealsrky.com").trim().replace(/\/+$/, "");
+-   if (normalizedCategory) {
++   return `${baseUrl}/deals/${focusAsin}`;
+-     re
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: GET
-3. identifier: List
-4. identifier: SELECT
-5. identifier: FROM
+2. identifier: GenerationProductCandidate
+3. identifier: Product
+4. identifier: Number
+5. identifier: Date
 
-### Fixed null crash in Cache — prevents null/undefined runtime crashes
--       reviewContent: row.review_content,
-+       description: row.description,
--       productImages: parseJsonArray(row.product_images),
-+       features: parseJsonArray(row.features),
--       aplusImages: parseJsonArray(row.aplus_images),
-+       productImages: parseJsonArray(row.product_images),
--     },
-+       aplusImages: parseJsonArray(row.aplus_images),
--     trackingTag: row.tracking_ta
+### Fixed null crash in Array — offloads heavy computation off the main thread
+- function buildTopicLabel(product: GenerationProductCandidate): string {
++ function clampField(value: string, maxLength: number, preserveWhitespace = false): string {
+-   const normalizedCategory = product.category?.trim();
++   const clean = preserveWhitespace ? value.trim() : value.replace(/\s+/g, " ").trim();
+-   if (normalizedCategory) {
++   if (clean.length <= maxLength) {
+-     return `${nor
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: Cache
-3. identifier: Track
-4. identifier: JSON
-5. identifier: Array
+2. identifier: Array
+3. identifier: Record
+4. identifier: GenerationProductCandidate
+5. identifier: Product
 
-### Fixed null crash in RuntimeSecretEnv — prevents null/undefined runtime crashes
-- function isCommonBotProbe(pathname: string): boolean {
-+ type RuntimeSecretEnv = Env & {
--   return (
-+   AMAZON_API_KEY?: string;
--     pathname === "/.env" ||
-+   AMAZON_API_KEY_FALLBACK?: string;
--     pathname === "/xmlrpc.php" ||
-+   GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
--     pathname === "/wordpress" ||
-+   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
--     pathname.endsWith("/wlwmanifes
+### problem-fix in blog-generation.ts
+File updated (external): server/services/blog-generation.ts
+
+Content summary (689 lines):
+import { z } from "zod";
+import type { Bindings } from "../utils/types";
+import { buildBlogExcerpt, createUniqueBlogSlug } from "./blog";
+
+type BlogGenerationStatus = "success" | "skipped" | "failed";
+type BlogGenerationProvider = "workers_ai" | "ollama_cloud";
+
+interface GenerationProductCandidate {
+  asin: 
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: RuntimeSecretEnv
-3. identifier: Env
-4. identifier: Date
-5. identifier: Number
 
-### Fixed null crash in SiteBrandingMeta — prevents null/undefined runtime crashes
-- export interface SiteBrandingMeta {
-+ function containsAmazonTrademark(value: string | null | undefined): boolean {
--   ogSiteName: string;
-+   return /amazon/i.test(value?.trim() || "");
--   ogDescription: string;
-+ }
--   ogImageUrl: string;
+### Fixed null crash in SELECT — prevents null/undefined runtime crashes
+- import { createTrackingIdSchema } from '../schemas';
++ import { createTrackingIdSchema, updateTrackingIdSchema } from '../schemas';
+- tracking.put('/:id', async (c) => {
++ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
+-   const body = await c.req.json<{
++   const body = c.req.valid('json');
+-     label?: string;
 + 
-- }
-+ export interface SiteBrandingMeta {
-- 
-+   ogSiteName: string;
-- export function toSiteBrandingMeta(input?: {
-+   ogDescription: string;
--   og_si
+-     is_default?: boolean;
++   const current =
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: SiteBrandingMeta
-3. identifier: URL
-4. identifier: Array
-5. identifier: Record
+2. identifier: SELECT
+3. identifier: FROM
+4. identifier: WHERE
+5. identifier: HTTPException
 
-### Fixed null crash in ProductEditorialSection — prevents null/undefined runtime...
-- export function getProductDetailTitleClass(title: string): string {
-+ interface ProductEditorialSection {
--   const normalizedLength = title.trim().length;
-+   heading: string;
-- 
-+   body: string;
--   if (normalizedLength > 90) {
-+   bullets: string[];
--     return "mt-5 text-2xl font-black leading-tight tracking-[-0.02em] text-gray-950 break-words md:text-3xl xl:text-[2.6rem]";
-+ }
--   }
-+ 
-- 
+### problem-fix in blog-generation.ts
+File updated (external): server/services/blog-generation.ts
+
+Content summary (679 lines):
+import { z } from "zod";
+import type { Bindings } from "../utils/types";
+import { buildBlogExcerpt, createUniqueBlogSlug } from "./blog";
+
+type BlogGenerationStatus = "success" | "skipped" | "failed";
+type BlogGenerationProvider = "workers_ai" | "ollama_cloud";
+
+interface GenerationProductCandidate {
+  asin: 
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: ProductEditorialSection
-3. identifier: Editorial
-4. identifier: Summary
-5. identifier: Amazon
 
-### Fixed null crash in HeadlessChrome — prevents null/undefined runtime crashes
-- 
-+ const REVIEWER_BLOCKED_PATTERNS = [
-- export function isReviewerUserAgent(userAgent: string | undefined): boolean {
-+   /curl/i,
--   if (!userAgent) return false;
-+   /wget/i,
-- 
-+   /HeadlessChrome/i,
--   return REVIEWER_ALLOWLIST.some((pattern) => pattern.test(userAgent));
-+   /python-requests/i,
-- }
-+   /pytho
+### problem-fix in api-errors.test.ts
+File updated (external): test/unit/api-errors.test.ts
+
+Content summary (36 lines):
+import { describe, expect, it } from "vitest";
+import { extractApiErrorMessage } from "../../app/utils/api-errors";
+
+describe("extractApiErrorMessage", () => {
+  it("returns nested zod issue messages with a field path", () => {
+    expect(
+      extractApiErrorMessage(
+        {
+          error: {
+            issues
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Fixed null crash in Bindings — reduces initial bundle size with code splitting
+- import { shouldRedirectToPublicAppUrl } from "../server/utils/ur
 
 ... [Truncated — see individual observations for full content]

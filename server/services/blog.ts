@@ -14,6 +14,11 @@ export interface BlogPostRecord {
   seo_title: string | null;
   seo_description: string | null;
   status: BlogStatus;
+  generation_source: "manual" | "ai";
+  generation_provider: string | null;
+  generation_topic: string | null;
+  generation_focus_asin: string | null;
+  generation_marketplace: string | null;
   is_featured: number;
   is_deleted: number;
   published_at: string | null;
@@ -94,12 +99,68 @@ export function buildBlogImageUrl(env: Pick<Bindings, "BLOG_IMAGES_PUBLIC_BASE_U
     return null;
   }
 
+  if (/^https?:\/\//i.test(key)) {
+    return key;
+  }
+
   const publicBaseUrl = env.BLOG_IMAGES_PUBLIC_BASE_URL?.trim();
   if (publicBaseUrl) {
     return `${publicBaseUrl.replace(/\/+$/, "")}/${key}`;
   }
 
   return `/api/public/blog-images/${key}`;
+}
+
+export async function createBlogImageResponse(
+  env: Pick<Bindings, "BLOG_IMAGES">,
+  pathname: string
+): Promise<Response> {
+  const prefix = "/api/public/blog-images/";
+  const keyIndex = pathname.indexOf(prefix);
+
+  if (keyIndex === -1) {
+    return Response.json(
+      {
+        error: "Invalid image path",
+        status: 400,
+      },
+      { status: 400 }
+    );
+  }
+
+  const encodedKey = pathname.slice(keyIndex + prefix.length);
+  const key = decodeURIComponent(encodedKey);
+
+  if (!key) {
+    return Response.json(
+      {
+        error: "Missing image key",
+        status: 400,
+      },
+      { status: 400 }
+    );
+  }
+
+  const object = await env.BLOG_IMAGES.get(key);
+  if (!object) {
+    return Response.json(
+      {
+        error: "Image not found",
+        status: 404,
+      },
+      { status: 404 }
+    );
+  }
+
+  const headers = new Headers();
+  object.writeHttpMetadata(headers);
+  headers.set("etag", object.httpEtag);
+  headers.set("cache-control", "public, max-age=31536000, immutable");
+
+  return new Response(object.body, {
+    status: 200,
+    headers,
+  });
 }
 
 export function buildStoredImageKey(prefix: string, extension: string): string {

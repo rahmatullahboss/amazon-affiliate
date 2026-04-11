@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 20 gotchas, 90 conventions, 11 fixes."
+description: "Project for amazon-affiliate. 75 gotchas, 242 conventions, 17 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **470 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **814 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -18,28 +18,147 @@ Auto-compiled from **470 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
-| gotcha in flow-c-ascii.md | File updated (external): .qwen/skills/wds-4-ux-design/data/page-creation-flows/flow-c-ascii.md  Cont |
-| Agent: follow existing project patterns — don't in | Agent: follow existing project patterns — don't introduce a different style |
-| Agent: don't generate code with "any" type — defin | Agent: don't generate code with "any" type — define proper TypeScript types |
-| Agent: always handle loading/error states — don't  | Agent: always handle loading/error states — don't just render data |
-| Agent: don't use deprecated APIs — check library v | Agent: don't use deprecated APIs — check library version, use current API |
-| Agent: check existing code before creating utility | Agent: check existing code before creating utility functions — avoid duplicates |
-| Don't expose database errors to clients — map to u | Don't expose database errors to clients — map to user-friendly messages |
-| Always validate data on the SERVER — client valida | Always validate data on the SERVER — client validation is for UX only |
-| Don't fetch data inside render loops or hot paths | Don't fetch data inside render loops or hot paths |
-| Don't swallow errors silently — empty catch blocks | Don't swallow errors silently — empty catch blocks hide bugs |
-| Never store session tokens in localStorage — use h | Never store session tokens in localStorage — use httpOnly cookies |
-| Use parameterized queries — never string concatena | Use parameterized queries — never string concatenation for SQL |
-| Don't store passwords in plain text — use bcrypt,  | Don't store passwords in plain text — use bcrypt, argon2, or scrypt |
-| Don't use innerHTML — use textContent or sanitized | Don't use innerHTML — use textContent or sanitized rendering |
-| Sanitize ALL user input before database queries —  | Sanitize ALL user input before database queries — prevent SQL injection |
-| Never use eval(), exec(), or Function() with user  | Never use eval(), exec(), or Function() with user input |
-| Don't hardcode API keys, passwords, database URLs, | Don't hardcode API keys, passwords, database URLs, or secrets anywhere |
-| Don't leave console.log, print(), debugger, or TOD | Don't leave console.log, print(), debugger, or TODO in production code |
-| Don't commit .env, secrets, API keys, or credentia | Don't commit .env, secrets, API keys, or credentials — add to .gitignore |
-| Never force push to main, master, or production br | Never force push to main, master, or production branches |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2351 notes - Score threshold: >40 + > 2358 notes - Score threshold: >40 - - **⚠️ GOTCHA: Patched |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Patched security issue |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Patched security issue Patched + - ⚠️ GOTCHA: Optimized Score - - ⚠️ GOTCHA: Patched  |
+| ⚠️ GOTCHA: Optimized Score | - > 2287 notes - Score threshold: >40 + > 2351 notes - Score threshold: >40 - - **⚠️ GOTCHA: Fixed n |
+| ⚠️ GOTCHA: Patched security issue Patched | - - Patched security issue UeIDDQ + - Patched security issue Patched - - Fixed null crash in Product |
+| ⚠️ GOTCHA: Patched security issue Fixed | - - Fixed null crash in MarketplaceSelectionSource — protects against XSS and CSR... + - Fixed null  |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2252 notes - Score threshold: >40 + > 2271 notes - Score threshold: >40 - - **gotcha in agent-ru |
+| gotcha in agent-rules.md | File updated (external): .brainsync/agent-rules.md  Content summary (94 lines): # Project Intelligen |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2214 notes - Score threshold: >40 + > 2219 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2210 notes - Score threshold: >40 + > 2212 notes - Score threshold: >40 - - **gotcha in shared-c |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2207 notes - Score threshold: >40 + > 2210 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2202 notes - Score threshold: >40 + > 2207 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: problem-fix in agent-rules.md + - ⚠️ GOTCHA: Optimized Score — parallelizes async ope |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2200 notes - Score threshold: >40 + > 2202 notes - Score threshold: >40 - ## 📝 NOTE: 1 uncommit |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2199 notes - Score threshold: >40 + > 2200 notes - Score threshold: >40 - ## 📝 NOTE: 1 uncommit |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Patched security issue KKcp — hardens HTTP security headers + - problem-fix in shared-context.js |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2138 notes - Score threshold: >40 + > 2140 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2132 notes - Score threshold: >40 + > 2138 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - gotcha in shared-contex |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2130 notes - Score threshold: >40 + > 2132 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2126 notes - Score threshold: >40 + > 2130 notes - Score threshold: >40 - - **gotcha in agent-ru |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2124 notes - Score threshold: >40 + > 2126 notes - Score threshold: >40 - ## Active: `.` + ## Pr |
+| gotcha in agent-rules.md | File updated (external): .brainsync/agent-rules.md  Content summary (94 lines): # Project Intelligen |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2113 notes - Score threshold: >40 + > 2115 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2111 notes - Score threshold: >40 + > 2113 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2100 notes - Score threshold: >40 + > 2111 notes - Score threshold: >40 - - **gotcha in shared-c |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - gotcha in shared-context.json + - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2094 notes - Score threshold: >40 + > 2100 notes - Score threshold: >40 - +       "id": "3381552 |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2076 notes - Score threshold: >40 + > 2080 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2068 notes - Score threshold: >40 + > 2076 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - gotcha in shared-contex |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2028 notes - Score threshold: >40 + > 2062 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in Array — offloads heavy computation off the main thread + - Fixed null crash  |
+| ⚠️ GOTCHA: Optimized Score | - > 2009 notes - Score threshold: >40 + > 2028 notes - Score threshold: >40 - - **gotcha in shared-c |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in Array — offloads heavy computation off the main thread + - problem-fix in ag |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1952 notes - Score threshold: >40 + > 2009 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Patched security issue ZuKiASvYEzKvkGoIVWd + - problem-fix in blog-generation.ts - - Patched sec |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Patched security issue KUKB + - Patched security issue ZuKiASvYEzKvkGoIVWd - - problem-fix in bl |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1934 notes - Score threshold: >40 + > 1937 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized Score | - > 1932 notes - Score threshold: >40 + > 1934 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
+| ⚠️ GOTCHA: Optimized Score | - > 1922 notes - Score threshold: >40 + > 1932 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - problem-fix in blog-generation.ts + - problem-fix in agent-rules.md - - problem-fix in api-error |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Patched security issue Score + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Optimized |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - ⚠️ GOTCHA: Patched security issue Score - - ⚠️ GOTCHA: Optimized |
+| ⚠️ GOTCHA: Patched security issue Score | - > 1910 notes - Score threshold: >40 + > 1912 notes - Score threshold: >40 - - what-changed in shar |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for s |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1901 notes - Score threshold: >40 + > 1903 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
 
 ## 🔧 Problem Playbooks
+
+### Patched security issue Patched
+- - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
++ - Patched security issue UeIDDQ
+- - Fixed null crash in MarketplaceSelectionSource — protects against XSS and CSR...
++ - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
+- - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
++ - Fixed null crash in MarketplaceSelectionSource
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Patched
+3. identifier: UeIDDQ
+4. identifier: Fixed
+5. identifier: ProductRow
+
+### problem-fix in agent-rules.md
+- - Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
++ - Patched security issue JIxAZxJNe
+- - Fixed null crash in Array — offloads heavy computation off the main thread
++ - Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
+- - problem-fix in blog-generation.ts
++ - Fixed null crash in Array — offloads heavy computation off the main thre
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - Fixed null crash in Array — offloads heavy computation off the main thread
++ - problem-fix in agent-rules.md
+- - problem-fix in blog-generation.ts
++ - Fixed null crash in Array — offloads heavy computation off the main thread
+- - Patched security issue ZuKiASvYEzKvkGoIVWd
++ - problem-fix in blog-generation.ts
+- - Patched security issue KUKB
++ - Patched security issue ZuKiASvYEzKvkGoIVWd
+- - pr
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - problem-fix in blog-generation.ts
++ - Fixed null crash in Array — offloads heavy computation off the main thread
+- - Patched security issue ZuKiASvYEzKvkGoIVWd
++ - problem-fix in blog-generation.ts
+- - Patched security issue KUKB
++ - Patched security issue ZuKiASvYEzKvkGoIVWd
+- - problem-fix in blog-generation.ts
++ - Patched security issue KUKB
+- - problem-fix in api-errors.test.ts
++ - problem
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - problem-fix in blog-generation.ts
++ - problem-fix in agent-rules.md
+- - problem-fix in api-errors.test.ts
++ - problem-fix in blog-generation.ts
+- - problem-fix in public-slugs.ts
++ - problem-fix in api-errors.test.ts
+- - problem-fix in product-detail.tsx
++ - problem-fix in public-slugs.ts
+- - problem-fix in dynamic-links.ts
++ - problem-fix in product-detail.tsx
+
+📌 IDE AST Context: Modified sy
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - Patched security issue DMwyEHz
++ - problem-fix in blog-generation.ts
+- - Patched security issue RhmoEOLZ — hardens HTTP security headers
++ - problem-fix in api-errors.test.ts
+- - problem-fix in blog-generation.ts
++ - problem-fix in public-slugs.ts
+- - problem-fix in api-errors.test.ts
++ - problem-fix in product-detail.tsx
+- - problem-fix in public-slugs.ts
++ - problem-fix in dynamic-links.ts
+
+
+
+**Actionable Steps:**
+1. Modified 1 files
 
 ### Patched security issue BEGIN — ensures atomic multi-step database operations
 - "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
@@ -56,180 +175,6 @@ Auto-compiled from **470 real patterns** in **amazon-affiliate**. This skill is 
 ### Patched security issue BEGIN — ensures atomic multi-step database operations
 - 
 + "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
-+   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YHUbHzqIVXcXzsh7gouVN9EQMPxqto0/q+I5eKQXbKyFTiY1JoA0hP\nRS9PDcJolDYD0Y0Xfz/MytAYEv54Uek9QhuIF
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: BEGIN
-3. identifier: PRIVATE
-4. identifier: KEY
-5. identifier: Ggr
-
-### problem-fix in step-04-generate-tests.md
-File updated (external): .qwen/skills/bmad-testarch-atdd/steps-c/step-04-generate-tests.md
-
-Content summary (335 lines):
----
-name: 'step-04-generate-tests'
-description: 'Orchestrate adaptive FAILING test generation (TDD red phase)'
-nextStepFile: './step-04c-aggregate.md'
----
-
-# Step 4: Orchestrate Adaptive FAILING Test Generation
-
-## STEP GOAL
-
-Select execution mode deterministically, then generat
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in template-substitution-rules.md
-File updated (external): _bmad/bmb/bmad-workflow-builder/references/template-substitution-rules.md
-
-Content summary (33 lines):
-# Template Substitution Rules
-
-The SKILL-template provides a minimal skeleton: frontmatter, overview, and activation with config loading. Everything beyond that is crafted by the builder based on what was learned during discovery and requirements phases.
-
-## Frontmatter
-
-
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_zgx4ynez.md
-- - [ ] Navigate to http://localhost:5173/
-+ - [x] Navigate to http://localhost:5173/
--     - [ ] Screenshot captured
-+     - [x] Screenshot captured
--     - [ ] Logo "DealsRky" verified
-+     - [x] Logo "DealsRky" verified (SVG text fallback works)
-- - [ ] Navigate to http://localhost:5173/category/kitchen
-+ - [x] Navigate to http://localhost:5173/category/kitchen
--     - [ ] Screenshot captured
-
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_e348z4wk.md
-- - [ ] Open `http://localhost:5175/` and wait for page load.
-+ - [x] Open `http://localhost:5175/` and wait for page load.
-- - [ ] Capture screenshot of the UI/Error.
-+ - [x] Capture screenshot of the UI/Error.
-- - [ ] Capture browser console logs.
-+ - [x] Capture browser console logs.
-- - [ ] Analyze the error and report findings.
-+ - [x] Analyze the error and report findings.
-- 
-+ - [ ] Investi
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_3pekeu96.md
-- - [ ] Scroll to "Latest Deals" section and take screenshot `product_cards_check`
-+ - [x] Scroll to "Latest Deals" section and take screenshot `product_cards_check`
-- - [ ] Scroll to Footer and take screenshot `footer_disclosure_check`
-+ - [x] Scroll to Footer and take screenshot `footer_disclosure_check`
-- - [ ] Verify affiliate disclosure in footer
-+ - [x] Verify affiliate disclosure in footer
-
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_3pekeu96.md
-- - [ ] Navigate to http://localhost:5174/
-+ - [x] Navigate to http://localhost:5174/
-
-📌 IDE AST Context: Modified symbols likely include [# Verification Plan for DealsRky Fixes]
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_aavf6k92.md
-- - [ ] Check /deals page product listing (no $ prices, no ★ ratings)
-+ - [x] Check /deals page product listing (no $ prices, no ★ ratings)
-- - [ ] Capture deals page screenshot
-+ - [x] Capture deals page screenshot
-- - [ ] Final report
-+ - [x] Final report
-
-📌 IDE AST Context: Modified symbols likely include [# Amazon Affiliate Site Fixes Verification]
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in scratchpad_aavf6k92.md
-- - [ ] Check homepage product cards (no $ prices, no ★ ratings, "View Deal →" present)
-+ - [x] Check homepage product cards (no $ prices, no ★ ratings, "View Deal →" present)
-- - [ ] Capture homepage screenshot
-+ - [x] Capture homepage screenshot
-- - [ ] Check footer for Affiliate Disclosure
-+ - [x] Check footer for Affiliate Disclosure
-- - [ ] Capture footer screenshot
-+ - [x] Capture footer scr
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### Fixed null crash in Dealsrky — hardens HTTP security headers
-- # Refactor: Single Worker App with Asset Binding
-+ # Dealsrky.com — Enterprise Affiliate Bridge (Single Worker)
-- ## Problem
-+ ## Client Requirements Summary
-- The current architecture uses **2 separate projects**:
-+ | Requirement | Answer |
-- 1. `apps/api` — Hono Worker (port 8787) for API/data
-+ |-------------|--------|
-- 2. `apps/web` — React Router v7 (Node adapter) for UI
-+ | **Domain** | `
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Dealsrky
-3. identifier: Enterprise
-4. identifier: Affiliate
-5. identifier: Bridge
-
-## 📐 Conventions & Best Practices
-
-### Project Conventions
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
-- 📐 **decision in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-wal — confirmed 10x**
-- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-shm — confirmed 10x**
-- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-wal — confirmed 9x**
-- 📐 **what-changed in 12d339a40265b0a81c1c88ae79e3b0609a2492a1dcd3511b337ddffaf8fecccb.sqlite-shm — confirmed 9x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 5x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 3x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 4x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
-- 📐 **Replaced auth DESC — evolves the database schema to support new requirements — confirmed 3x** — - ON sheet_submission_rows(status, validation_color, created_at DESC)
-+ ON sheet_submission_rows(sta
-- 📐 **Replaced auth SQLite — evolves the database schema to support new requirements — confirmed 6x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 25x**
-- 📐 **Updated schema 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc871862... — confirmed 3x**
-- 📐 **Updated page_views database schema — evolves the database schema to support n... — confirmed 6x**
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-wal — confirmed 6x** — - If you are looking for a top-tier experience and do not mind paying a slight premium, this is curr
-- 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
-
-Content summary (1 lines):
-{"fileNames":["
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x** — File updated (external): tsconfig.cloudflare.tsbuildinfo
-
-Content summary (1 lines):
-{"fileNames":["
-- 📐 **what-changed in 6ff324b00a136583bcd892a64686650ed4ed5f9c69e6fd52e861d3cc87186247.sqlite-shm — confirmed 3x**
-- 📐 **Fixed null crash in System — confirmed 3x** — - android {
-+ def androidVersionCode = (System.getenv("ANDROID_VERSION_CODE") ?: "1").toInteger()
-- 
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 3x** — - {"fileNames":["./node_modules/typescript/lib/lib.es5.d.ts","./node_modules/typescript/lib/lib.es20
-- 📐 **Optimized impliedFormat — offloads heavy computation off the main thread — confirmed 5x** — - {"fileNames":["./node_mo
++   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YHUbHzqIVXcXzsh7gouVN9EQMPxqto
 
 ... [Truncated — see individual observations for full content]

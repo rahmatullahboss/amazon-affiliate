@@ -16,6 +16,7 @@ import {
 } from "../utils/affiliate-copy";
 import { buildSeoMeta } from "../utils/seo";
 import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
+import { buildAmazonUrl } from "../../server/utils/types";
 
 interface ProductRow {
   id: number;
@@ -43,6 +44,7 @@ interface ProductDetailData {
   relatedProducts: RelatedProductRow[];
   canonicalPath: string;
   availableMarketplaces: string[];
+  amazonUrlsByMarketplace: Record<string, string>;
 }
 
 function buildEditorialExcerpt(reviewContent: string | null, title: string): string {
@@ -101,6 +103,38 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     )
   ).sort((left, right) => left.localeCompare(right));
 
+  const amazonUrlsByMarketplace: Record<string, string> = {};
+
+  if (availableMarketplaces.length > 0) {
+    const placeholders = availableMarketplaces.map(() => "?").join(", ");
+    const { results: trackingRows } = await env.DB
+      .prepare(
+        `
+          SELECT marketplace, tag
+          FROM tracking_ids
+          WHERE is_active = 1
+            AND is_site_primary = 1
+            AND marketplace IN (${placeholders})
+          ORDER BY marketplace ASC, id DESC
+        `
+      )
+      .bind(...availableMarketplaces)
+      .all<{ marketplace: string | null; tag: string }>();
+
+    for (const trackingRow of trackingRows ?? []) {
+      const marketplace = trackingRow.marketplace?.trim().toUpperCase() || null;
+      if (!marketplace || amazonUrlsByMarketplace[marketplace]) {
+        continue;
+      }
+
+      amazonUrlsByMarketplace[marketplace] = buildAmazonUrl(
+        asin,
+        trackingRow.tag,
+        marketplace
+      );
+    }
+  }
+
   const relatedQuery =
     product.category && product.category.trim().length > 0
       ? env.DB.prepare(
@@ -128,6 +162,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     relatedProducts: related || [],
     canonicalPath: `/deals/${asin}`,
     availableMarketplaces,
+    amazonUrlsByMarketplace,
   } satisfies ProductDetailData;
 }
 
@@ -145,13 +180,19 @@ function parseJsonArray(raw: string | null): string[] {
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
-  const { product, relatedProducts, availableMarketplaces } = loaderData as ProductDetailData;
+  const { product, relatedProducts, availableMarketplaces, amazonUrlsByMarketplace } = loaderData as ProductDetailData;
   const galleryImages = parseJsonArray(product.product_images);
   const publicProductCallout = getPublicProductPageCallout();
   const editorialSections = getProductEditorialSections(product.review_content);
   const [selectedMarketplace, setSelectedMarketplace] = useState<string | null>(
     getInitialPublicMarketplace(availableMarketplaces, product.marketplace)
   );
+  const selectedAmazonUrl = selectedMarketplace
+    ? amazonUrlsByMarketplace[selectedMarketplace] || null
+    : null;
+  const filteredRelatedProducts = selectedMarketplace
+    ? relatedProducts.filter((relatedProduct) => relatedProduct.marketplace === selectedMarketplace)
+    : relatedProducts;
   useEffect(() => {
     const context = {
       page_type: "product_detail",
@@ -290,10 +331,10 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                   </>
                 ) : null}
 
-                {selectedMarketplace ? (
+                {selectedAmazonUrl ? (
                   <div className="mt-4">
                     <a
-                      href={`/go/p/${selectedMarketplace.toLowerCase()}/${product.asin}`}
+                      href={selectedAmazonUrl}
                       className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
                       rel="nofollow sponsored"
                     >
@@ -306,6 +347,10 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                       {INLINE_AFFILIATE_DISCLOSURE}
                     </p>
                   </div>
+                ) : selectedMarketplace ? (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+                    No active site-primary Amazon tag is configured for the selected {selectedMarketplace} marketplace yet.
+                  </div>
                 ) : null}
               </div>
             ) : null}
@@ -313,7 +358,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
           </section>
         </div>
 
-        {relatedProducts.length > 0 ? (
+        {selectedMarketplace ? (
           <section className="mt-12">
             <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
               <div>
@@ -321,16 +366,22 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                   Explore more
                 </p>
                 <h2 className="mt-2 text-3xl font-black text-gray-950">
-                  Related products
+                  {selectedMarketplace} related products
                 </h2>
               </div>
             </div>
 
-            <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-              {relatedProducts.map((relatedProduct) => (
-                <ProductCard key={relatedProduct.id} item={relatedProduct} />
-              ))}
-            </div>
+            {filteredRelatedProducts.length > 0 ? (
+              <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+                {filteredRelatedProducts.map((relatedProduct) => (
+                  <ProductCard key={relatedProduct.id} item={relatedProduct} />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-8 rounded-[1.75rem] border border-dashed border-gray-300 bg-white/70 p-8 text-sm leading-7 text-gray-600">
+                No related products available for {selectedMarketplace} marketplace yet.
+              </div>
+            )}
           </section>
         ) : null}
       </div>

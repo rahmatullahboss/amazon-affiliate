@@ -3,6 +3,9 @@ export type Bindings = {
   DB: D1Database;
   KV: KVNamespace;
   BLOG_IMAGES: R2Bucket;
+  AI?: {
+    run(model: string, input: unknown): Promise<unknown>;
+  };
   ENVIRONMENT: string;
   SUPPORTED_MARKETPLACES: string;
   PUBLIC_APP_URL?: string;
@@ -27,6 +30,11 @@ export type Bindings = {
   IP_SALT?: string;
   GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
+  BLOG_AI_PRIMARY_MODEL?: string;
+  BLOG_AI_NEURON_DAILY_LIMIT?: string;
+  OLLAMA_CLOUD_BASE_URL?: string;
+  OLLAMA_CLOUD_API_KEY?: string;
+  OLLAMA_CLOUD_MODEL?: string;
 };
 
 // Hono app types
@@ -137,12 +145,33 @@ export interface BlogPostRow {
   seo_title: string | null;
   seo_description: string | null;
   status: 'draft' | 'published';
+  generation_source: 'manual' | 'ai';
+  generation_provider: string | null;
+  generation_topic: string | null;
+  generation_focus_asin: string | null;
+  generation_marketplace: string | null;
   is_featured: number;
   is_deleted: number;
   published_at: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+}
+
+export interface BlogGenerationRunRow {
+  id: number;
+  status: 'success' | 'skipped' | 'failed';
+  provider: string | null;
+  model: string | null;
+  topic_label: string | null;
+  focus_asin: string | null;
+  marketplace: string | null;
+  blog_post_id: number | null;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  reason: string | null;
+  created_at: string;
 }
 
 export interface UserRow {
@@ -167,8 +196,6 @@ export interface LandingPageData {
     asin: string;
     title: string;
     imageUrl: string;
-    description?: string | null;
-    features?: string[];
     reviewContent?: string | null;
     productImages?: string[];
     aplusImages?: string[];

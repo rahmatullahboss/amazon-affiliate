@@ -1,13 +1,16 @@
 import type { Route } from "./+types/blog";
 import { Link } from "react-router";
 import { BlogCard } from "../components/blog/BlogCard";
+import { orderBlogPostsForMarketplace } from "../utils/blog-personalization";
 import { buildSeoMeta } from "../utils/seo";
 import type { BlogPostSummary } from "../utils/blog";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import { resolvePreferredMarketplace } from "../utils/marketplace";
 
 interface BlogPageData {
   featuredPost: BlogPostSummary | null;
   posts: BlogPostSummary[];
+  preferredMarketplace: string;
 }
 
 export function meta({}: Route.MetaArgs) {
@@ -19,8 +22,14 @@ export function meta({}: Route.MetaArgs) {
   });
 }
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
+  const url = new URL(request.url);
+  const preferredMarketplace = resolvePreferredMarketplace({
+    searchParams: url.searchParams,
+    cookieHeader: request.headers.get("cookie"),
+    countryHeader: request.headers.get("cf-ipcountry"),
+  });
 
   const { results } = await env.DB.prepare(
     `SELECT *
@@ -36,10 +45,12 @@ export async function loader({ context }: Route.LoaderArgs) {
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
   }));
+  const orderedPosts = orderBlogPostsForMarketplace(posts, preferredMarketplace);
 
   return {
-    featuredPost: posts[0] || null,
-    posts: posts.slice(1),
+    featuredPost: orderedPosts[0] || null,
+    posts: orderedPosts.slice(1),
+    preferredMarketplace,
   } satisfies BlogPageData;
 }
 

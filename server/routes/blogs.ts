@@ -11,6 +11,7 @@ import {
   createUniqueBlogSlug,
   estimateReadingMinutes,
 } from "../services/blog";
+import { generateScheduledBlogDraft } from "../services/blog-generation";
 
 const blogs = new Hono<AppEnv>();
 
@@ -40,17 +41,15 @@ blogs.get("/", async (c) => {
            FROM blog_posts
            WHERE is_deleted = 0 AND status = ?
            ORDER BY
-             CASE WHEN published_at IS NULL THEN 1 ELSE 0 END,
-             published_at DESC,
-             updated_at DESC`
+             updated_at DESC,
+             published_at DESC`
         ).bind(status)
       : c.env.DB.prepare(
           `SELECT *
            FROM blog_posts
            WHERE is_deleted = 0
            ORDER BY
-             CASE WHEN published_at IS NULL THEN 1 ELSE 0 END,
-             published_at DESC,
+             CASE WHEN status = 'draft' THEN 0 ELSE 1 END,
              updated_at DESC`
         );
 
@@ -58,6 +57,31 @@ blogs.get("/", async (c) => {
 
   return c.json({
     posts: (results ?? []).map((row) => mapBlogPost(c.env, row)),
+  });
+});
+
+blogs.post("/generate-ai-draft", async (c) => {
+  const result = await generateScheduledBlogDraft(c.env);
+
+  if (result.status === "success") {
+    return c.json(
+      {
+        message: "AI blog draft generated and added to the approval queue.",
+        result,
+      },
+      201
+    );
+  }
+
+  if (result.status === "skipped") {
+    return c.json({
+      message: result.reason || "AI blog generation skipped for this run.",
+      result,
+    });
+  }
+
+  throw new HTTPException(502, {
+    message: result.reason || "AI blog generation failed.",
   });
 });
 

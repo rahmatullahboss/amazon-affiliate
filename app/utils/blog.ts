@@ -14,6 +14,11 @@ export interface BlogPostSummary {
   seo_title: string | null;
   seo_description: string | null;
   status: "draft" | "published";
+  generation_source: "manual" | "ai";
+  generation_provider: string | null;
+  generation_topic: string | null;
+  generation_focus_asin: string | null;
+  generation_marketplace: string | null;
   is_featured: number;
   published_at: string | null;
   created_at: string;
@@ -44,8 +49,35 @@ export function formatBlogDate(value: string | null): string {
 }
 
 export function splitBlogContent(content: string): string[] {
-  return content
+  const paragraphs = content
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
+
+  const urlOnlyPattern = /^(https?:\/\/\S+)$/i;
+  const shortCtaPattern =
+    /^(check|cheak|view|see|shop|buy|browse|read|open|go)\b[\w\s-]{0,50}(amazon|price|deal|now|here)?$/i;
+
+  const removedIndexes = new Set<number>();
+
+  paragraphs.forEach((paragraph, index) => {
+    const plainText = paragraph.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (!urlOnlyPattern.test(plainText)) {
+      return;
+    }
+
+    removedIndexes.add(index);
+
+    const previous = paragraphs[index - 1];
+    if (!previous) {
+      return;
+    }
+
+    const previousPlainText = previous.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    if (previousPlainText.length <= 80 && shortCtaPattern.test(previousPlainText)) {
+      removedIndexes.add(index - 1);
+    }
+  });
+
+  return paragraphs.filter((_, index) => !removedIndexes.has(index));
 }

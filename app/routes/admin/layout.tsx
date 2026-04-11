@@ -155,6 +155,7 @@ export default function AdminLayout() {
         { to: "/admin/reports", label: "Reports", icon: "🧾" },
         { to: "/admin/blogs", label: "Blogs", icon: "📝" },
         { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
+        { to: "/admin/help", label: "Help Center", icon: "❓" },
       ];
 
   return (

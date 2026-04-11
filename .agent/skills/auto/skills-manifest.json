@@ -1,19 +1,19 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.152Z",
-    "observationCount": 470,
+    "lastGenerated": "2026-04-11T09:52:53.220Z",
+    "observationCount": 814,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Project for amazon-affiliate. 20 gotchas, 90 conventions, 11 fixes."
+    "description": "Project for amazon-affiliate. 75 gotchas, 242 conventions, 17 fixes."
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
-    "observationCount": 29,
+    "lastGenerated": "2026-04-11T09:52:53.220Z",
+    "observationCount": 163,
     "skillCount": 0,
     "domain": "config",
     "triggerGlobs": [
@@ -22,46 +22,56 @@
       "**/*.json",
       "**/*.toml"
     ],
-    "description": "Config for amazon-affiliate. 4 conventions."
+    "description": "Config for amazon-affiliate. 12 gotchas, 30 conventions, 11 fixes."
+  },
+  "typescript-react": {
+    "enabled": true,
+    "lastGenerated": "2026-04-11T09:52:53.220Z",
+    "observationCount": 363,
+    "skillCount": 0,
+    "domain": "typescript-react",
+    "triggerGlobs": [
+      "**/*.tsx"
+    ],
+    "description": "Typescript React for amazon-affiliate. 57 gotchas, 79 conventions, 67 fixes, 1 error→fix pairs."
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
-    "observationCount": 863,
+    "lastGenerated": "2026-04-11T09:52:53.220Z",
+    "observationCount": 1107,
     "skillCount": 0,
     "domain": "typescript",
     "triggerGlobs": [
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for amazon-affiliate. 72 gotchas, 189 conventions, 94 fixes."
+    "description": "Typescript for amazon-affiliate. 80 gotchas, 248 conventions, 107 fixes."
   },
-  "typescript-react": {
+  "html": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.158Z",
-    "observationCount": 319,
-    "skillCount": 0,
-    "domain": "typescript-react",
-    "triggerGlobs": [
-      "**/*.tsx"
-    ],
-    "description": "Typescript React for amazon-affiliate. 50 gotchas, 66 conventions, 60 fixes, 1 error→fix pairs."
-  },
-  "css": {
-    "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "lastGenerated": "2026-04-11T09:52:53.220Z",
     "observationCount": 4,
     "skillCount": 0,
-    "domain": "css",
+    "domain": "html",
     "triggerGlobs": [
-      "**/*.css",
-      "**/*.scss"
+      "**/*.html"
     ],
-    "description": "Css for amazon-affiliate. ."
+    "description": "Html for amazon-affiliate. 1 fixes."
+  },
+  "database": {
+    "enabled": true,
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "observationCount": 6,
+    "skillCount": 0,
+    "domain": "database",
+    "triggerGlobs": [
+      "**/*.sql"
+    ],
+    "description": "Database for amazon-affiliate. 1 fixes."
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
     "observationCount": 4,
     "skillCount": 0,
     "domain": "javascript",
@@ -71,11 +81,23 @@
     ],
     "description": "Javascript for amazon-affiliate. ."
   },
+  "css": {
+    "enabled": true,
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "observationCount": 4,
+    "skillCount": 0,
+    "domain": "css",
+    "triggerGlobs": [
+      "**/*.css",
+      "**/*.scss"
+    ],
+    "description": "Css for amazon-affiliate. ."
+  },
   "convention": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.160Z",
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
     "observationCount": 0,
-    "skillCount": 99,
+    "skillCount": 111,
     "domain": "convention",
     "triggerGlobs": [
       "**/*"
@@ -84,7 +106,7 @@
   },
   "decision": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.160Z",
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
     "observationCount": 0,
     "skillCount": 6,
     "domain": "decision",
@@ -93,48 +115,38 @@
     ],
     "description": "Decision for amazon-affiliate. ."
   },
-  "database": {
-    "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
-    "observationCount": 6,
-    "skillCount": 0,
-    "domain": "database",
-    "triggerGlobs": [
-      "**/*.sql"
-    ],
-    "description": "Database for amazon-affiliate. 1 fixes."
-  },
   "gotcha": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.160Z",
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
     "observationCount": 0,
-    "skillCount": 6,
+    "skillCount": 14,
     "domain": "gotcha",
     "triggerGlobs": [
       "**/*"
     ],
     "description": "Gotcha for amazon-affiliate. ."
   },
-  "html": {
-    "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.159Z",
-    "observationCount": 2,
-    "skillCount": 0,
-    "domain": "html",
-    "triggerGlobs": [
-      "**/*.html"
-    ],
-    "description": "Html for amazon-affiliate. ."
-  },
   "problem-fix": {
     "enabled": true,
-    "lastGenerated": "2026-04-03T17:47:03.160Z",
+    "lastGenerated": "2026-04-11T09:52:53.221Z",
     "observationCount": 0,
-    "skillCount": 1,
+    "skillCount": 2,
     "domain": "problem-fix",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Problem Fix for amazon-affiliate. 28 error→fix pairs."
+    "description": "Problem Fix for amazon-affiliate. 35 error→fix pairs."
+  },
+  "shell": {
+    "enabled": true,
+    "lastGenerated": "2026-04-07T02:57:30.301Z",
+    "observationCount": 2,
+    "skillCount": 0,
+    "domain": "shell",
+    "triggerGlobs": [
+      "**/*.sh",
+      "**/*.bash"
+    ],
+    "description": "Shell for amazon-affiliate. ."
   }
 }

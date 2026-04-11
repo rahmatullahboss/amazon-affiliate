@@ -29,4 +29,13 @@ test.describe('Storefront Disclosures & UI', () => {
     const appError = page.locator('text=Application Error').first();
     await expect(appError).not.toBeVisible();
   });
+
+  test('P1-003: Shows a mobile floating Amazon CTA on product pages', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'Floating CTA is mobile-only');
+
+    await page.goto('/deals/B0DJ3JBT19');
+
+    const floatingCta = page.getByRole('link', { name: /view on amazon/i }).last();
+    await expect(floatingCta).toBeVisible();
+  });
 });

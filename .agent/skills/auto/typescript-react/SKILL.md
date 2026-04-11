@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for amazon-affiliate. 50 gotchas, 66 conventions, 60 fixes, 1 error→fix pairs."
+description: "Typescript React for amazon-affiliate. 57 gotchas, 79 conventions, 67 fixes, 1 error→fix pairs."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,7 +12,7 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **363 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -20,6 +20,13 @@ Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in Mapping — paralleli | -  + import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links"; - const getToken  |
+| ⚠️ GOTCHA: Fixed null crash in ProductMapping — pa | - interface ProductPagination { + interface ProductMapping { -   page: number; +   id: number; -   p |
+| ⚠️ GOTCHA: Fixed null crash in MARKETPLACES — avoi | - import { copyTextToClipboard } from "../../utils/clipboard"; + import { extractApiErrorMessage } f |
+| ⚠️ GOTCHA: Fixed null crash in Product — paralleli | - import { getAuthToken, getAuthUser } from "../../utils/auth-session"; + import { extractApiErrorMe |
+| ⚠️ GOTCHA: Fixed null crash in TrackingId — avoids | -  + import { extractApiErrorMessage } from "../../utils/api-errors"; - const getToken = () => getAu |
+| ⚠️ GOTCHA: Fixed null crash in BlogPostSummary — a | - import { formatBlogDate, slugifyClientTitle, type BlogPostSummary } from "../../utils/blog"; + imp |
+| ⚠️ GOTCHA: Fixed null crash in Authorization — avo | -   const [error, setError] = useState(""); +   const [generatingDraft, setGeneratingDraft] = useSta |
 | ⚠️ GOTCHA: Fixed null crash in TrackingId — avoids | - import { extractApiErrorMessage } from "../../utils/api-errors"; + import { getAuthToken } from ". |
 | ⚠️ GOTCHA: Fixed null crash in Product — paralleli | - import { getAuthToken } from "../../utils/auth-session"; + import { getAuthToken, getAuthUser } fr |
 | ⚠️ GOTCHA: Fixed null crash in Mapping — paralleli | -  + import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links"; - const getToken  |
@@ -63,13 +70,6 @@ Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Fixed null crash in SubmissionResponse  | - } +   bridge_page_url: string; -  +   redirect_url: string; - interface SubmissionResponse { + } - |
 | ⚠️ GOTCHA: Fixed null crash in ProductSummary — pa | - interface ImportResult { + interface ProductSummary { -   asin: string; +   totalProducts: number; |
 | ⚠️ GOTCHA: Fixed null crash in ProductPagination — | - interface ImportResult { + interface ProductPagination { -   asin: string; +   page: number; -   s |
-| ⚠️ GOTCHA: Fixed null crash in ProductSubmissionPa | - export default function PortalProductsPage() { + interface ProductSubmissionPayload { -   const [p |
-| ⚠️ GOTCHA: Fixed null crash in Authorization — add | -   const [editingId, setEditingId] = useState<number - null>(null); +   const [replacingId, setRepl |
-| ⚠️ GOTCHA: Fixed null crash in MARKETPLACES — impr | - } +   usage_count: number; -  + } - const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES" |
-| ⚠️ GOTCHA: Fixed null crash in PortalRegisterPage  | -   return { +   const env = context.cloudflare.env as unknown as { GOOGLE_CLIENT_ID?: string }; -   |
-| ⚠️ GOTCHA: Fixed null crash in PortalLoginPage — i | -  + import { extractApiErrorMessage } from "../../utils/api-errors"; - export default function Port |
-| ⚠️ GOTCHA: Fixed null crash in PortalProduct — for | -  + import { copyTextToClipboard } from "../../utils/clipboard"; - interface PortalProduct { +  -   |
-| ⚠️ GOTCHA: Fixed null crash in TrackingId | -     if (tRes.ok) { const d = await tRes.json(); setTrackingIds(d.trackingIds); } +     if (tRes.ok |
 
 ## 🔧 Problem Playbooks
 
@@ -79,100 +79,17 @@ Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is 
 |-------|-----|------|
 | `- import { extractApiErrorMessage } from "../../ut` | Fixed null crash in Route — avoids unnecessary re-renders in | 2x |
 
-### Fixed null crash in Mapping — parallelizes async operations for speed
-- import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
-+ 
-- 
-+ const getToken = () => getAuthToken();
-- const getToken = () => getAuthToken();
-+ 
-- 
-+ interface Mapping {
-- interface Mapping {
-+   id: number; agent_name: string; agent_slug: string; asin: string;
--   id: number; agent_name: string; agent_slug: string; asin: string;
-+   product_title: string; image_url: stri
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Mapping
-3. identifier: Agent
-4. identifier: Product
-5. identifier: TrackId
-
-### Fixed null crash in ImportFormState — hardens HTTP security headers
-- import { useEffect, useMemo, useState } from "react";
-+ import { useEffect, useState } from "react";
-- interface MonthlyAnalyticsResponse {
-+ interface ImportFormState {
--   summary: {
-+   marketplace: string;
--     thisMonthRevenue: number;
-+   source_file_name: string;
--     thisMonthOrders: number;
-+   report_type: string;
--     thisMonthCommission: number;
-+   period_start: string;
--     lif
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ImportFormState
-3. identifier: AnalyticsPage
-4. identifier: OverviewData
-5. identifier: ReportsResponse
-
-### Fixed null crash in Outlet — prevents null/undefined runtime crashes
-- import { Outlet, NavLink, useNavigate } from "react-router";
-+ import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
--   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
-+   const location = useLocation();
--   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-+   const [user, setUser] = useState<{ username: string; role: string
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Outlet
-3. identifier: NavLink
-4. identifier: Dealsrky
-5. identifier: RKY
-
-### Fixed null crash in Types — offloads heavy computation off the main thread
-- import {
-+ import { getProductEditorialSections } from "../utils/product-detail";
--   buildCanonicalRedirectPath,
-+ import {
--   normalizeMarketplaceHint,
-+   buildCanonicalRedirectPath,
-- } from "../../server/utils/url";
-+   normalizeMarketplaceHint,
-- import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
-+ } from "../../server/utils/url";
-- import {
-+ import
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Types
-3. identifier: BridgeData
-4. identifier: Continue
-5. identifier: Meta
-
 ### Fixed null crash in ProductRow — prevents null/undefined runtime crashes
--   getProductDetailTitleClass,
-+   getProductEditorialSections,
--   getPublicProductPageCallout,
-+   getProductDetailTitleClass,
-- } from "../utils/product-detail";
-+   getPublicProductPageCallout,
-- import {
-+ } from "../utils/product-detail";
--   AMAZON_DESTINATION_NOTE,
-+ import {
--   AMAZON_PRIMARY_CTA_LABEL,
-+   AMAZON_DESTINATION_NOTE,
--   INLINE_AFFILIATE_DISCLOSURE,
-+   AMAZON_PRIMARY_CTA
+- import { buildAmazonUrl } from "../../server/utils/types";
++ import { buildSeoMeta } from "../utils/seo";
+- import { buildSeoMeta } from "../utils/seo";
++ import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
+- import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
++ 
+- 
++ interface ProductRow {
+- interface ProductRow {
++   i
 
 **Actionable Steps:**
 1. Modified 1 files
@@ -181,7 +98,87 @@ Auto-compiled from **319 real patterns** in **amazon-affiliate**. This skill is 
 4. identifier: ProductDetailData
 5. identifier: Explore
 
-### Fixed null crash in ProductRow — prevents null/undefined runtime crashes
-- import { buildSeo
+### Fixed null crash in MarketplaceSelectionSource — protects against XSS and CSR...
+- import { TrustBadges } from "../components/home/TrustBadges";
++ import {
+- import {
++   buildSeoMeta,
+-   buildSeoMeta,
++   toSiteBrandingMeta,
+-   toSiteBrandingMeta,
++ } from "../utils/seo";
+- } from "../utils/seo";
++ import {
+- import {
++   HOME_HERO_EYEBROW,
+-   HOME_HERO_EYEBROW,
++   HOME_HERO_TITLE,
+-   HOME_HERO_TITLE,
++ } from "../utils/affiliate-copy";
+- } from "../utils/affiliate-copy"
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: MarketplaceSelectionSource
+3. identifier: PublicMarketplace
+4. identifier: BlogPostSummary
+5. identifier: ProductRow
+
+### Fixed null crash in Select — parallelizes async operations for speed
+-   async function handleProductImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
++   async function handleBulkMappingAssign() {
+-     const file = event.target.files?.[0];
++     if (selectedProductIds.length === 0) {
+-     if (!file) {
++       setError("Select products first.");
+-     setUploadingProductImage(true);
++     if (!bulkMappingDraft.agent_id || !bulkMappingDraft.tracking_id) {
+
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Select
+3. identifier: POST
+4. identifier: Content
+5. identifier: Type
+
+### Fixed null crash in ImportResult — parallelizes async operations for speed
+- 
++   const [bulkMappingDraft, setBulkMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
+-   const [bulkAsins, setBulkAsins] = useState("");
++   const [bulkAssigningMappings, setBulkAssigningMappings] = useState(false);
+-   const [bulkMarketplace, setBulkMarketplace] = useState("US");
++ 
+-   const [bulkPrefix, setBulkPrefix] = useState("");
++   const [bulkAsins, setBulkAsins] = useState("
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: ImportResult
+3. identifier: HTMLInputElement
+4. identifier: SheetSyncConfig
+5. identifier: SheetSyncLog
+
+### Fixed null crash in JSON — filters out falsy/null values explicitly
+-         body: JSON.stringify({ ...form, agent_id: Number(form.agent_id), alias_slug: form.alias_slug || null }),
++         body: JSON.stringify({
+-       });
++           ...(editingId
+-       if (!res.ok) {
++             ? {
+-         const data = (await res.json()) as unknown;
++                 tag: form.tag,
+-         throw new Error(
++                 label: form.label || null,
+-           ex
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: JSON
+3. identifier: Number
+4. identifier: Error
+5. identifier: Failed
+
+### Fixed null crash in BlogPostData — prev
 
 ... [Truncated — see individual observations for full content]

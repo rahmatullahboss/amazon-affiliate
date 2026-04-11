@@ -5,6 +5,7 @@ import { csrf } from 'hono/csrf';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from './utils/types';
 import { authMiddleware } from './middleware/auth';
+import { createBlogImageResponse } from './services/blog';
 
 // Route imports
 import redirect from './routes/redirect';
@@ -66,6 +67,11 @@ app.route('/api/page', page);
 
 // Auth endpoints
 app.route('/api/auth', auth);
+
+// Direct mount for blog images to avoid sub-router wildcard/regex bugs at the Edge
+app.get('/api/public/blog-images/*', async (c) => {
+  return createBlogImageResponse(c.env, new URL(c.req.url).pathname);
+});
 
 // Public API endpoints for the main site
 app.route('/api/public', publicRoutes);

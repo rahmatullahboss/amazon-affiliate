@@ -1,14 +1,18 @@
 import type { Route } from "./+types/blog-post";
 import { Link } from "react-router";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import { buildMarketplaceAwareDealsHref, orderBlogPostsForMarketplace } from "../utils/blog-personalization";
 import {
   AMAZON_DESTINATION_NOTE,
   AMAZON_PRIMARY_CTA_LABEL,
   BROWSE_PICKS_LABEL,
   INLINE_AFFILIATE_DISCLOSURE,
 } from "../utils/affiliate-copy";
+import { resolvePreferredMarketplace } from "../utils/marketplace";
+import type { PublicMarketplace } from "../utils/marketplace";
 import { buildCanonicalUrl, PUBLIC_SITE_URL } from "../utils/seo";
 import { formatBlogDate, splitBlogContent } from "../utils/blog";
+import { buildAmazonUrl } from "../../server/utils/types";
 
 interface BlogPostData {
   id: number;
@@ -27,6 +31,27 @@ interface BlogPostData {
   published_at: string | null;
   updated_at: string;
   reading_minutes: number;
+  generation_source: "manual" | "ai";
+  generation_focus_asin: string | null;
+  generation_marketplace: string | null;
+  preferredMarketplace: PublicMarketplace;
+  featuredProduct: {
+    asin: string;
+    title: string;
+    imageUrl: string | null;
+    marketplace: string;
+  } | null;
+  directAmazonUrl: string | null;
+  relatedPosts: Array<{
+    id: number;
+    title: string;
+    slug: string;
+    generation_source: "manual" | "ai";
+    generation_marketplace: string | null;
+    is_featured: number;
+    published_at: string | null;
+    updated_at: string;
+  }>;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -66,9 +91,15 @@ export function meta({ data }: Route.MetaArgs) {
   return meta;
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, request, context }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const slug = params.slug;
+  const url = new URL(request.url);
+  const preferredMarketplace = resolvePreferredMarketplace({
+    searchParams: url.searchParams,
+    cookieHeader: request.headers.get("cookie"),
+    countryHeader: request.headers.get("cf-ipcountry"),
+  });
 
   const row = await env.DB.prepare(
     `SELECT *
@@ -92,17 +123,71 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       seo_description: string | null;
       published_at: string | null;
       updated_at: string;
+      generation_source: "manual" | "ai";
+      generation_focus_asin: string | null;
+      generation_marketplace: string | null;
     }>();
 
   if (!row) {
     throw new Response("Article not found", { status: 404 });
   }
 
+  const { results: relatedRows } = await env.DB.prepare(
+    `SELECT id, title, slug, generation_source, generation_marketplace, is_featured, published_at, updated_at
+     FROM blog_posts
+     WHERE is_deleted = 0
+       AND status = 'published'
+       AND slug != ?
+     ORDER BY published_at DESC, updated_at DESC
+     LIMIT 12`
+  )
+    .bind(slug)
+    .all<BlogPostData["relatedPosts"][number]>();
+
+  const featuredProduct =
+    row.generation_focus_asin && row.generation_marketplace
+      ? await env.DB.prepare(
+          `SELECT asin, title, image_url, marketplace
+           FROM products
+           WHERE asin = ?
+             AND marketplace = ?
+             AND is_active = 1
+             AND status = 'active'
+           LIMIT 1`
+        )
+          .bind(row.generation_focus_asin, row.generation_marketplace)
+          .first<{
+            asin: string;
+            title: string;
+            image_url: string | null;
+            marketplace: string;
+          }>()
+      : null;
+
+  const directAmazonUrl = await resolveDirectAmazonUrl({
+    db: env.DB,
+    ctaUrl: row.cta_url,
+    preferredMarketplace,
+    generationFocusAsin: row.generation_focus_asin,
+    generationMarketplace: row.generation_marketplace,
+  });
+
   return {
     ...row,
     cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
+    preferredMarketplace,
+    featuredProduct: featuredProduct
+      ? {
+          asin: featuredProduct.asin,
+          title: featuredProduct.title,
+          imageUrl: featuredProduct.image_url,
+          marketplace: featuredProduct.marketplace,
+        }
+      : null,
+    directAmazonUrl,
+    relatedPosts: orderBlogPostsForMarketplace(relatedRows ?? [], preferredMarketplace).slice(0, 3),
   } satisfies BlogPostData;
 }
 
@@ -110,6 +195,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
   const post = loaderData as BlogPostData;
   const paragraphs = splitBlogContent(post.content);
   const articleUrl = buildCanonicalUrl(`/blog/${post.slug}`);
+  const amazonCtaHref = post.directAmazonUrl;
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -180,7 +266,47 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
 
-        {post.cta_url ? (
+        {post.featuredProduct?.imageUrl ? (
+          <div className="mt-8 rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-5 md:flex-row md:items-center">
+              <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50 md:w-56 md:shrink-0">
+                <img
+                  src={post.featuredProduct.imageUrl}
+                  alt={post.cover_image_alt || post.featuredProduct.title}
+                  className="h-56 w-full object-cover md:h-44"
+                />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
+                  Featured product
+                </p>
+                <h2 className="mt-3 text-2xl font-black text-gray-950">
+                  {post.featuredProduct.title}
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-gray-600">
+                  This article was generated around our {post.featuredProduct.marketplace} catalog entry for this product,
+                  so you can compare the buying angle with the actual listing before deciding.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {amazonCtaHref ? (
+                    <a
+                      href={amazonCtaHref}
+                      rel="nofollow sponsored"
+                      className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                    >
+                      {post.cta_label || AMAZON_PRIMARY_CTA_LABEL}
+                    </a>
+                  ) : null}
+                  <span className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-gray-500">
+                    {post.featuredProduct.asin}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {post.cta_url && amazonCtaHref ? (
           <div className="mt-8 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6">
             <h2 className="text-2xl font-black text-gray-950">Ready to check this on Amazon?</h2>
             <p className="mt-3 text-sm leading-7 text-gray-600">
@@ -188,7 +314,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <a
-                href={post.cta_url}
+                href={amazonCtaHref}
                 rel="nofollow sponsored"
                 className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
@@ -208,7 +334,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              to="/deals"
+              to={buildMarketplaceAwareDealsHref("/deals", post.preferredMarketplace)}
               className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
             >
               {BROWSE_PICKS_LABEL}
@@ -221,7 +347,82 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             </Link>
           </div>
         </div>
+
+        {post.relatedPosts.length > 0 ? (
+          <div className="mt-10 rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+            <h2 className="text-2xl font-black text-gray-950">
+              More {post.preferredMarketplace} buying guides
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-gray-600">
+              These articles are prioritized for shoppers browsing from the same marketplace region.
+            </p>
+            <div className="mt-6 space-y-4">
+              {post.relatedPosts.map((relatedPost) => (
+                <Link
+                  key={relatedPost.id}
+                  to={`/blog/${relatedPost.slug}`}
+                  className="block rounded-2xl border border-gray-200 px-5 py-4 transition-colors hover:border-primary/40 hover:bg-primary/5"
+                >
+                  <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
+                    {relatedPost.generation_marketplace || "Global"} article
+                  </p>
+                  <h3 className="mt-2 text-lg font-black text-gray-950">{relatedPost.title}</h3>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </article>
   );
+}
+
+function extractAsinFromDealsUrl(ctaUrl: string | null): string | null {
+  if (!ctaUrl) {
+    return null;
+  }
+
+  const directMatch = ctaUrl.match(/\/deals\/([A-Z0-9]{10})(?:[/?#]|$)/i);
+  if (directMatch) {
+    return directMatch[1].toUpperCase();
+  }
+
+  return null;
+}
+
+async function resolveDirectAmazonUrl(input: {
+  db: D1Database;
+  ctaUrl: string | null;
+  preferredMarketplace: PublicMarketplace;
+  generationFocusAsin: string | null;
+  generationMarketplace: string | null;
+}): Promise<string | null> {
+  if (input.ctaUrl && /^https:\/\/www\.amazon\./i.test(input.ctaUrl)) {
+    return input.ctaUrl;
+  }
+
+  const asin = input.generationFocusAsin || extractAsinFromDealsUrl(input.ctaUrl);
+  const marketplace = (input.generationMarketplace || input.preferredMarketplace || "US").toUpperCase();
+
+  if (!asin) {
+    return null;
+  }
+
+  const tagRow = await input.db
+    .prepare(
+      `SELECT tag
+       FROM tracking_ids
+       WHERE marketplace = ?
+         AND is_active = 1
+         AND is_site_primary = 1
+       LIMIT 1`
+    )
+    .bind(marketplace)
+    .first<{ tag: string }>();
+
+  if (!tagRow?.tag) {
+    return null;
+  }
+
+  return buildAmazonUrl(asin, tagRow.tag, marketplace);
 }

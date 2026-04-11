@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 1699 notes | Score threshold: >40
+> 2367 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,52 +20,43 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability** — - router.get("/blog-images/*", async (c) => {
-+ router.get("/blog-imag
-- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React** — - import { extractApiErrorMessage } from "../../utils/api-errors";
-+ i
-- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed** — - import { getAuthToken } from "../../utils/auth-session";
-+ import { 
-- **⚠️ GOTCHA: Fixed null crash in Hono — parallelizes async operations for speed** — - 
-+ import { buildBlogImageUrl, buildStoredImageKey } from '../servic
-- **⚠️ GOTCHA: Replaced auth Protected** — - // ─── Protected Routes (Admin Only) ───────────────────────
-+ // ──
-- **⚠️ GOTCHA: Fixed null crash in Mapping — parallelizes async operations for speed** — - 
-+ import { buildMarketplaceReadyLinkTemplate } from "../../utils/pu
-
-## Active: `.`
-
-- **⚠️ GOTCHA: Fixed null crash in HTTPException — improves module reusability**
-- **⚠️ GOTCHA: Fixed null crash in TrackingId — avoids unnecessary re-renders in React**
-- **⚠️ GOTCHA: Fixed null crash in Product — parallelizes async operations for speed**
-- **⚠️ GOTCHA: Fixed null crash in Hono — parallelizes async operations for speed**
-- **⚠️ GOTCHA: Replaced auth Protected**
+- **⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed** — - > 2351 notes | Score threshold: >40
++ > 2358 notes | Score threshold
+- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Optimized Score
++ - ⚠️ GOTCHA: Optimized GOTCHA
+- - ⚠️ 
+- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Patched security issue Patched
++ - ⚠️ GOTCHA: Optimized
+- **⚠️ GOTCHA: Optimized Score** — - > 2287 notes | Score threshold: >40
++ > 2351 notes | Score threshold
+- **⚠️ GOTCHA: Patched security issue Patched** — - - Patched security issue UeIDDQ
++ - Patched security issue Patched
+-
+- **⚠️ GOTCHA: Patched security issue Fixed** — - - Fixed null crash in MarketplaceSelectionSource — protects against 
 
 ## Project Standards
 
-- what-changed in tsconfig.cloudflare.tsbuildinfo — confirmed 3x
-- Added JWT tokens authentication — hardens HTTP security headers — confirmed 3x
-- what-changed in mappings.ts — confirmed 3x
-- Updated amazon_reports database schema — parallelizes async operations for speed — confirmed 4x
-- convention in TrustBadges.tsx
-- Fixed null crash in Route — prevents null/undefined runtime crashes — confirmed 6x
-- what-changed in ProductCard.tsx — confirmed 3x
-- discovery in products.tsx — confirmed 3x
+- what-changed in brainsync_auto.md — confirmed 3x
+- discovery in blog-post.tsx — confirmed 3x
+- what-changed in shared-context.json — confirmed 3x
+- what-changed in shared-context.json — confirmed 8x
+- Patched security issue Patched — confirmed 3x
+- what-changed in sheet-control.ts — confirmed 3x
+- what-changed in products.ts — confirmed 4x
+- what-changed in login.ts — confirmed 4x
 
 ## Known Fixes
 
-- ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
 - ❌ deferredStatusError: DynamicLinkResolutionError | null = null; → ✅ Fixed null crash in DynamicLinkResolutionError — prevents null/undefined runt...
+- ❌ -   const [error, setError] = useState(""); → ✅ Fixed null crash in Link — formalizes the data contract with explicit types
+- ❌ - - Fixed null crash in GenerationProductCandidate — offloads heavy computation o... → ✅ problem-fix in agent-rules.md
 - ❌ -   status: "created" | "exists" | "error"; → ✅ Fixed null crash in ImportResult — parallelizes async operations for speed
 - ❌ -     throw new HTTPException(429, { message: 'Too many login attempts. Try again in 15 minutes.' }) → ✅ Fixed null crash in Hono — prevents brute-force and DoS attacks
-- ❌ copyError: string; → ✅ Fixed null crash in Route — formalizes the data contract with explicit types
 
 ## Recent Decisions
 
-- Optimized impliedFormat — offloads heavy computation off the main thread
-- decision in upload_r2.sh
-- decision in deals.tsx
-- decision in ImageGallery.tsx
+- Optimized Score — parallelizes async operations for speed
+- decision in shared-context.json
 
 ## Learned Patterns
 
@@ -231,6 +222,6 @@ Guidance for using the `@tinybirdco/sdk` package to define Tinybird resources in
 - [JavaScript/TypeScript] Use === not == (strict equality prevents type coercion bugs)
 
 ## Available Tools (ON-DEMAND only)
-- `query(q)` — Deep search when stuck
-- `find(query)` — Full-text lookup
-> Context above IS your context. Do NOT call load() at startup.
+- `sys_core_01(q)` — Deep search when stuck
+- `sys_core_05(query)` — Full-text lookup
+> Context above IS your context. Do NOT call sys_core_14() at startup.

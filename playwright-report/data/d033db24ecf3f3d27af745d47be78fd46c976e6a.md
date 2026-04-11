@@ -1,0 +1,183 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - text: As an Amazon Associate, we earn from qualifying purchases.
+      - link "Learn more" [ref=e5] [cursor=pointer]:
+        - /url: /disclosure
+    - banner [ref=e6]:
+      - generic [ref=e8]:
+        - link "D DealsRky Curated Picks" [ref=e9] [cursor=pointer]:
+          - /url: /
+          - generic [ref=e10]: D
+          - generic [ref=e11]:
+            - paragraph [ref=e12]: DealsRky
+            - paragraph [ref=e13]: Curated Picks
+        - generic [ref=e14]:
+          - generic [ref=e15]:
+            - textbox "Search..." [ref=e16]
+            - button "Search" [ref=e17]:
+              - img [ref=e18]
+          - button "Toggle menu" [ref=e20]:
+            - img [ref=e21]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e26]:
+        - generic [ref=e27]:
+          - paragraph [ref=e28]: Buying Guides & Curated Picks
+          - heading "Research products with confidence before you buy on Amazon." [level=1] [ref=e29]
+          - paragraph [ref=e30]: DealsRky publishes concise buying guidance, curated recommendations, and marketplace-aware product pages so you can compare options before continuing to Amazon for current pricing and checkout.
+          - generic [ref=e31]:
+            - link "Browse curated picks" [ref=e32] [cursor=pointer]:
+              - /url: /deals
+            - link "Read affiliate disclosure" [ref=e33] [cursor=pointer]:
+              - /url: /disclosure
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]:
+              - paragraph [ref=e37]: Supported Marketplaces
+              - heading "Research First, Then Continue" [level=2] [ref=e38]
+            - generic [ref=e39]: Editorial guidance
+          - generic [ref=e40]:
+            - generic [ref=e41]:
+              - paragraph [ref=e42]: Marketplace
+              - paragraph [ref=e43]: US
+            - generic [ref=e44]:
+              - paragraph [ref=e45]: Marketplace
+              - paragraph [ref=e46]: CA
+            - generic [ref=e47]:
+              - paragraph [ref=e48]: Marketplace
+              - paragraph [ref=e49]: UK
+            - generic [ref=e50]:
+              - paragraph [ref=e51]: Marketplace
+              - paragraph [ref=e52]: DE
+            - generic [ref=e53]:
+              - paragraph [ref=e54]: Marketplace
+              - paragraph [ref=e55]: IT
+            - generic [ref=e56]:
+              - paragraph [ref=e57]: Marketplace
+              - paragraph [ref=e58]: FR
+            - generic [ref=e59]:
+              - paragraph [ref=e60]: Marketplace
+              - paragraph [ref=e61]: ES
+          - paragraph [ref=e63]: Use DealsRky to review product context and compare marketplace availability before you continue to Amazon.
+      - generic [ref=e65]:
+        - article [ref=e66]:
+          - paragraph [ref=e67]: Our Promise
+          - heading "Curated Expert Picks" [level=2] [ref=e68]
+          - paragraph [ref=e69]: Every product we feature is hand-selected and reviewed for fit, quality, and buying context before it appears in our catalog.
+        - article [ref=e70]:
+          - paragraph [ref=e71]: Our Promise
+          - heading "Transparent Shopping" [level=2] [ref=e72]
+          - paragraph [ref=e73]: Clear specifications, direct retailer handoff, and visible affiliate disclosures help you understand exactly how each page works.
+        - article [ref=e74]:
+          - paragraph [ref=e75]: Our Promise
+          - heading "Retailer Checkout Clarity" [level=2] [ref=e76]
+          - paragraph [ref=e77]: When you find a product you like, the final retailer page shows live pricing, shipping, and checkout details.
+      - generic [ref=e78]:
+        - generic [ref=e79]:
+          - generic [ref=e80]:
+            - paragraph [ref=e81]: Editor's picks
+            - heading "Recent recommendations worth reviewing" [level=2] [ref=e82]
+          - link "View full catalog" [ref=e83] [cursor=pointer]:
+            - /url: /deals
+        - generic [ref=e84]:
+          - heading "Check back soon for new recommendations" [level=3] [ref=e85]
+          - paragraph [ref=e86]: Our editors are reviewing the next batch of product pages and buying guides. Please check back shortly.
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - paragraph [ref=e90]: How it works
+          - heading "Simple path from product research to the final retailer page" [level=2] [ref=e91]
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - generic [ref=e94]: "1"
+              - paragraph [ref=e95]: We review catalog data, product positioning, and marketplace availability before publishing a page.
+            - generic [ref=e96]:
+              - generic [ref=e97]: "2"
+              - paragraph [ref=e98]: You browse concise research notes, comparisons, and recommendation summaries without clutter.
+            - generic [ref=e99]:
+              - generic [ref=e100]: "3"
+              - paragraph [ref=e101]: When you are ready, continue to Amazon to review live pricing, shipping, and final checkout details.
+        - generic [ref=e102]:
+          - paragraph [ref=e103]: Fresh catalog
+          - heading "Recently published" [level=3] [ref=e104]
+          - generic [ref=e106]: No recent products yet.
+      - generic [ref=e108]:
+        - paragraph [ref=e109]: Featured guide
+        - heading "Start with practical buying guides, not rush-driven deals" [level=2] [ref=e110]
+        - paragraph [ref=e111]: DealsRky works best when you use product pages and articles for research first, then continue to Amazon for the latest price, delivery details, reviews, and checkout.
+        - generic [ref=e112]:
+          - link "Read the Buying Guide" [ref=e113] [cursor=pointer]:
+            - /url: /blog
+          - link "Browse curated picks" [ref=e114] [cursor=pointer]:
+            - /url: /deals
+      - generic [ref=e116]:
+        - generic [ref=e117]:
+          - paragraph [ref=e118]: Original Content
+          - heading "Why Trust DealsRky? Our Methodology & Compliance" [level=2] [ref=e119]
+          - paragraph [ref=e120]: DealsRky is built to help you research products before you continue to Amazon. We summarize relevant details, compare marketplace coverage, and keep our public pages focused on clear editorial guidance instead of urgency-led sales copy.
+        - generic [ref=e121]:
+          - generic [ref=e122]:
+            - img [ref=e124]
+            - heading "Independent Research" [level=3] [ref=e126]
+            - paragraph [ref=e127]: We independently research and curate all products. We do not accept payment to feature specific items in our regular catalog, ensuring unbiased recommendations.
+          - generic [ref=e128]:
+            - img [ref=e130]
+            - heading "Affiliate Disclosure" [level=3] [ref=e132]
+            - paragraph [ref=e133]: As an Amazon Associate, we earn from qualifying purchases. This means if you click on a retailer link and make a purchase, we may earn a small commission at no additional cost to you.
+          - generic [ref=e134]:
+            - img [ref=e136]
+            - heading "Live Retailer Pricing" [level=3] [ref=e138]
+            - paragraph [ref=e139]: Prices fluctuate constantly. To avoid confusion, we link directly to the retailer's checkout page so you can see the guaranteed live price and shipping details.
+      - generic [ref=e140]:
+        - generic [ref=e141]:
+          - generic [ref=e142]:
+            - paragraph [ref=e143]: Fresh Articles
+            - heading "Research-driven buying advice" [level=2] [ref=e144]
+          - link "Visit the blog" [ref=e145] [cursor=pointer]:
+            - /url: /blog
+        - generic [ref=e146]:
+          - heading "Blog articles are coming soon" [level=3] [ref=e147]
+          - paragraph [ref=e148]: We are preparing comparison posts, buying guides, and deeper product research pieces.
+  - contentinfo [ref=e149]:
+    - generic [ref=e150]:
+      - generic [ref=e151]:
+        - generic [ref=e152]:
+          - generic [ref=e153]: D
+          - generic [ref=e154]:
+            - paragraph [ref=e155]: DealsRky
+            - paragraph [ref=e156]: Curated Product Picks
+        - paragraph [ref=e157]: DealsRky publishes curated product pages and routes visitors to the final retailer page for pricing and checkout. We do not process payments, hold inventory, or manage order fulfillment.
+        - generic [ref=e158]:
+          - strong [ref=e159]: "Affiliate disclosure:"
+          - text: As an Amazon Associate, we earn from qualifying purchases. DealsRky may earn a commission when you continue through eligible product links and make a purchase. Final pricing and availability are always shown on the retailer page.
+      - generic [ref=e160]:
+        - heading "Explore" [level=2] [ref=e161]
+        - generic [ref=e162]:
+          - link "Home" [ref=e163] [cursor=pointer]:
+            - /url: /
+          - link "Browse Picks" [ref=e164] [cursor=pointer]:
+            - /url: /deals
+          - link "Blog" [ref=e165] [cursor=pointer]:
+            - /url: /blog
+          - link "About" [ref=e166] [cursor=pointer]:
+            - /url: /about
+          - link "Contact" [ref=e167] [cursor=pointer]:
+            - /url: /contact
+      - generic [ref=e168]:
+        - heading "Policies" [level=2] [ref=e169]
+        - generic [ref=e170]:
+          - link "Affiliate Disclosure" [ref=e171] [cursor=pointer]:
+            - /url: /disclosure
+          - link "Terms of Use" [ref=e172] [cursor=pointer]:
+            - /url: /terms
+          - link "Privacy Policy" [ref=e173] [cursor=pointer]:
+            - /url: /privacy
+          - link "Contact Support" [ref=e174] [cursor=pointer]:
+            - /url: /contact
+    - generic [ref=e176]:
+      - paragraph [ref=e177]: © 2026 DealsRky. All rights reserved.
+      - paragraph [ref=e178]: Checkout, pricing, inventory, and fulfillment are handled by the retailer.
+```

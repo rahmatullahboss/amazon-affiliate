@@ -530,12 +530,22 @@ describe('Redirect Engine API', () => {
     expect(pageJson.amazonUrl).toContain('amazon.de/dp/B0CANON123');
   });
 
-  it('P0-007A: Exposes country-specific public redirect options on generic product detail pages', async () => {
+  it('P0-007A: Exposes country-specific public Amazon URLs on generic product detail pages', async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES
        (1101, 'B0DETAIL12', 'Detail Product DE', 'http://img.com/detail.jpg', 'DE', 'active', 1),
        (1102, 'B0DETAIL12', 'Detail Product US', 'http://img.com/detail-us.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (9001, 'site-primary-agent', 'Site Primary Agent', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+       (9002, 9001, 'site-de-21', 'DE', 1, 1, 1),
+       (9003, 9001, 'site-us-20', 'US', 1, 1, 1)`
     ).run();
 
     const loaderResult = (await productDetailLoader({
@@ -548,11 +558,20 @@ describe('Redirect Engine API', () => {
         },
       },
       request: new Request('http://localhost/deals/B0DETAIL12'),
-    } as never)) as { canonicalPath: string; redirectUrl?: string; availableMarketplaces: string[] };
+    } as never)) as {
+      canonicalPath: string;
+      redirectUrl?: string;
+      availableMarketplaces: string[];
+      amazonUrlsByMarketplace?: Record<string, string>;
+    };
 
     expect(loaderResult.canonicalPath).toBe('/deals/B0DETAIL12');
     expect(loaderResult.redirectUrl).toBeUndefined();
     expect(loaderResult.availableMarketplaces).toEqual(['DE', 'US']);
+    expect(loaderResult.amazonUrlsByMarketplace).toEqual({
+      DE: 'https://www.amazon.de/dp/B0DETAIL12?tag=site-de-21',
+      US: 'https://www.amazon.com/dp/B0DETAIL12?tag=site-us-20',
+    });
   });
 
   it('P0-008: Rejects an unsupported country path instead of resolving another marketplace', async () => {
