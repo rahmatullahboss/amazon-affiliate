@@ -20,6 +20,7 @@ worker-configuration.d.ts
 AGENT.md
 CLAUDE.md
 .agent-mem/
+.worktrees/
 
 # Auto-generated AI agent exclusions
 .cursorrules
