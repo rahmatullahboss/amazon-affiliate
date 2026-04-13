@@ -57,8 +57,13 @@ export function parseSheetSyncRow(
     "amazon_url",
     "product_url",
     "url",
+    "link",
   ]);
-  const asin = extractAsinFromInput(rawAsinInput)?.toUpperCase() || "";
+  const inferredFromDealsRky = extractDealsRkyLinkData(rawAsinInput);
+  const asin =
+    inferredFromDealsRky?.asin?.toUpperCase() ||
+    extractAsinFromInput(rawAsinInput)?.toUpperCase() ||
+    "";
   if (!isValidAsin(asin)) {
     return null;
   }
@@ -66,7 +71,9 @@ export function parseSheetSyncRow(
   const explicitMarketplace = normalizeCell(
     getRowValue(row, ["marketplace", "country", "country_code", "domain_country"])
   ).toUpperCase();
-  const inferredMarketplace = extractMarketplaceFromInput(rawAsinInput);
+  const inferredMarketplace =
+    inferredFromDealsRky?.marketplace ||
+    extractMarketplaceFromInput(rawAsinInput);
   const marketplace = explicitMarketplace || inferredMarketplace || defaultMarketplace;
 
   return {
@@ -75,8 +82,15 @@ export function parseSheetSyncRow(
     title: getNullableRowValue(row, ["title", "product_title"]),
     category: getNullableRowValue(row, ["category", "product_category"]),
     customTitle: getNullableRowValue(row, ["custom_title", "mapping_title"]),
-    agentSlug: getNullableRowValue(row, ["agent_slug", "agent", "slug"])?.toLowerCase() || null,
-    trackingTag: normalizeTrackingTag(getNullableRowValue(row, ["tracking_tag", "tag"]) || ""),
+    agentSlug:
+      getNullableRowValue(row, ["agent_slug", "agent", "slug"])?.toLowerCase() ||
+      inferredFromDealsRky?.agentSlug ||
+      null,
+    trackingTag: normalizeTrackingTag(
+      getNullableRowValue(row, ["tracking_tag", "tag"]) ||
+        inferredFromDealsRky?.trackingTag ||
+        ""
+    ),
     rowStatus: parseRowStatus(row),
     productStatus: parseProductStatus(row),
   };
@@ -156,6 +170,50 @@ function extractMarketplaceFromInput(rawInput: string): string {
   } catch {
     return "";
   }
+}
+
+function extractDealsRkyLinkData(
+  rawInput: string
+): { asin: string | null; marketplace: string | null; agentSlug: string | null; trackingTag: string | null } | null {
+  const normalized = normalizeCell(rawInput);
+  if (!normalized) {
+    return null;
+  }
+
+  try {
+    const url = new URL(normalized);
+    if (!url.hostname.includes("dealsrky.com")) {
+      return null;
+    }
+
+    const path = url.pathname.replace(/\/+$/, "");
+    const segments = path.split("/").filter(Boolean);
+    if (segments.length === 0) {
+      return null;
+    }
+
+    // /go/t/{tag}/{asin}
+    if (segments[0] === "go" && segments[1] === "t" && segments.length >= 4) {
+      return {
+        asin: segments[3] || null,
+        marketplace: null,
+        agentSlug: null,
+        trackingTag: segments[2] || null,
+      };
+    }
+
+    // /{agentSlug}/{marketplace}/{asin}
+    if (segments.length >= 3) {
+      const agentSlug = segments[0];
+      const marketplace = segments[1]?.toUpperCase() || null;
+      const asin = segments[2] || null;
+      return { asin, marketplace, agentSlug, trackingTag: null };
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 function parseRowStatus(row: SheetRowRecord): "active" | "inactive" {
