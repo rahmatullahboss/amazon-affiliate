@@ -8,6 +8,17 @@ import { writeAuditLog } from '../services/audit-log';
 
 const agents = new Hono<AppEnv>();
 
+function generateBindCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  let code = '';
+  for (let i = 0; i < bytes.length; i += 1) {
+    code += alphabet[bytes[i] % alphabet.length];
+  }
+  return code;
+}
+
 /**
  * GET /api/agents — List all agents with stats
  */
@@ -96,6 +107,47 @@ agents.post('/', zValidator('json', createAgentSchema), async (c) => {
     }
     throw error;
   }
+});
+
+/**
+ * POST /api/agents/:id/telegram-bind — Generate a one-time bind code
+ */
+agents.post('/:id/telegram-bind', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid agent ID' });
+
+  const agent = await c.env.DB.prepare(
+    'SELECT id, telegram_chat_id FROM agents WHERE id = ?'
+  )
+    .bind(id)
+    .first<{ id: number; telegram_chat_id: string | null }>();
+  if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
+  if (agent.telegram_chat_id) {
+    throw new HTTPException(409, { message: 'Agent already bound to Telegram' });
+  }
+
+  let code = '';
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = generateBindCode();
+    const exists = await c.env.DB.prepare(
+      'SELECT id FROM agents WHERE telegram_bind_code = ? LIMIT 1'
+    )
+      .bind(candidate)
+      .first<{ id: number }>();
+    if (!exists) {
+      code = candidate;
+      break;
+    }
+  }
+  if (!code) throw new HTTPException(503, { message: 'Could not generate a unique bind code' });
+
+  await c.env.DB.prepare(
+    'UPDATE agents SET telegram_bind_code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  )
+    .bind(code, id)
+    .run();
+
+  return c.json({ bindCode: code });
 });
 
 /**
