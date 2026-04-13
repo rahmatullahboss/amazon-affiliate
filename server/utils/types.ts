@@ -35,6 +35,8 @@ export type Bindings = {
   OLLAMA_CLOUD_BASE_URL?: string;
   OLLAMA_CLOUD_API_KEY?: string;
   OLLAMA_CLOUD_MODEL?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
 };
 
 // Hono app types
@@ -56,6 +58,8 @@ export interface AgentRow {
   email: string | null;
   phone: string | null;
   is_active: number;
+  telegram_chat_id?: string | null;
+  telegram_bind_code?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -70,6 +74,7 @@ export interface ProductRow {
   description?: string | null;
   features?: string | null;
   review_content?: string | null;
+  order_requirement?: string | null;
   status?: 'active' | 'pending_review' | 'rejected';
   is_active: number;
   fetched_at: string | null;
