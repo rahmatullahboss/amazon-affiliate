@@ -17,6 +17,8 @@ interface Agent {
   email: string | null;
   phone: string | null;
   is_active: number;
+  telegram_chat_id: string | null;
+  telegram_bind_code: string | null;
   tracking_count: number;
   product_count: number;
   total_clicks: number;
@@ -139,6 +141,8 @@ export default function AgentsPage() {
   const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
   const [agentForm, setAgentForm] = useState<AgentFormState>(EMPTY_AGENT_FORM);
   const [agentError, setAgentError] = useState("");
+  const [telegramError, setTelegramError] = useState("");
+  const [bindingAgentId, setBindingAgentId] = useState<number | null>(null);
 
   const [tagFormMode, setTagFormMode] = useState<TagFormMode>(null);
   const [tagForm, setTagForm] = useState<TagFormState>(EMPTY_TAG_FORM);
@@ -184,6 +188,33 @@ export default function AgentsPage() {
   useEffect(() => {
     void fetchAll();
   }, []);
+
+  async function handleGenerateBindCode(agentId: number) {
+    setTelegramError("");
+    setBindingAgentId(agentId);
+
+    try {
+      const response = await fetch(`/api/agents/${agentId}/telegram-bind`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(await response.text());
+      }
+
+      const payload = (await response.json()) as { bindCode: string };
+      setAgents((current) =>
+        current.map((agent) =>
+          agent.id === agentId ? { ...agent, telegram_bind_code: payload.bindCode } : agent
+        )
+      );
+    } catch (error) {
+      setTelegramError(extractApiErrorMessage(error, "Could not generate bind code."));
+    } finally {
+      setBindingAgentId(null);
+    }
+  }
 
   const trackingByAgent = useMemo(() => {
     const grouped = new Map<number, TrackingId[]>();
@@ -758,6 +789,28 @@ export default function AgentsPage() {
                       <div className="mt-1">Login issues: reset password or reactivate linked accounts below.</div>
                       <div className="mt-1">Slug issues: set alias slug per marketplace inside the tag section.</div>
                     </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-white/5 bg-[#111827]/80 p-4">
+                    <div className="text-[0.68rem] uppercase tracking-[0.16em] text-[#8b8ba7]">Telegram Access</div>
+                    <div className="mt-3 text-sm text-[#d5d5e4] leading-relaxed">
+                      <div>Chat ID: {agent.telegram_chat_id || "Not connected"}</div>
+                      <div className="mt-1">
+                        Bind code: {agent.telegram_bind_code || "Not generated"}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={() => void handleGenerateBindCode(agent.id)}
+                        className="px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-md text-emerald-300 text-xs font-medium cursor-pointer hover:bg-emerald-500/20 transition-colors disabled:opacity-60"
+                        disabled={Boolean(agent.telegram_chat_id) || bindingAgentId === agent.id}
+                      >
+                        {bindingAgentId === agent.id ? "Generating..." : "Generate Bind Code"}
+                      </button>
+                    </div>
+                    {telegramError ? (
+                      <p className="mt-2 text-xs text-red-400">{telegramError}</p>
+                    ) : null}
                   </div>
                 </div>
 

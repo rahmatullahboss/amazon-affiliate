@@ -19,6 +19,7 @@ interface Product {
   description?: string | null;
   features?: string | string[] | null;
   review_content?: string | null;
+  order_requirement?: string | null;
   status: "active" | "pending_review" | "rejected";
   is_active: number;
   agent_count: number;
@@ -129,6 +130,7 @@ interface ProductEditorForm {
   description: string;
   review_content: string;
   featuresText: string;
+  order_requirement: string;
 }
 
 function analyzeBulkAsins(text: string) {
@@ -192,6 +194,7 @@ export default function ProductsPage() {
     description: "",
     review_content: "",
     featuresText: "",
+    order_requirement: "",
   });
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
@@ -265,6 +268,7 @@ export default function ProductsPage() {
       description: product.description || "",
       review_content: product.review_content || "",
       featuresText: parseProductFeatures(product.features).join("\n"),
+      order_requirement: product.order_requirement || "",
     });
     setError("");
     setSheetMessage("");
@@ -279,6 +283,7 @@ export default function ProductsPage() {
       description: "",
       review_content: "",
       featuresText: "",
+      order_requirement: "",
     });
     setUploadingProductImage(false);
   }
@@ -510,6 +515,7 @@ export default function ProductsPage() {
           description: editorForm.description.trim() || null,
           review_content: editorForm.review_content.trim() || null,
           features,
+          order_requirement: editorForm.order_requirement.trim() || null,
         }),
       });
 
@@ -1221,6 +1227,18 @@ export default function ProductsPage() {
                 rows={4}
                 className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                 placeholder="Write a concise, original product description."
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <label className="block text-sm text-[#a0a0b8] mb-1.5">Order requirement</label>
+              <textarea
+                value={editorForm.order_requirement}
+                onChange={(event) =>
+                  setEditorForm((current) => ({ ...current, order_requirement: event.target.value }))
+                }
+                rows={3}
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                placeholder="Example: US only, minimum order 2, price under $30"
               />
             </div>
             <div>
