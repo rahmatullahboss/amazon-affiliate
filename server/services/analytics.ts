@@ -258,6 +258,116 @@ export const getAnalyticsOverview = async (db: D1Database): Promise<AnalyticsOve
   };
 };
 
+export const getMonthlyRevenueAnalytics = async (
+  db: D1Database,
+  referenceDate: string
+): Promise<{
+  summary: {
+    thisMonthRevenue: number;
+    thisMonthOrders: number;
+    thisMonthCommission: number;
+    lifetimeRevenue: number;
+    lifetimeCommission: number;
+  };
+  monthlyRevenueTrend: Array<{
+    month: string;
+    revenueAmount: number;
+    orderedItems: number;
+    commissionAmount: number;
+  }>;
+  agentMonthlyBreakdown: Array<{
+    month: string;
+    agentId: number;
+    agentName: string;
+    agentSlug: string;
+    orderedItems: number;
+    revenueAmount: number;
+    commissionAmount: number;
+  }>;
+}> => {
+  const monthStart = `${referenceDate.slice(0, 7)}-01`;
+
+  const summaryRow = await db
+    .prepare(
+      `SELECT
+         COALESCE(SUM(CASE WHEN date(raw_date) >= date(?) AND date(raw_date) < date(?, '+1 month')
+           THEN revenue_amount ELSE 0 END), 0) as thisMonthRevenue,
+         COALESCE(SUM(CASE WHEN date(raw_date) >= date(?) AND date(raw_date) < date(?, '+1 month')
+           THEN ordered_items ELSE 0 END), 0) as thisMonthOrders,
+         COALESCE(SUM(CASE WHEN date(raw_date) >= date(?) AND date(raw_date) < date(?, '+1 month')
+           THEN commission_amount ELSE 0 END), 0) as thisMonthCommission,
+         COALESCE(SUM(revenue_amount), 0) as lifetimeRevenue,
+         COALESCE(SUM(commission_amount), 0) as lifetimeCommission
+       FROM amazon_conversions`
+    )
+    .bind(monthStart, monthStart, monthStart, monthStart, monthStart, monthStart)
+    .first<{
+      thisMonthRevenue: number;
+      thisMonthOrders: number;
+      thisMonthCommission: number;
+      lifetimeRevenue: number;
+      lifetimeCommission: number;
+    }>();
+
+  const trendRows = await db
+    .prepare(
+      `SELECT
+         strftime('%Y-%m', raw_date) as month,
+         COALESCE(SUM(revenue_amount), 0) as revenueAmount,
+         COALESCE(SUM(ordered_items), 0) as orderedItems,
+         COALESCE(SUM(commission_amount), 0) as commissionAmount
+       FROM amazon_conversions
+       WHERE raw_date IS NOT NULL
+       GROUP BY strftime('%Y-%m', raw_date)
+       ORDER BY month ASC`
+    )
+    .all<{
+      month: string;
+      revenueAmount: number;
+      orderedItems: number;
+      commissionAmount: number;
+    }>();
+
+  const agentRows = await db
+    .prepare(
+      `SELECT
+         strftime('%Y-%m', ac.raw_date) as month,
+         a.id as agentId,
+         a.name as agentName,
+         a.slug as agentSlug,
+         COALESCE(SUM(ac.ordered_items), 0) as orderedItems,
+         COALESCE(SUM(ac.revenue_amount), 0) as revenueAmount,
+         COALESCE(SUM(ac.commission_amount), 0) as commissionAmount
+       FROM amazon_conversions ac
+       JOIN tracking_ids t ON t.tag = ac.tracking_tag AND t.marketplace = ac.marketplace
+       JOIN agents a ON a.id = t.agent_id
+       WHERE ac.raw_date IS NOT NULL
+       GROUP BY strftime('%Y-%m', ac.raw_date), a.id
+       ORDER BY month DESC, a.id ASC`
+    )
+    .all<{
+      month: string;
+      agentId: number;
+      agentName: string;
+      agentSlug: string;
+      orderedItems: number;
+      revenueAmount: number;
+      commissionAmount: number;
+    }>();
+
+  return {
+    summary: {
+      thisMonthRevenue: summaryRow?.thisMonthRevenue ?? 0,
+      thisMonthOrders: summaryRow?.thisMonthOrders ?? 0,
+      thisMonthCommission: summaryRow?.thisMonthCommission ?? 0,
+      lifetimeRevenue: summaryRow?.lifetimeRevenue ?? 0,
+      lifetimeCommission: summaryRow?.lifetimeCommission ?? 0,
+    },
+    monthlyRevenueTrend: trendRows.results ?? [],
+    agentMonthlyBreakdown: agentRows.results ?? [],
+  };
+};
+
 export const getAgentAnalytics = async (
   db: D1Database,
   agentId: number

@@ -642,6 +642,7 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
   if (body.description !== undefined) { updates.push('description = ?'); values.push(body.description); }
   if (body.review_content !== undefined) { updates.push('review_content = ?'); values.push(body.review_content); }
   if (body.features !== undefined) { updates.push('features = ?'); values.push(body.features ? JSON.stringify(body.features) : null); }
+  if (body.order_requirement !== undefined) { updates.push('order_requirement = ?'); values.push(body.order_requirement); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
   if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
 
@@ -682,6 +683,7 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
         descriptionUpdated: body.description !== undefined,
         reviewContentUpdated: body.review_content !== undefined,
         featuresUpdated: body.features !== undefined,
+        orderRequirementUpdated: body.order_requirement !== undefined,
         isActive: body.is_active,
         status: body.status,
       },

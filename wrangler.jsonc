@@ -53,7 +53,9 @@
     "BLOG_AI_PRIMARY_MODEL": "",
     "BLOG_AI_NEURON_DAILY_LIMIT": "10000",
     "OLLAMA_CLOUD_BASE_URL": "https://api.ollama.com",
-    "OLLAMA_CLOUD_MODEL": "minimax-m2.7:cloud"
+    "OLLAMA_CLOUD_MODEL": "minimax-m2.7:cloud",
+    "TELEGRAM_BOT_TOKEN": "",
+    "TELEGRAM_WEBHOOK_SECRET": ""
   },
 
   // Secrets (set via `wrangler secret put`):
@@ -63,4 +65,6 @@
   // - OLLAMA_CLOUD_BASE_URL (optional fallback)
   // - OLLAMA_CLOUD_API_KEY (optional fallback)
   // - OLLAMA_CLOUD_MODEL (optional fallback)
+  // - TELEGRAM_BOT_TOKEN
+  // - TELEGRAM_WEBHOOK_SECRET
 }

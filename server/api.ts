@@ -24,13 +24,21 @@ import sheets from './routes/sheets';
 import auditLogs from './routes/audit-logs';
 import blogs from './routes/blogs';
 import sheetControl from './routes/sheet-control';
+import telegram from './routes/telegram';
+import siteBranding from './routes/site-branding';
 
 const app = new Hono<AppEnv>();
 
 // ─── Global Middleware ────────────────────────────────────
 app.use('*', logger());
 app.use('*', secureHeaders());
-app.use('*', csrf());
+const csrfMiddleware = csrf();
+app.use('*', async (c, next) => {
+  if (c.req.path.startsWith('/api/public/telegram')) {
+    return next();
+  }
+  return csrfMiddleware(c, next);
+});
 
 // NOTE: No CORS middleware needed — same-origin single Worker!
 
@@ -75,6 +83,7 @@ app.get('/api/public/blog-images/*', async (c) => {
 
 // Public API endpoints for the main site
 app.route('/api/public', publicRoutes);
+app.route('/api/public/telegram', telegram);
 
 // ─── Protected Routes ────────────────────────────────────
 const adminContent = new Hono<AppEnv>();
@@ -102,6 +111,7 @@ adminOnly.route('/mappings', mappings);
 adminOnly.route('/analytics', analytics);
 adminOnly.route('/sheets', sheets);
 adminOnly.route('/sheet-control', sheetControl);
+adminOnly.route('/site-branding', siteBranding);
 adminOnly.route('/audit-logs', auditLogs);
 
 app.route('/api', adminContent);

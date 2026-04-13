@@ -3,6 +3,8 @@ export interface EditableAgentLike {
   slug: string;
   email: string | null;
   phone: string | null;
+  telegram_chat_id?: string | null;
+  telegram_bind_code?: string | null;
 }
 
 export interface AgentFormValues {

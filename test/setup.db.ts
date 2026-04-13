@@ -4,6 +4,10 @@ import type { AppEnv } from '../server/utils/types';
 
 beforeAll(async () => {
   if (!env.DB) return;
+
+  if (!env.JWT_SECRET) {
+    (env as unknown as { JWT_SECRET?: string }).JWT_SECRET = 'test-secret';
+  }
   
   try {
     // Dynamically import all migration files
