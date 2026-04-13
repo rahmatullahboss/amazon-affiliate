@@ -25,6 +25,7 @@ import auditLogs from './routes/audit-logs';
 import blogs from './routes/blogs';
 import sheetControl from './routes/sheet-control';
 import telegram from './routes/telegram';
+import siteBranding from './routes/site-branding';
 
 const app = new Hono<AppEnv>();
 
@@ -110,6 +111,7 @@ adminOnly.route('/mappings', mappings);
 adminOnly.route('/analytics', analytics);
 adminOnly.route('/sheets', sheets);
 adminOnly.route('/sheet-control', sheetControl);
+adminOnly.route('/site-branding', siteBranding);
 adminOnly.route('/audit-logs', auditLogs);
 
 app.route('/api', adminContent);

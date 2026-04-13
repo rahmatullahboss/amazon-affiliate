@@ -151,7 +151,7 @@ describe("Mappings update API", () => {
 
     expect(response.status).toBe(400);
 
-    const payload = (await response.json()) as { message: string };
-    expect(payload.message).toContain("Selected tag is for US");
+    const payload = (await response.json()) as { error?: string; message?: string };
+    expect(payload.error || payload.message).toContain("Selected tag is for US");
   });
 });
