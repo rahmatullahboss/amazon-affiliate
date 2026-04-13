@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 
 interface AmazonReport {
@@ -25,12 +25,14 @@ interface ImportFormState {
 const getToken = () => getAuthToken();
 
 export default function AdminReportsPage() {
+  const REPORTS_PER_PAGE = 10;
   const [reports, setReports] = useState<AmazonReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [form, setForm] = useState<ImportFormState>({
     marketplace: "US",
@@ -44,6 +46,18 @@ export default function AdminReportsPage() {
   useEffect(() => {
     void loadReports();
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(reports.length / REPORTS_PER_PAGE));
+  const paginatedReports = useMemo(() => {
+    const start = (currentPage - 1) * REPORTS_PER_PAGE;
+    return reports.slice(start, start + REPORTS_PER_PAGE);
+  }, [currentPage, reports]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   async function loadReports(showRefreshing = false) {
     if (showRefreshing) {
@@ -301,7 +315,7 @@ export default function AdminReportsPage() {
         ) : null}
 
         <div className="grid gap-3">
-          {reports.map((report) => (
+          {paginatedReports.map((report) => (
             <article key={report.id} className="border border-white/5 rounded-xl p-4">
               <div>
                 <div className="flex gap-2 flex-wrap mb-2">
@@ -325,6 +339,31 @@ export default function AdminReportsPage() {
             </article>
           ))}
         </div>
+        {reports.length > 0 ? (
+          <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-[#94a3b8]">
+              Page {currentPage} of {totalPages}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                disabled={currentPage === 1}
+                className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+                disabled={currentPage === totalPages}
+                className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );

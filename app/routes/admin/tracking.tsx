@@ -9,12 +9,15 @@ const getToken = () => getAuthToken();
 interface TrackingId {
   id: number; agent_id: number; tag: string; label: string | null;
   marketplace: string; is_default: number; is_active: number; is_portal_editable: number;
+  is_site_primary?: number;
+  linked_product_count?: number;
   created_at?: string;
   agent_name: string; agent_slug: string; alias_slug?: string | null;
 }
 interface Agent { id: number; name: string; slug: string; }
 
 export default function TrackingPage() {
+  const TAG_GROUPS_PER_PAGE = 8;
   const [trackingIds, setTrackingIds] = useState<TrackingId[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,9 +25,11 @@ export default function TrackingPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false, is_portal_editable: false, alias_slug: "" });
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("ALL");
   const [copiedKey, setCopiedKey] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -118,8 +123,39 @@ export default function TrackingPage() {
     };
   }, [filteredTrackingIds, groupedTrackingIds.length]);
 
+  const totalPages = Math.max(1, Math.ceil(groupedTrackingIds.length / TAG_GROUPS_PER_PAGE));
+  const paginatedGroups = useMemo(() => {
+    const start = (currentPage - 1) * TAG_GROUPS_PER_PAGE;
+    return groupedTrackingIds.slice(start, start + TAG_GROUPS_PER_PAGE);
+  }, [currentPage, groupedTrackingIds]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [marketplaceFilter, searchQuery]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const missingPrimaryMarketplaces = useMemo(() => {
+    const supported = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
+    const activePrimary = new Set(
+      trackingIds
+        .filter(
+          (item) =>
+            item.is_active === 1 &&
+            (item.is_site_primary === 1 || item.is_default === 1)
+        )
+        .map((item) => item.marketplace)
+    );
+
+    return supported.filter((marketplace) => !activePrimary.has(marketplace));
+  }, [trackingIds]);
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setError("");
+    e.preventDefault(); setError(""); setMessage("");
     try {
       const res = await fetch(editingId ? `/api/tracking/${editingId}` : "/api/tracking", {
         method: editingId ? "PUT" : "POST",
@@ -147,13 +183,27 @@ export default function TrackingPage() {
         );
       }
       setShowForm(false); setEditingId(null); setForm({ agent_id: 0, tag: "", label: "", marketplace: "US", is_default: false, is_portal_editable: false, alias_slug: "" });
+      setMessage(editingId ? "Tag updated successfully." : "Tag created successfully.");
       fetchAll();
     } catch (err) { setError(err instanceof Error ? err.message : "Failed"); }
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Delete this tag?")) return;
-    await fetch(`/api/tracking/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${getToken()}` } });
+  const handleDelete = async (id: number, force = false) => {
+    setError("");
+    setMessage("");
+    const response = await fetch(`/api/tracking/${id}${force ? "?force=1" : ""}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    if (!response.ok) {
+      const data = (await response.json()) as unknown;
+      setError(extractApiErrorMessage(data, "Failed to delete tag"));
+      return;
+    }
+
+    const payload = (await response.json()) as { message?: string };
+    setMessage(payload.message || "Tag deleted successfully.");
     fetchAll();
   };
 
@@ -199,6 +249,45 @@ export default function TrackingPage() {
           </div>
         ))}
       </div>
+
+      {missingPrimaryMarketplaces.length > 0 ? (
+        <div className="mb-6 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-100">
+          <p className="m-0 text-xs font-bold uppercase tracking-[0.18em] text-red-200">Missing Tracking</p>
+          <p className="mt-2 mb-0 leading-relaxed">
+            Main-site CTA can stay hidden for these marketplaces until an active primary tag exists:{" "}
+            <strong>{missingPrimaryMarketplaces.join(", ")}</strong>
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {missingPrimaryMarketplaces.map((marketplace) => (
+              <button
+                key={marketplace}
+                type="button"
+                onClick={() => {
+                  setMarketplaceFilter(marketplace);
+                  setShowForm(true);
+                  setEditingId(null);
+                  setError("");
+                  setMessage("");
+                  setForm((current) => ({
+                    ...current,
+                    marketplace,
+                    is_default: true,
+                  }));
+                }}
+                className="rounded-full border border-red-300/20 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-50 transition-colors hover:bg-red-500/20"
+              >
+                Add {marketplace} tag
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {message ? (
+        <div className="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+          {message}
+        </div>
+      ) : null}
 
       <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-4">
@@ -280,7 +369,7 @@ export default function TrackingPage() {
 
       {loading ? <p className="text-[#6b6b85] m-0">Loading...</p> : (
         <div className="flex flex-col gap-4">
-          {groupedTrackingIds.map((group) => (
+          {paginatedGroups.map((group) => (
             <section key={group.agent.agent_id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 sm:p-5">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <div>
@@ -368,7 +457,27 @@ export default function TrackingPage() {
                       >
                         Edit
                       </button>
-                      <button onClick={() => void handleDelete(t.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors">Delete</button>
+                      <button
+                        onClick={() => {
+                          if (!confirm("Delete this tag?")) return;
+                          void handleDelete(t.id);
+                        }}
+                        className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-500 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors"
+                      >
+                        Delete
+                      </button>
+                      <button
+                        onClick={() => {
+                          const confirmed = confirm(
+                            `Force delete this ${t.marketplace} tag? Any linked products will move to the active default ${t.marketplace} tag.`
+                          );
+                          if (!confirmed) return;
+                          void handleDelete(t.id, true);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-300 text-xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors"
+                      >
+                        Force Delete
+                      </button>
                       </div>
                     </div>
                   </div>
@@ -376,6 +485,31 @@ export default function TrackingPage() {
               </div>
             </section>
           ))}
+          {groupedTrackingIds.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[#94a3b8]">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
           {groupedTrackingIds.length === 0 && <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">No tags found for the current filter.</p>}
         </div>
       )}

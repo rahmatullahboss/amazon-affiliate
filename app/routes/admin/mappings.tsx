@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
-import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
+import { buildMarketplaceReadyLink } from "../../utils/public-links";
 
 const getToken = () => getAuthToken();
 
@@ -14,6 +14,7 @@ interface Product { id: number; asin: string; title: string; }
 interface TrackId { id: number; tag: string; agent_id: number; label: string | null; }
 
 export default function MappingsPage() {
+  const MAPPINGS_PER_PAGE = 12;
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -22,6 +23,7 @@ export default function MappingsPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ agent_id: 0, product_id: 0, tracking_id: 0, custom_title: "" });
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -41,6 +43,17 @@ export default function MappingsPage() {
   };
 
   const filteredTracking = trackingIds.filter(t => t.agent_id === Number(form.agent_id));
+  const totalPages = Math.max(1, Math.ceil(mappings.length / MAPPINGS_PER_PAGE));
+  const paginatedMappings = useMemo(() => {
+    const start = (currentPage - 1) * MAPPINGS_PER_PAGE;
+    return mappings.slice(start, start + MAPPINGS_PER_PAGE);
+  }, [currentPage, mappings]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setError("");
@@ -65,8 +78,8 @@ export default function MappingsPage() {
     fetchAll();
   };
 
-  const copyLink = (slug: string, marketplace: string) => {
-    const link = buildMarketplaceReadyLinkTemplate(window.location.origin, slug, marketplace);
+  const copyLink = (slug: string, marketplace: string, asin: string) => {
+    const link = buildMarketplaceReadyLink(window.location.origin, slug, marketplace, asin);
     navigator.clipboard.writeText(link);
     alert(`Link copied: ${link}`);
   };
@@ -123,7 +136,7 @@ export default function MappingsPage() {
 
       {loading ? <p className="text-[#6b6b85] m-0">Loading...</p> : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-          {mappings.map(m => (
+          {paginatedMappings.map(m => (
             <div key={m.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl flex flex-col gap-4 p-5 justify-between">
               <div className="flex items-center gap-3">
                 <img src={m.image_url} alt="" className="w-12 h-12 object-contain rounded-lg bg-white shrink-0 p-1" />
@@ -133,7 +146,7 @@ export default function MappingsPage() {
                 </div>
               </div>
               <div className="flex gap-2 justify-end mt-auto pt-2 border-t border-white/5">
-                <button onClick={() => void copyLink(m.agent_slug, m.tracking_marketplace)} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-md text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors">📋 Copy Link</button>
+                <button onClick={() => void copyLink(m.agent_slug, m.tracking_marketplace, m.asin)} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 rounded-md text-xs font-medium cursor-pointer hover:bg-indigo-500/20 transition-colors">📋 Copy Link</button>
                 <button onClick={() => void handleDelete(m.id)} className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 text-red-400 rounded-md text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors">Delete</button>
               </div>
             </div>
@@ -141,6 +154,31 @@ export default function MappingsPage() {
           {mappings.length === 0 && <p className="col-span-1 md:col-span-2 xl:col-span-3 text-center text-[#6b6b85] p-8 m-0">No mappings yet. Create one to generate shareable links.</p>}
         </div>
       )}
+      {mappings.length > 0 ? (
+        <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[#94a3b8]">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

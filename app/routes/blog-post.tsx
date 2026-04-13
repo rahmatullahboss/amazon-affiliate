@@ -1,7 +1,16 @@
 import type { Route } from "./+types/blog-post";
 import { Link } from "react-router";
-import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
-import { buildMarketplaceAwareDealsHref, orderBlogPostsForMarketplace } from "../utils/blog-personalization";
+import {
+  buildBlogExcerpt,
+  buildBlogImageUrl,
+  estimateReadingMinutes,
+  resolveBlogAmazonCtaUrl,
+} from "../../server/services/blog";
+import {
+  buildMarketplaceAwareDealsHref,
+  filterBlogPostsForMarketplace,
+  orderBlogPostsForMarketplace,
+} from "../utils/blog-personalization";
 import {
   AMAZON_DESTINATION_NOTE,
   AMAZON_PRIMARY_CTA_LABEL,
@@ -11,8 +20,7 @@ import {
 import { resolvePreferredMarketplace } from "../utils/marketplace";
 import type { PublicMarketplace } from "../utils/marketplace";
 import { buildCanonicalUrl, PUBLIC_SITE_URL } from "../utils/seo";
-import { formatBlogDate, splitBlogContent } from "../utils/blog";
-import { buildAmazonUrl } from "../../server/utils/types";
+import { buildBlogContentHtml, formatBlogDate } from "../utils/blog";
 
 interface BlogPostData {
   id: number;
@@ -164,13 +172,19 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
           }>()
       : null;
 
-  const directAmazonUrl = await resolveDirectAmazonUrl({
-    db: env.DB,
-    ctaUrl: row.cta_url,
-    preferredMarketplace,
-    generationFocusAsin: row.generation_focus_asin,
-    generationMarketplace: row.generation_marketplace,
-  });
+  const isMarketplaceAligned =
+    !row.generation_marketplace ||
+    row.generation_marketplace.trim().toUpperCase() === preferredMarketplace;
+
+  const directAmazonUrl = isMarketplaceAligned
+    ? await resolveBlogAmazonCtaUrl({
+        db: env.DB,
+        ctaUrl: row.cta_url,
+        preferredMarketplace,
+        generationFocusAsin: row.generation_focus_asin,
+        generationMarketplace: row.generation_marketplace,
+      })
+    : null;
 
   return {
     ...row,
@@ -187,15 +201,21 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
         }
       : null,
     directAmazonUrl,
-    relatedPosts: orderBlogPostsForMarketplace(relatedRows ?? [], preferredMarketplace).slice(0, 3),
+    relatedPosts: orderBlogPostsForMarketplace(
+      filterBlogPostsForMarketplace(relatedRows ?? [], preferredMarketplace),
+      preferredMarketplace
+    ).slice(0, 3),
   } satisfies BlogPostData;
 }
 
 export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
   const post = loaderData as BlogPostData;
-  const paragraphs = splitBlogContent(post.content);
+  const contentHtml = buildBlogContentHtml(post.content);
   const articleUrl = buildCanonicalUrl(`/blog/${post.slug}`);
   const amazonCtaHref = post.directAmazonUrl;
+  const showMarketplaceProductBlocks =
+    !post.generation_marketplace ||
+    post.generation_marketplace.trim().toUpperCase() === post.preferredMarketplace;
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -257,16 +277,13 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
         ) : null}
 
         <div className="mt-10 rounded-[2rem] border border-gray-200 bg-white p-7 shadow-sm md:p-10">
-          <div className="prose prose-lg max-w-none prose-p:leading-8 prose-headings:text-gray-950 prose-p:text-gray-700">
-            {paragraphs.map((paragraph, index) => (
-              <p key={`${post.id}-${index}`} className="mb-6 text-base leading-8 text-gray-700 last:mb-0">
-                {paragraph}
-              </p>
-            ))}
-          </div>
+          <div
+            className="prose prose-lg max-w-none prose-p:my-5 prose-p:leading-8 prose-h2:mt-10 prose-h2:mb-4 prose-h3:mt-8 prose-h3:mb-3 prose-ul:my-6 prose-li:my-1 prose-headings:text-gray-950 prose-p:text-gray-700 prose-a:text-primary prose-strong:text-gray-950"
+            dangerouslySetInnerHTML={{ __html: contentHtml }}
+          />
         </div>
 
-        {post.featuredProduct?.imageUrl ? (
+        {showMarketplaceProductBlocks && post.featuredProduct?.imageUrl ? (
           <div className="mt-8 rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-5 md:flex-row md:items-center">
               <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50 md:w-56 md:shrink-0">
@@ -297,16 +314,13 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
                       {post.cta_label || AMAZON_PRIMARY_CTA_LABEL}
                     </a>
                   ) : null}
-                  <span className="inline-flex items-center justify-center rounded-full border border-gray-300 px-4 py-3 text-xs font-bold uppercase tracking-[0.22em] text-gray-500">
-                    {post.featuredProduct.asin}
-                  </span>
                 </div>
               </div>
             </div>
           </div>
         ) : null}
 
-        {post.cta_url && amazonCtaHref ? (
+        {showMarketplaceProductBlocks && post.cta_url && amazonCtaHref ? (
           <div className="mt-8 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6">
             <h2 className="text-2xl font-black text-gray-950">Ready to check this on Amazon?</h2>
             <p className="mt-3 text-sm leading-7 text-gray-600">
@@ -375,54 +389,4 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
       </div>
     </article>
   );
-}
-
-function extractAsinFromDealsUrl(ctaUrl: string | null): string | null {
-  if (!ctaUrl) {
-    return null;
-  }
-
-  const directMatch = ctaUrl.match(/\/deals\/([A-Z0-9]{10})(?:[/?#]|$)/i);
-  if (directMatch) {
-    return directMatch[1].toUpperCase();
-  }
-
-  return null;
-}
-
-async function resolveDirectAmazonUrl(input: {
-  db: D1Database;
-  ctaUrl: string | null;
-  preferredMarketplace: PublicMarketplace;
-  generationFocusAsin: string | null;
-  generationMarketplace: string | null;
-}): Promise<string | null> {
-  if (input.ctaUrl && /^https:\/\/www\.amazon\./i.test(input.ctaUrl)) {
-    return input.ctaUrl;
-  }
-
-  const asin = input.generationFocusAsin || extractAsinFromDealsUrl(input.ctaUrl);
-  const marketplace = (input.generationMarketplace || input.preferredMarketplace || "US").toUpperCase();
-
-  if (!asin) {
-    return null;
-  }
-
-  const tagRow = await input.db
-    .prepare(
-      `SELECT tag
-       FROM tracking_ids
-       WHERE marketplace = ?
-         AND is_active = 1
-         AND is_site_primary = 1
-       LIMIT 1`
-    )
-    .bind(marketplace)
-    .first<{ tag: string }>();
-
-  if (!tagRow?.tag) {
-    return null;
-  }
-
-  return buildAmazonUrl(asin, tagRow.tag, marketplace);
 }

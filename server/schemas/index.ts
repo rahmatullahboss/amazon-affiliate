@@ -5,7 +5,7 @@ export const MARKETPLACES = ['US', 'CA', 'UK', 'DE', 'IT', 'FR', 'ES'] as const;
 export type Marketplace = (typeof MARKETPLACES)[number];
 export const PRODUCT_STATUSES = ['active', 'pending_review', 'rejected'] as const;
 export type ProductStatus = (typeof PRODUCT_STATUSES)[number];
-export const BLOG_STATUSES = ['draft', 'published'] as const;
+export const BLOG_STATUSES = ['draft', 'scheduled', 'published'] as const;
 export type BlogStatus = (typeof BLOG_STATUSES)[number];
 
 function normalizeTrackingTag(value: string): string {
@@ -141,6 +141,7 @@ export const bulkAssignMappingsSchema = z.object({
 export const updateMappingSchema = z.object({
   tracking_id: z.number().int().positive().optional(),
   custom_title: z.string().max(500).optional().nullable(),
+  show_on_homepage: z.boolean().optional(),
 });
 
 // ─── Auth Schemas ──────────────────────────────────────
@@ -314,6 +315,7 @@ export const createBlogPostSchema = z.object({
   status: z.enum(BLOG_STATUSES).default('draft'),
   is_featured: z.boolean().default(false),
   published_at: z.string().optional().nullable(),
+  scheduled_for: z.string().datetime().optional().nullable(),
 });
 
 export const updateBlogPostSchema = createBlogPostSchema.partial().extend({

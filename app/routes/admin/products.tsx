@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ASIN_IMPORT_ENABLED,
   ASIN_IMPORT_PAUSED_DETAIL,
@@ -36,6 +36,7 @@ interface ProductMapping {
   tracking_is_active: number;
   tracking_marketplace: string;
   custom_title: string | null;
+  show_on_homepage: number;
 }
 
 interface TrackingOption {
@@ -51,6 +52,7 @@ interface AgentOption {
   id: number;
   name: string;
   slug: string;
+  is_active: number;
 }
 
 interface ProductPagination {
@@ -198,7 +200,9 @@ export default function ProductsPage() {
   const [productMappings, setProductMappings] = useState<ProductMapping[]>([]);
   const [trackingOptions, setTrackingOptions] = useState<TrackingOption[]>([]);
   const [agentOptions, setAgentOptions] = useState<AgentOption[]>([]);
+  const [showInactiveAgents, setShowInactiveAgents] = useState(false);
   const [changingMappingId, setChangingMappingId] = useState<number | null>(null);
+  const [togglingHomepageMappingId, setTogglingHomepageMappingId] = useState<number | null>(null);
   const [mappingTagSelection, setMappingTagSelection] = useState<Record<number, number>>({});
   const [addingMappingProductId, setAddingMappingProductId] = useState<number | null>(null);
   const [mappingDraft, setMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
@@ -228,6 +232,11 @@ export default function ProductsPage() {
   const [sheetImporting, setSheetImporting] = useState(false);
   const [sheetExporting, setSheetExporting] = useState(false);
   const [sheetMessage, setSheetMessage] = useState("");
+
+  const visibleAgentOptions = useMemo(
+    () => (showInactiveAgents ? agentOptions : agentOptions.filter((agent) => agent.is_active === 1)),
+    [agentOptions, showInactiveAgents]
+  );
 
   function parseProductFeatures(features: Product["features"]): string[] {
     if (Array.isArray(features)) {
@@ -580,6 +589,46 @@ export default function ProductsPage() {
         requestError instanceof Error ? requestError.message : "Failed to change tracking tag"
       );
       setChangingMappingId(null);
+    }
+  }
+
+  async function handleHomepageMappingToggle(mapping: ProductMapping) {
+    setTogglingHomepageMappingId(mapping.id);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const response = await fetch(`/api/mappings/${mapping.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({
+          show_on_homepage: mapping.show_on_homepage !== 1,
+        }),
+      });
+
+      const payload = (await response.json()) as unknown;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to update homepage visibility"));
+      }
+
+      setSheetMessage(
+        mapping.show_on_homepage === 1
+          ? "Removed product from homepage feed."
+          : "Added product to homepage feed."
+      );
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Failed to update homepage visibility"
+      );
+    } finally {
+      setTogglingHomepageMappingId(null);
     }
   }
 
@@ -1737,6 +1786,17 @@ export default function ProductsPage() {
                   <input
                     type="checkbox"
                     className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
+                    checked={showInactiveAgents}
+                    onChange={(event) => setShowInactiveAgents(event.target.checked)}
+                  />
+                  Show previous / inactive agents
+                </label>
+              ) : null}
+              {!isEditor ? (
+                <label className="inline-flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 rounded border-white/10 bg-white/5 text-[#ff9900] focus:ring-[#ff9900]"
                     checked={allVisibleSelected}
                     onChange={(event) => toggleVisibleSelection(event.target.checked)}
                   />
@@ -1794,9 +1854,9 @@ export default function ProductsPage() {
                   className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
                 >
                   <option value={0}>Select agent for selected products</option>
-                  {agentOptions.map((agent) => (
+                  {visibleAgentOptions.map((agent) => (
                     <option key={agent.id} value={agent.id}>
-                      {agent.name} (/{agent.slug})
+                      {agent.name} (/{agent.slug}){agent.is_active === 1 ? "" : " · Inactive"}
                     </option>
                   ))}
                 </select>
@@ -1955,6 +2015,17 @@ export default function ProductsPage() {
                                 <p className="mt-2 text-xs text-[#8d8da6] m-0">
                                   /{mapping.agent_slug} · {mapping.tracking_marketplace}
                                 </p>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  {mapping.show_on_homepage === 1 ? (
+                                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-bold text-emerald-300">
+                                      Homepage visible
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-white/8 px-2 py-0.5 text-[11px] font-bold text-[#9ca3af]">
+                                      Homepage hidden
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="mt-3 flex flex-col gap-2">
                                   <select
                                     value={selectedTrackingId}
@@ -1990,6 +2061,23 @@ export default function ProductsPage() {
                                       {changingMappingId === mapping.id ? "Saving..." : "Change Tag"}
                                     </button>
                                     <button
+                                      onClick={() => void handleHomepageMappingToggle(mapping)}
+                                      disabled={togglingHomepageMappingId === mapping.id}
+                                      className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
+                                        togglingHomepageMappingId === mapping.id
+                                          ? "border-white/10 bg-white/5 text-[#6b6b85] cursor-not-allowed"
+                                          : mapping.show_on_homepage === 1
+                                            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
+                                            : "border-sky-500/30 bg-sky-500/10 text-sky-200 hover:bg-sky-500/20"
+                                      }`}
+                                    >
+                                      {togglingHomepageMappingId === mapping.id
+                                        ? "Saving..."
+                                        : mapping.show_on_homepage === 1
+                                          ? "Remove from Homepage"
+                                          : "Show on Homepage"}
+                                    </button>
+                                    <button
                                       onClick={() => void handleMappingRemove(mapping.id)}
                                       disabled={removingMappingId === mapping.id}
                                       className={`flex-1 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
@@ -2022,9 +2110,9 @@ export default function ProductsPage() {
                               className="w-full rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-sm text-[#f0f0f5] outline-none focus:border-[#ff9900]"
                             >
                               <option value={0}>Select agent</option>
-                              {agentOptions.map((agent) => (
+                              {visibleAgentOptions.map((agent) => (
                                 <option key={agent.id} value={agent.id}>
-                                  {agent.name} (/{agent.slug})
+                                  {agent.name} (/{agent.slug}){agent.is_active === 1 ? "" : " · Inactive"}
                                 </option>
                               ))}
                             </select>

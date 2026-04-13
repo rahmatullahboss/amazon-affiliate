@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMarketplaceAwareDealsHref,
+  filterBlogPostsForMarketplace,
   orderBlogPostsForMarketplace,
   type PersonalizedBlogSummary,
 } from "../../app/utils/blog-personalization";
@@ -64,5 +65,11 @@ describe("blog personalization helpers", () => {
     expect(buildMarketplaceAwareDealsHref("/deals?source=blog", "US")).toBe(
       "/deals?source=blog&market=US"
     );
+  });
+
+  it("filters out ai posts from other marketplaces while keeping global manual posts", () => {
+    const filtered = filterBlogPostsForMarketplace(basePosts, "FR");
+
+    expect(filtered.map((post) => post.slug)).toEqual(["global-manual-guide"]);
   });
 });

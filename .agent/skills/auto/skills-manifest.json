@@ -1,19 +1,19 @@
 {
   "project": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.220Z",
-    "observationCount": 814,
+    "lastGenerated": "2026-04-12T03:20:45.271Z",
+    "observationCount": 905,
     "skillCount": 0,
     "domain": "project",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Project for amazon-affiliate. 75 gotchas, 242 conventions, 17 fixes."
+    "description": "Project for amazon-affiliate. 97 gotchas, 263 conventions, 29 fixes."
   },
   "config": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.220Z",
-    "observationCount": 163,
+    "lastGenerated": "2026-04-12T03:20:45.271Z",
+    "observationCount": 237,
     "skillCount": 0,
     "domain": "config",
     "triggerGlobs": [
@@ -22,34 +22,34 @@
       "**/*.json",
       "**/*.toml"
     ],
-    "description": "Config for amazon-affiliate. 12 gotchas, 30 conventions, 11 fixes."
+    "description": "Config for amazon-affiliate. 17 gotchas, 41 conventions, 17 fixes."
   },
   "typescript-react": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.220Z",
-    "observationCount": 363,
+    "lastGenerated": "2026-04-12T03:20:45.271Z",
+    "observationCount": 386,
     "skillCount": 0,
     "domain": "typescript-react",
     "triggerGlobs": [
       "**/*.tsx"
     ],
-    "description": "Typescript React for amazon-affiliate. 57 gotchas, 79 conventions, 67 fixes, 1 error→fix pairs."
+    "description": "Typescript React for amazon-affiliate. 62 gotchas, 87 conventions, 72 fixes, 2 error→fix pairs."
   },
   "typescript": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.220Z",
-    "observationCount": 1107,
+    "lastGenerated": "2026-04-12T03:20:45.270Z",
+    "observationCount": 1119,
     "skillCount": 0,
     "domain": "typescript",
     "triggerGlobs": [
       "**/*.ts",
       "**/*.tsx"
     ],
-    "description": "Typescript for amazon-affiliate. 80 gotchas, 248 conventions, 107 fixes."
+    "description": "Typescript for amazon-affiliate. 81 gotchas, 251 conventions, 110 fixes."
   },
   "html": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.220Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 4,
     "skillCount": 0,
     "domain": "html",
@@ -60,7 +60,7 @@
   },
   "database": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 6,
     "skillCount": 0,
     "domain": "database",
@@ -71,7 +71,7 @@
   },
   "javascript": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 4,
     "skillCount": 0,
     "domain": "javascript",
@@ -83,8 +83,8 @@
   },
   "css": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
-    "observationCount": 4,
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
+    "observationCount": 5,
     "skillCount": 0,
     "domain": "css",
     "triggerGlobs": [
@@ -95,9 +95,9 @@
   },
   "convention": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 0,
-    "skillCount": 111,
+    "skillCount": 114,
     "domain": "convention",
     "triggerGlobs": [
       "**/*"
@@ -106,9 +106,9 @@
   },
   "decision": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 0,
-    "skillCount": 6,
+    "skillCount": 7,
     "domain": "decision",
     "triggerGlobs": [
       "**/*"
@@ -117,9 +117,9 @@
   },
   "gotcha": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.272Z",
     "observationCount": 0,
-    "skillCount": 14,
+    "skillCount": 16,
     "domain": "gotcha",
     "triggerGlobs": [
       "**/*"
@@ -128,14 +128,14 @@
   },
   "problem-fix": {
     "enabled": true,
-    "lastGenerated": "2026-04-11T09:52:53.221Z",
+    "lastGenerated": "2026-04-12T03:20:45.273Z",
     "observationCount": 0,
     "skillCount": 2,
     "domain": "problem-fix",
     "triggerGlobs": [
       "**/*"
     ],
-    "description": "Problem Fix for amazon-affiliate. 35 error→fix pairs."
+    "description": "Problem Fix for amazon-affiliate. 41 error→fix pairs."
   },
   "shell": {
     "enabled": true,

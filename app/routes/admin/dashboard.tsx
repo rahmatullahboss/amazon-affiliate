@@ -38,10 +38,25 @@ interface OverviewData {
   }>;
 }
 
+interface DashboardTrackingId {
+  id: number;
+  marketplace: string;
+  is_active: number;
+  is_default: number;
+  is_site_primary?: number;
+}
+
+interface DashboardBlogPost {
+  id: number;
+  status: "draft" | "scheduled" | "published";
+}
+
 export default function Dashboard() {
   const [data, setData] = useState<OverviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [draftApprovalCount, setDraftApprovalCount] = useState(0);
+  const [missingPrimaryMarketplaces, setMissingPrimaryMarketplaces] = useState<string[]>([]);
 
   useEffect(() => { fetchData(); }, []);
 
@@ -51,15 +66,46 @@ export default function Dashboard() {
 
     try {
       const token = getAuthToken();
-      const res = await fetch("/api/analytics/overview", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const headers = { Authorization: `Bearer ${token}` };
+      const [overviewRes, blogsRes, trackingRes] = await Promise.all([
+        fetch("/api/analytics/overview", { headers }),
+        fetch("/api/blogs?status=draft", { headers }),
+        fetch("/api/tracking", { headers }),
+      ]);
 
-      if (!res.ok) {
+      if (!overviewRes.ok) {
         throw new Error("Failed to load dashboard analytics");
       }
 
-      setData(await res.json());
+      setData(await overviewRes.json());
+
+      if (blogsRes.ok) {
+        const blogPayload = (await blogsRes.json()) as { posts?: DashboardBlogPost[] };
+        setDraftApprovalCount((blogPayload.posts ?? []).filter((post) => post.status === "draft").length);
+      } else {
+        setDraftApprovalCount(0);
+      }
+
+      if (trackingRes.ok) {
+        const trackingPayload = (await trackingRes.json()) as { trackingIds?: DashboardTrackingId[] };
+        const trackingIds = trackingPayload.trackingIds ?? [];
+        const supportedMarketplaces = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
+        const activePrimaryMarketplaces = new Set(
+          trackingIds
+            .filter(
+              (item) =>
+                item.is_active === 1 &&
+                (item.is_site_primary === 1 || item.is_default === 1)
+            )
+            .map((item) => item.marketplace)
+        );
+
+        setMissingPrimaryMarketplaces(
+          supportedMarketplaces.filter((marketplace) => !activePrimaryMarketplaces.has(marketplace))
+        );
+      } else {
+        setMissingPrimaryMarketplaces([]);
+      }
     } catch (requestError) {
       console.error("Failed to fetch dashboard data:", requestError);
       setError(requestError instanceof Error ? requestError.message : "Failed to load dashboard analytics");
@@ -115,6 +161,54 @@ export default function Dashboard() {
           Refresh Dashboard
         </button>
       </div>
+
+      {draftApprovalCount > 0 || missingPrimaryMarketplaces.length > 0 ? (
+        <div className="grid gap-4 mb-8 lg:grid-cols-2">
+          {draftApprovalCount > 0 ? (
+            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="m-0 text-xs font-bold uppercase tracking-[0.22em] text-amber-200">Approval Alert</p>
+                  <h2 className="mt-2 text-lg font-bold text-[#f0f0f5]">
+                    {draftApprovalCount} post{draftApprovalCount === 1 ? "" : "s"} waiting for approval
+                  </h2>
+                  <p className="mt-2 mb-0 text-sm leading-7 text-amber-100/90">
+                    Review the draft queue and publish approved posts from the blog manager.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/blogs"
+                  className="inline-flex items-center justify-center rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#111111] no-underline transition hover:brightness-105"
+                >
+                  Review posts
+                </Link>
+              </div>
+            </div>
+          ) : null}
+
+          {missingPrimaryMarketplaces.length > 0 ? (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="m-0 text-xs font-bold uppercase tracking-[0.22em] text-red-200">Tracking Alert</p>
+                  <h2 className="mt-2 text-lg font-bold text-[#f0f0f5]">
+                    Primary tag missing for {missingPrimaryMarketplaces.join(", ")}
+                  </h2>
+                  <p className="mt-2 mb-0 text-sm leading-7 text-red-100/90">
+                    Main-site Amazon CTA can be hidden for these marketplaces until an active primary tag is set.
+                  </p>
+                </div>
+                <Link
+                  to="/admin/tracking"
+                  className="inline-flex items-center justify-center rounded-lg bg-red-300 px-4 py-2 text-sm font-semibold text-[#111111] no-underline transition hover:brightness-105"
+                >
+                  Fix tags
+                </Link>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-10">
         {stats.map((stat) => (

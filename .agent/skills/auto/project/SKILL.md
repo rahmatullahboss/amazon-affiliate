@@ -1,6 +1,6 @@
 ---
 name: project
-description: "Project for amazon-affiliate. 75 gotchas, 242 conventions, 17 fixes."
+description: "Project for amazon-affiliate. 97 gotchas, 263 conventions, 29 fixes."
 domain: project
 triggers:
   - glob: "**/*"
@@ -10,7 +10,7 @@ enabled: true
 
 # Project
 
-Auto-compiled from **814 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
+Auto-compiled from **905 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on project files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -18,6 +18,28 @@ Auto-compiled from **814 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| gotcha in agent-rules.md | File updated (external): .brainsync/agent-rules.md  Content summary (94 lines): # Project Intelligen |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - gotcha in shared-context.json - - ⚠️ GOTCHA: Optimized Score + - |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: problem-fix in agent-r |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: problem-fix in agent-rules.md + - ⚠️ GOTCHA: Optimized Score - - ⚠️ GOTCHA: Optimized |
+| ⚠️ GOTCHA: Optimized Score | - > 2495 notes - Score threshold: >40 + > 2536 notes - Score threshold: >40 - - **⚠️ GOTCHA: Fixed n |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - problem-fix in shared-context.json + - problem-fix in agent-rules.md - - Fixed null crash in Mat |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - gotcha in shared-context.json + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Optimized GOTCHA +  |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - gotcha in shared-context.json - - gotcha in shared-context.json  |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - gotcha in shared-context.json + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Fixed null crash in |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Fixed null crash in Mapping — avoids unnecessary re-renders in React + - gotcha in sh |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2482 notes - Score threshold: >40 + > 2495 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - problem-fix in blog.ts + - problem-fix in agent-rules.md - - problem-fix in blogs.ts + - problem |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - problem-fix in blogs.ts + - problem-fix in blog.ts - - problem-fix in agent-rules.md + - problem |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - ⚠️ GOTCHA: problem-fix in agent-rules.md - - ⚠️ GOTCHA: problem- |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in PublicMarketplace — prevents null/undefined runtime crashes + - problem-fix  |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: problem-fix  |
+| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in SELECT — prevents null/undefined runtime crashes + - problem-fix in agent-ru |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2419 notes - Score threshold: >40 + > 2437 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Fixed null crash in AppLoadContext — reduces initial bundle size with code sp... + -  |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2413 notes - Score threshold: >40 + > 2419 notes - Score threshold: >40 - - **gotcha in shared-c |
+| ⚠️ GOTCHA: Optimized GOTCHA | - - gotcha in shared-context.json + - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for |
+| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2406 notes - Score threshold: >40 + > 2413 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
 | ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2351 notes - Score threshold: >40 + > 2358 notes - Score threshold: >40 - - **⚠️ GOTCHA: Patched |
 | ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Patched security issue |
 | ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Patched security issue Patched + - ⚠️ GOTCHA: Optimized Score - - ⚠️ GOTCHA: Patched  |
@@ -46,135 +68,122 @@ Auto-compiled from **814 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2100 notes - Score threshold: >40 + > 2111 notes - Score threshold: >40 - - **gotcha in shared-c |
 | ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
 | ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - gotcha in shared-context.json + - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2094 notes - Score threshold: >40 + > 2100 notes - Score threshold: >40 - +       "id": "3381552 |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2076 notes - Score threshold: >40 + > 2080 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2068 notes - Score threshold: >40 + > 2076 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - gotcha in shared-contex |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 2028 notes - Score threshold: >40 + > 2062 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
-| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in Array — offloads heavy computation off the main thread + - Fixed null crash  |
-| ⚠️ GOTCHA: Optimized Score | - > 2009 notes - Score threshold: >40 + > 2028 notes - Score threshold: >40 - - **gotcha in shared-c |
-| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Fixed null crash in Array — offloads heavy computation off the main thread + - problem-fix in ag |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1952 notes - Score threshold: >40 + > 2009 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
-| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Patched security issue ZuKiASvYEzKvkGoIVWd + - problem-fix in blog-generation.ts - - Patched sec |
-| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - Patched security issue KUKB + - Patched security issue ZuKiASvYEzKvkGoIVWd - - problem-fix in bl |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1934 notes - Score threshold: >40 + > 1937 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
-| ⚠️ GOTCHA: Optimized Score | - > 1932 notes - Score threshold: >40 + > 1934 notes - Score threshold: >40 - - **⚠️ GOTCHA: problem |
-| ⚠️ GOTCHA: Optimized Score | - > 1922 notes - Score threshold: >40 + > 1932 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
-| ⚠️ GOTCHA: problem-fix in agent-rules.md | - - problem-fix in blog-generation.ts + - problem-fix in agent-rules.md - - problem-fix in api-error |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Patched security issue Score + - ⚠️ GOTCHA: Optimized GOTCHA - - ⚠️ GOTCHA: Optimized |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - ⚠️ GOTCHA: Patched security issue Score - - ⚠️ GOTCHA: Optimized |
-| ⚠️ GOTCHA: Patched security issue Score | - > 1910 notes - Score threshold: >40 + > 1912 notes - Score threshold: >40 - - what-changed in shar |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed + - ⚠️ GOTCHA: Optimized GO |
-| ⚠️ GOTCHA: Optimized GOTCHA | - - ⚠️ GOTCHA: Optimized GOTCHA + - ⚠️ GOTCHA: Optimized Score — parallelizes async operations for s |
-| ⚠️ GOTCHA: Optimized Score — parallelizes async op | - > 1901 notes - Score threshold: >40 + > 1903 notes - Score threshold: >40 - - **⚠️ GOTCHA: Optimiz |
 
 ## 🔧 Problem Playbooks
 
-### Patched security issue Patched
-- - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
-+ - Patched security issue UeIDDQ
-- - Fixed null crash in MarketplaceSelectionSource — protects against XSS and CSR...
-+ - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
-- - Fixed null crash in ProductRow — prevents null/undefined runtime crashes
-+ - Fixed null crash in MarketplaceSelectionSource
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Patched
-3. identifier: UeIDDQ
-4. identifier: Fixed
-5. identifier: ProductRow
-
 ### problem-fix in agent-rules.md
-- - Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
-+ - Patched security issue JIxAZxJNe
-- - Fixed null crash in Array — offloads heavy computation off the main thread
-+ - Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
-- - problem-fix in blog-generation.ts
-+ - Fixed null crash in Array — offloads heavy computation off the main thre
+- - Fixed null crash in Math — avoids unnecessary re-renders in React
++ - problem-fix in shared-context.json
+- - problem-fix in agent-rules.md
++ - Fixed null crash in Math — avoids unnecessary re-renders in React
+- - Fixed null crash in AgentFormState — avoids unnecessary re-renders in React
++ - problem-fix in agent-rules.md
+- - problem-fix in agent-rules.md
++ - Fixed null crash in AgentFormState 
 
 **Actionable Steps:**
 1. Modified 1 files
 
 ### problem-fix in agent-rules.md
-- - Fixed null crash in Array — offloads heavy computation off the main thread
+- - Patched security issue EZAL
++ - problem-fix in agent-rules.md
+- - Fixed null crash in TrackingId — avoids unnecessary re-renders in React
++ - Patched security issue EZAL
+- - Patched security issue ZluVcwM
++ - Fixed null crash in TrackingId — avoids unnecessary re-renders in React
+- - problem-fix in agent-rules.md
++ - Patched security issue ZluVcwM
+- - problem-fix in blog.ts
++ - problem-fix in 
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - Patched security issue ZluVcwM
++ - Patched security issue EZAL
+- - problem-fix in agent-rules.md
++ - Fixed null crash in TrackingId — avoids unnecessary re-renders in React
+- - problem-fix in blog.ts
++ - Patched security issue ZluVcwM
+- - problem-fix in blogs.ts
 + - problem-fix in agent-rules.md
 - - problem-fix in blog-generation.ts
-+ - Fixed null crash in Array — offloads heavy computation off the main thread
-- - Patched security issue ZuKiASvYEzKvkGoIVWd
-+ - problem-fix in blog-generation.ts
-- - Patched security issue KUKB
-+ - Patched security issue ZuKiASvYEzKvkGoIVWd
-- - pr
++ - problem-fix in blog.ts
+
+📌 IDE AST Context: Modified symb
 
 **Actionable Steps:**
 1. Modified 1 files
 
 ### problem-fix in agent-rules.md
-- - problem-fix in blog-generation.ts
-+ - Fixed null crash in Array — offloads heavy computation off the main thread
-- - Patched security issue ZuKiASvYEzKvkGoIVWd
+- - problem-fix in agent-rules.md
 + - problem-fix in blog-generation.ts
-- - Patched security issue KUKB
-+ - Patched security issue ZuKiASvYEzKvkGoIVWd
-- - problem-fix in blog-generation.ts
-+ - Patched security issue KUKB
-- - problem-fix in api-errors.test.ts
-+ - problem
+- - problem-fix in agent-rules.md
++ - problem-fix in blog-generation.ts
+- - problem-fix in agent-rules.md
++ - problem-fix in api-errors.test.ts
+
+📌 IDE AST Context: Modified symbols likely include [# Project Intelligence (auto-generated), # Intellectual Property & Architecture Rules, # 🧠 Agent Lessons]
 
 **Actionable Steps:**
 1. Modified 1 files
 
 ### problem-fix in agent-rules.md
-- - problem-fix in blog-generation.ts
+- - Fixed null crash in PublicMarketplace — prevents null/undefined runtime crashes
 + - problem-fix in agent-rules.md
-- - problem-fix in api-errors.test.ts
-+ - problem-fix in blog-generation.ts
-- - problem-fix in public-slugs.ts
-+ - problem-fix in api-errors.test.ts
-- - problem-fix in product-detail.tsx
-+ - problem-fix in public-slugs.ts
-- - problem-fix in dynamic-links.ts
-+ - problem-fix in product-detail.tsx
+- - problem-fix in shared-context.json
++ - Fixed null crash in PublicMarketplace — prevents null/undefined runtime crashes
+- - problem-fix in agent-rules.md
++ - problem-fix in shared-context.json
 
-📌 IDE AST Context: Modified sy
+📌 IDE AST Context: Modified symbols likely include [# Project Intelligence (auto-gen
 
 **Actionable Steps:**
 1. Modified 1 files
 
 ### problem-fix in agent-rules.md
-- - Patched security issue DMwyEHz
-+ - problem-fix in blog-generation.ts
-- - Patched security issue RhmoEOLZ — hardens HTTP security headers
-+ - problem-fix in api-errors.test.ts
-- - problem-fix in blog-generation.ts
-+ - problem-fix in public-slugs.ts
-- - problem-fix in api-errors.test.ts
-+ - problem-fix in product-detail.tsx
-- - problem-fix in public-slugs.ts
-+ - problem-fix in dynamic-links.ts
+- - problem-fix in agent-rules.md
++ - Fixed null crash in PublicMarketplace — prevents null/undefined runtime crashes
+- - problem-fix in agent-rules.md
++ - problem-fix in shared-context.json
+- - Fixed null crash in Bindings — prevents null/undefined runtime crashes
++ - problem-fix in agent-rules.md
 
-
+📌 IDE AST Context: Modified symbols likely include [# Project Intelligence (auto-generated), # Int
 
 **Actionable Steps:**
 1. Modified 1 files
 
-### Patched security issue BEGIN — ensures atomic multi-step database operations
-- "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
-+ GOOGLE_SERVICE_ACCOUNT_EMAIL=zisan-affiliate@sanguine-era-484512-i2.iam.gserviceaccount.com
--   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YH
+### problem-fix in agent-rules.md
+- - Fixed null crash in Bindings — prevents null/undefined runtime crashes
++ - problem-fix in agent-rules.md
+- - problem-fix in agent-rules.md
++ - Fixed null crash in Bindings — prevents null/undefined runtime crashes
+
+📌 IDE AST Context: Modified symbols likely include [# Project Intelligence (auto-generated), # Intellectual Property & Architecture Rules, # 🧠 Agent Lessons]
 
 **Actionable Steps:**
 1. Modified 1 files
-2. identifier: BEGIN
-3. identifier: PRIVATE
-4. identifier: KEY
-5. identifier: Ggr
 
-### Patched security issue BEGIN — ensures atomic multi-step database operations
-- 
-+ "private_key_id": "a073a5e7898628f2376ee6dbfc26e3bfb67bfa3c",
-+   "private_key": "[REDACTED]\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7afd/EEp0T1BL\nOTveLPaC5OVcEXHSFYCg5gQYapLEkxSQd7eJtySbHpiXj7B/z6SCH4UfHrO8g+DO\ni3qGe0P/G/Ggr/KrS07yrLrZl59fC7qEbwMQ1hjc37B+v+pSH7PGnbjeEpjKVWZJ\nCu11iVSI40YHUbHzqIVXcXzsh7gouVN9EQMPxqto
+### problem-fix in agent-rules.md
+- - Fixed null crash in Bindings — prevents null/undefined runtime crashes
++ - problem-fix in agent-rules.md
+- - problem-fix in agent-rules.md
++ - Fixed null crash in Bindings — prevents null/undefined runtime crashes
+- - Fixed null crash in SELECT — prevents null/undefined runtime crashes
++ - problem-fix in agent-rules.md
+
+📌 IDE AST Context: Modified symbols likely include [# Project Intelligenc
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in agent-rules.md
+- - problem-fix in agent-rules.md
++ - Fixed null crash in Bindings — prevents null/undefined runtime crashes
+- - Fixed null crash in SELECT — prevents null/undefined runtime crashes
++ - problem-fix in agent-rules.md
+- - Fixed null crash in Dealsrky — prev
 
 ... [Truncated — see individual observations for full content]

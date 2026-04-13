@@ -19,3 +19,103 @@
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
+
+@layer components {
+  .admin-dark {
+    background: #0a0a0f;
+    color: #f0f0f5;
+    color-scheme: dark;
+  }
+
+  .admin-light {
+    background: #f4f7fb;
+    color: #0f172a;
+    color-scheme: light;
+  }
+
+  .admin-dark input,
+  .admin-dark textarea,
+  .admin-dark select {
+    background-color: #12121a !important;
+    color: #f0f0f5 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+  }
+
+  .admin-dark select option,
+  .admin-dark select optgroup {
+    background-color: #12121a !important;
+    color: #f0f0f5 !important;
+  }
+
+  .admin-dark input::placeholder,
+  .admin-dark textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  .admin-light [class*="bg-[#0a0a0f]"],
+  .admin-light [class*="bg-[#12121a]"],
+  .admin-light [class*="bg-[#111827]"],
+  .admin-light [class*="bg-[#1a1a28]"],
+  .admin-light [class*="bg-[#0f172a]"] {
+    background-color: #ffffff !important;
+  }
+
+  .admin-light [class*="bg-white/5"],
+  .admin-light [class*="bg-white/[0.07]"],
+  .admin-light [class*="bg-white/10"] {
+    background-color: #f8fafc !important;
+  }
+
+  .admin-light [class*="border-white/5"],
+  .admin-light [class*="border-white/10"],
+  .admin-light [class*="border-white/15"] {
+    border-color: #dbe4f0 !important;
+  }
+
+  .admin-light [class*="text-[#f0f0f5]"],
+  .admin-light [class*="text-[#f8fafc]"] {
+    color: #0f172a !important;
+  }
+
+  .admin-light [class*="text-[#a0a0b8]"],
+  .admin-light [class*="text-[#94a3b8]"],
+  .admin-light [class*="text-[#6b7280]"],
+  .admin-light [class*="text-[#6b6b85]"] {
+    color: #64748b !important;
+  }
+
+  .admin-light aside {
+    background: #ffffff !important;
+    border-right-color: #dbe4f0 !important;
+    box-shadow: 0 18px 45px -32px rgba(15, 23, 42, 0.35);
+  }
+
+  .admin-light main {
+    background:
+      radial-gradient(circle at top left, rgba(11, 128, 128, 0.08), transparent 32%),
+      linear-gradient(180deg, #f7fafc 0%, #eef3f8 100%);
+  }
+
+  .admin-light input,
+  .admin-light textarea,
+  .admin-light select {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  .admin-light select option,
+  .admin-light select optgroup {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  .admin-light input::placeholder,
+  .admin-light textarea::placeholder {
+    color: #94a3b8 !important;
+  }
+
+  .admin-light img {
+    background-color: transparent;
+  }
+}

@@ -1,5 +1,5 @@
 import { Outlet, NavLink, useLocation, useNavigate } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Route } from "./+types/layout";
 import { clearAuthSession, getAuthToken, restoreAuthSession } from "../../utils/auth-session";
 import { extractApiErrorMessage } from "../../utils/api-errors";
@@ -19,6 +19,66 @@ export default function AdminLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [sessionError, setSessionError] = useState("");
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const savedTheme = window.localStorage.getItem("admin-theme");
+    if (savedTheme === "light" || savedTheme === "dark") {
+      setTheme(savedTheme);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.localStorage.setItem("admin-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    const container = mainRef.current;
+    if (!container || typeof window === "undefined") {
+      return;
+    }
+
+    const storageKey = `admin-scroll:${location.pathname}${location.search}`;
+    const rawValue = window.sessionStorage.getItem(storageKey);
+    const savedScrollTop = rawValue ? Number.parseInt(rawValue, 10) : 0;
+
+    if (!Number.isNaN(savedScrollTop) && savedScrollTop > 0) {
+      window.requestAnimationFrame(() => {
+        container.scrollTop = savedScrollTop;
+      });
+    }
+
+    let frameId = 0;
+    const persistScroll = () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      frameId = window.requestAnimationFrame(() => {
+        window.sessionStorage.setItem(storageKey, String(container.scrollTop));
+      });
+    };
+
+    container.addEventListener("scroll", persistScroll, { passive: true });
+
+    return () => {
+      if (frameId) {
+        window.cancelAnimationFrame(frameId);
+      }
+
+      window.sessionStorage.setItem(storageKey, String(container.scrollTop));
+      container.removeEventListener("scroll", persistScroll);
+    };
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     document.title = "Dealsrky | RKY Tag Store";
@@ -106,13 +166,18 @@ export default function AdminLayout() {
     navigate("/admin/login");
   };
 
+  const wrapperClass = theme === "light" ? "admin-light" : "admin-dark";
+  const toggleTheme = () => {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  };
+
   if (checkingSession) {
-    return <div className="min-h-screen bg-[#0a0a0f] p-8 text-[#a0a0b8]">Checking admin session...</div>;
+    return <div className={`${wrapperClass} min-h-screen bg-[#0a0a0f] p-8 text-[#a0a0b8]`}>Checking admin session...</div>;
   }
 
   if (sessionError) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] p-8 text-[#f0f0f5]">
+      <div className={`${wrapperClass} min-h-screen bg-[#0a0a0f] p-8 text-[#f0f0f5]`}>
         <div className="mx-auto max-w-xl rounded-2xl border border-red-500/20 bg-red-500/10 p-6">
           <h1 className="m-0 text-2xl font-bold">Admin Session Error</h1>
           <p className="mt-3 text-sm text-red-200">{sessionError}</p>
@@ -159,23 +224,32 @@ export default function AdminLayout() {
       ];
 
   return (
-    <div className="flex min-h-screen bg-[#0a0a0f] text-[#f0f0f5]">
+    <div className={`${wrapperClass} flex min-h-screen bg-[#0a0a0f] text-[#f0f0f5]`}>
       {/* Mobile Top Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#12121a]/95 border-b border-white/5 flex items-center justify-between px-4 z-40 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#ff9900] to-[#ffad33] flex items-center justify-center text-black font-bold text-xs shadow-lg">D</div>
           <span className="font-bold text-lg text-[#f0f0f5]">DealsRky</span>
         </div>
-        <button 
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="text-[#a0a0b8] hover:text-white p-2"
-        >
-          {isMobileMenuOpen ? (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-          ) : (
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-          )}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#f0f0f5] transition-colors hover:bg-white/10"
+          >
+            {theme === "dark" ? "Light" : "Dark"}
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="text-[#a0a0b8] hover:text-white p-2"
+          >
+            {isMobileMenuOpen ? (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            ) : (
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            )}
+          </button>
+        </div>
       </div>
 
       {/* Overlay */}
@@ -190,7 +264,16 @@ export default function AdminLayout() {
       <aside className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#12121a]/95 border-r border-white/5 flex flex-col transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:h-screen ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="hidden lg:flex items-center gap-3 px-5 py-6 border-b border-white/5">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#ff9900] to-[#ffad33] flex items-center justify-center text-black font-bold text-sm shadow-lg">D</div>
-          <span className="font-bold text-lg text-[#f0f0f5]">DealsRky</span>
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+            <span className="font-bold text-lg text-[#f0f0f5]">DealsRky</span>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-[#f0f0f5] transition-colors hover:bg-white/10"
+            >
+              {theme === "dark" ? "Light mode" : "Dark mode"}
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 px-3 py-4 flex flex-col gap-1 overflow-y-auto md:mt-0 mt-4">
@@ -229,7 +312,7 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-4 lg:p-8 overflow-y-auto w-full pt-20 lg:pt-8">
+      <main ref={mainRef} className="flex-1 p-4 lg:p-8 overflow-y-auto w-full pt-20 lg:pt-8">
         <Outlet />
       </main>
     </div>

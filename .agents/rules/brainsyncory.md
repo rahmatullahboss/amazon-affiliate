@@ -1,7 +1,7 @@
 
 
 # Project Memory — amazon-affiliate
-> 2367 notes | Score threshold: >40
+> 2551 notes | Score threshold: >40
 
 ## Safety — Never Run Destructive Commands
 
@@ -20,30 +20,45 @@
 
 ## 📝 NOTE: 1 uncommitted file(s) in working tree.\n\n## Important Warnings
 
-- **⚠️ GOTCHA: Optimized Score — parallelizes async operations for speed** — - > 2351 notes | Score threshold: >40
-+ > 2358 notes | Score threshold
+- **gotcha in agent-rules.md** — File updated (external): .brainsync/agent-rules.md
+
+Content summary (9
+- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Optimized GOTCHA
++ - gotcha in shared-context.json
+- - 
+- **gotcha in shared-context.json** — -     }
++     },
+-   ]
++     {
+- }
++       "id": "83e3c8943214ca6b",
++
 - **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Optimized Score
 + - ⚠️ GOTCHA: Optimized GOTCHA
 - - ⚠️ 
-- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: Patched security issue Patched
-+ - ⚠️ GOTCHA: Optimized
-- **⚠️ GOTCHA: Optimized Score** — - > 2287 notes | Score threshold: >40
-+ > 2351 notes | Score threshold
-- **⚠️ GOTCHA: Patched security issue Patched** — - - Patched security issue UeIDDQ
-+ - Patched security issue Patched
--
-- **⚠️ GOTCHA: Patched security issue Fixed** — - - Fixed null crash in MarketplaceSelectionSource — protects against 
+- **⚠️ GOTCHA: Optimized GOTCHA** — - - ⚠️ GOTCHA: problem-fix in agent-rules.md
++ - ⚠️ GOTCHA: Optimized 
+- **⚠️ GOTCHA: Optimized Score** — - > 2495 notes | Score threshold: >40
++ > 2536 notes | Score threshold
+
+## Active: `.`
+
+- **gotcha in agent-rules.md**
+- **⚠️ GOTCHA: Optimized GOTCHA**
+- **gotcha in shared-context.json**
+- **⚠️ GOTCHA: Optimized GOTCHA**
+- **⚠️ GOTCHA: Optimized GOTCHA**
 
 ## Project Standards
 
-- what-changed in brainsync_auto.md — confirmed 3x
-- discovery in blog-post.tsx — confirmed 3x
-- what-changed in shared-context.json — confirmed 3x
-- what-changed in shared-context.json — confirmed 8x
-- Patched security issue Patched — confirmed 3x
-- what-changed in sheet-control.ts — confirmed 3x
-- what-changed in products.ts — confirmed 4x
-- what-changed in login.ts — confirmed 4x
+- Strengthened types EDIT
+- convention in shared-context.json
+- what-changed in shared-context.json
+- what-changed in shared-context.json — confirmed 14x
+- problem-fix in agent-rules.md — confirmed 5x
+- Fixed null crash in Math — avoids unnecessary re-renders in React — confirmed 3x
+- Optimized GOTCHA — confirmed 3x
+- discovery in users.tsx — confirmed 3x
 
 ## Known Fixes
 
@@ -55,6 +70,8 @@
 
 ## Recent Decisions
 
+- Optimized Cannot — hardens HTTP security headers
+- decision in agents.tsx
 - Optimized Score — parallelizes async operations for speed
 - decision in shared-context.json
 

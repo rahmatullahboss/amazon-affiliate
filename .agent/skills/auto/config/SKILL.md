@@ -1,6 +1,6 @@
 ---
 name: config
-description: "Config for amazon-affiliate. 12 gotchas, 30 conventions, 11 fixes."
+description: "Config for amazon-affiliate. 17 gotchas, 41 conventions, 17 fixes."
 domain: config
 triggers:
   - glob: "**/*.yaml"
@@ -13,7 +13,7 @@ enabled: true
 
 # Config
 
-Auto-compiled from **163 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on config files.
+Auto-compiled from **237 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on config files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -21,6 +21,11 @@ Auto-compiled from **163 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "83e3c8943214ca6b", +       "ts": "2026-04-11T17:21 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "80df9bdf728a925f", +       "ts": "2026-04-11T17:19 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "4db2988419808546", +       "ts": "2026-04-11T17:15 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "6734a14828b93e6e", +       "ts": "2026-04-11T17:01 |
+| gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "4b8173ad14efe8e1", +       "ts": "2026-04-11T16:22 |
 | gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "aa07cda2f7191b57", +       "ts": "2026-04-11T08:13 |
 | gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "4e0720cd54123778", +       "ts": "2026-04-11T01:45 |
 | gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "14a6117fe84e357c", +       "ts": "2026-04-11T01:15 |
@@ -35,6 +40,104 @@ Auto-compiled from **163 real patterns** in **amazon-affiliate**. This skill is 
 | gotcha in shared-context.json | -     } +     }, -   ] +     { - } +       "id": "ceb8aecf0f80dfba", +       "ts": "2026-04-07T00:12 |
 
 ## 🔧 Problem Playbooks
+
+### Patched security issue JZrOsz
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "1679d921c67a5b73",
++       "ts": "2026-04-11T17:21:42.856Z",
++       "by": "rahmatullahzisan",
++       "data": "FetANOprO1/JoOeZ8LhdmrUVI7R7s8KEHPcv5q6aqxqG4ECDrbEiLcUAzPhmsY0XNgH1ZhPon5m7M6RPNHaepucQtcKNVL7ffAI4QTBC2d4wRMXBTVqxeiyh/Wyg0N1v4iDe8owBOetOhoID53GYxt30S31m/9411O/WrVbtbR4fJk3nv7QfiCT0Iil0reS2C2yWuyi9YsbMtoeqBK1qB2oBFC916bQLGuyipf1GMy5uiV
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: JZrOsz
+
+### problem-fix in shared-context.json
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "b991ff9ff703e5b2",
++       "ts": "2026-04-11T17:20:13.747Z",
++       "by": "rahmatullahzisan",
++       "data": "YFHbQO+RF/4sAq51btuaUwT+aYTfrefp9MV+EoZI9121ZgR9iE24VTGtevb/jymGJcHSQ7aoeMSa3fwOV2iD5cPYaI7jHNwbeXcdc8CgD+t07hjxlPkPfFKifgxzAkWWP96YdwKaUXiQ2AdlNlkSRhRlc9F8INlWKbxKtBCZKAe+7pxoZPQomzBVU3NwAz+DF0lXecTchwvmXYwEDVUUEgGGGpW5O/GvgCNHtPuGsPzyH4
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Patched security issue EZAL
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "6137fb840d818c7a",
++       "ts": "2026-04-11T17:19:08.628Z",
++       "by": "rahmatullahzisan",
++       "data": "NsNTW4VmTLgAj2qSRf5qmoqyd6LJnR7BHMJXUNNumOE7RGKwKnaWurQpOd9J14xmj+kc+kfnI7uxAKHpC49ogBFEP61daNwP/bGsd4fAaMDRoSyghg85mx62chZV08f1C7aBDtMtPtIkUQ1F+E9967a7gRxfAgBMQZChbq/LayL5GJhX4ezU9hEd7+k/P8dWMUNbB9UfvBQEpt9ynhtQ/oxPc3GOWcfq9ZXneSpcSA1Uuo
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: EZAL
+3. identifier: SxhAcqHlVxcD
+4. identifier: MfBnijmIsjXb
+5. identifier: VcXjQUmyVUiKcr
+
+### Patched security issue ZluVcwM
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "f3af3e07a279967b",
++       "ts": "2026-04-11T17:15:40.843Z",
++       "by": "rahmatullahzisan",
++       "data": "p7JYewxBc/78kKl5N0zEVN78MBGfqKDHX5XAxbFYWcqbnBeSdXUQIzupVSiojlzj0y/fCJO4f241HEspaQ5heBxFp0D61Dcr+iBzeQjC/KlgFHMkWd80BDv5XwFXht+36ZgmPyllHRoQv6YiN+nKYotRk2pMZ+5TrP9z6iJO91PAdaMQab77YRg99LW6pqKLUSMQmyv+VJi6RTgTWwOAm35IjjuFsXPY9CbLvT+ZQl+peB
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: ZQl
+3. identifier: ZluVcwM
+4. identifier: LxyKiHzGeX
+
+### Patched security issue FzcFwr
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "6762f75860ea0bc0",
++       "ts": "2026-04-11T16:50:38.249Z",
++       "by": "rahmatullahzisan",
++       "data": "00yO9RoedQywO8y5PvnB8BDnjtGDVNj3u08RNwRqF1xatdff2ySNE0cZuwfjHncYac1N9wBuGW21o5KeYIuEDizXxUD65B+OSUMorA3LwZ9jMLb/qYwy19RlwpNWHoEHFOr0rwPUA6wXZXkL5XXIzUVliyAZGlXmvQJ0JMVF9Eg2EIQ7mA858wNGmzb4xANd4MZl14HSXF2vKd9QTy74PepYJhx+hgXJVBVjiAlL5DkOhH
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: JMG
+3. identifier: FzcFwr
+
+### Patched security issue NZfI
+-     }
++     },
+-   ]
++     {
+- }
++       "id": "0036f14c02723786",
++       "ts": "2026-04-11T16:50:35.770Z",
++       "by": "rahmatullahzisan",
++       "data": "fXU/Z901gBPn3xiHoELeGQKpeNfxAVgmnVMLRr7/pBD0KUVTsQtygVYAbQBqaGxaJinSlD4FdQ+UCWX4FOK9/P2rCuKo+NZfI/ZFKYujeferjCldTRHe/Dlvr63DTkiJYhOUxxtq77tG86y/KCsG43Sf3S6gaD3CaHCldZWI4e0J61jVkWCNKvc3Jz7+A7ODg+OJKbMf/DkdYCu4p6qcFV9UeK5bM5cUDlb05EWzE5JTmJ
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: NZfI
+3. identifier: ZFKYujeferjCldTRHe
+4. identifier: OJKbMf
+5. identifier: JGgh
 
 ### Patched security issue UeIDDQ
 -     }
@@ -210,170 +313,6 @@ Auto-compiled from **163 real patterns** in **amazon-affiliate**. This skill is 
 +       "id": "f65081b68fab22f9",
 +       "ts": "2026-04-06T18:11:37.873Z",
 +       "by": "rahmatullahzisan",
-+       "data": "fN6W/Wee8ydAvijJjDeCu2XD9gMxwTBgobW96nAwN+K5QY+7AU8avzrWc+oJ2O2T2LCqtfuiUhyb48o8zg1jVKCvJ3OI80Kc6gX/MIElZZJdV4x5u7RRXyXG8tdobdIIlru5oRSiJqNxOxuJ4x2d81JMtjxUd9OMlPQ0J3EIiukop2kyWPJiIRfWBrCrJpPKBhGzWdoPRkGqUy5TrnYGFksqiTzNw8P7HaDqnlb2RjtOpj
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Zio
-3. identifier: RhmoEOLZ
-4. identifier: YHkoanVftU
-
-## 📐 Conventions & Best Practices
-
-### Project Conventions
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "2bf387f1c5d4d6a0",
-+       "ts": "2026-04-11T08:33
-- 📐 **what-changed in shared-context.json — confirmed 8x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "5557855783131648",
-+       "ts": "2026-04-11T08:26
-- 📐 **discovery in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "b579deede708f0fd",
-+       "ts": "2026-04-11T08:15
-- 📐 **what-changed in shared-context.json — confirmed 6x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "dba6bd6703b8bb0e",
-+       "ts": "2026-04-11T08:11
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "a01e6d379c5706c6",
-+       "ts": "2026-04-11T01:45
-- 📐 **Added JWT tokens authentication — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "796835f613e9f088",
-+       "ts": "2026-04-11T01:35
-- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "a874020f2a931649",
-+       "ts": "2026-04-11T01:06
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "a179ad23030d248a",
-+       "ts": "2026-04-07T13:44
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "f50f9d6ca490c9d7",
-+       "ts": "2026-04-07T13:23
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "7b94a79c3923556b",
-+       "ts": "2026-04-07T13:03
-- 📐 **what-changed in shared-context.json — confirmed 3x** — File updated (external): .brainsync/shared-context.json
-
-Content summary (3431 lines):
-{
-  "v": 1,
- 
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "22a8beedefd039ec",
-+       "ts": "2026-04-07T01:57
-- 📐 **Patched security issue TVxZD — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "e09ff51e45aea032",
-+       "ts": "2026-04-07T01:37
-- 📐 **what-changed in shared-context.json — confirmed 5x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "ea37960564875aa6",
-+       "ts": "2026-04-07T01:27
-- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "f4cdb2bde9da40f7",
-+       "ts": "2026-04-07T00:47
-- 📐 **what-changed in shared-context.json — confirmed 7x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "539dd83ab7a2dec9",
-+       "ts": "2026-04-07T00:36
-- 📐 **Patched security issue CdOSRl — confirmed 4x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "92c2b13a90e1e4f5",
-+       "ts": "2026-04-07T00:36
-- 📐 **what-changed in shared-context.json — confirmed 9x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "4230d9a820cfe3d7",
-+       "ts": "2026-04-07T00:26
-- 📐 **what-changed in shared-context.json — confirmed 4x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "2a4ce18578955ba8",
-+       "ts": "2026-04-07T00:12
-- 📐 **what-changed in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "6e8546ff5d8e035b",
-+       "ts": "2026-04-06T22:20
-- 📐 **what-changed in shared-context.json — confirmed 7x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "8d7acfc7fae665d8",
-+       "ts": "2026-04-06T21:19
-- 📐 **trade-off in shared-context.json — confirmed 3x** — -     }
-+     },
--   ]
-+     {
-- }
-+       "id": "cf2b1189a92bf494",
-+       "ts": "2026-04-06T21:00
-- 📐 **Patched
++       "data": "fN6W/Wee8ydAvijJjDeCu2XD9gMxwTBgobW96nAwN+K5QY+7AU8avzrWc+oJ2O2T2LCqtfuiUhyb48o8zg1jVKCvJ3OI80K
 
 ... [Truncated — see individual observations for full content]

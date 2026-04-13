@@ -2,7 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { getAuthToken } from "../../utils/auth-session";
-import { buildAgentFormValues, isInlineEditingAgent } from "../../utils/agents";
+import {
+  buildAgentFormValues,
+  filterAgentsByActivity,
+  getHomepageProductCountForAgent,
+  getMarketplaceProductCountsForAgent,
+  isInlineEditingAgent,
+  retainInlineEditingAgentId,
+  type AgentActivityFilter,
+} from "../../utils/agents";
 import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
 
 const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
@@ -40,6 +48,20 @@ interface TrackingId {
   agent_name: string;
   agent_slug: string;
   alias_slug?: string | null;
+}
+
+interface ProductMapping {
+  id: number;
+  agent_id: number;
+  product_id: number;
+  tracking_id: number;
+  product_title: string;
+  asin: string;
+  image_url: string | null;
+  tracking_tag: string;
+  tracking_marketplace: Marketplace;
+  custom_title: string | null;
+  show_on_homepage: number;
 }
 
 interface AdminUser {
@@ -105,6 +127,7 @@ const EMPTY_USER_FORM: UserFormState = {
   password: "",
   is_active: true,
 };
+const AGENTS_PER_PAGE = 8;
 
 const getToken = () => getAuthToken();
 
@@ -130,10 +153,13 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [trackingIds, setTrackingIds] = useState<TrackingId[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
+  const [productMappings, setProductMappings] = useState<ProductMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [activityFilter, setActivityFilter] = useState<AgentActivityFilter>("ALL");
   const [copiedKey, setCopiedKey] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const [showCreateAgentForm, setShowCreateAgentForm] = useState(false);
   const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
@@ -154,25 +180,31 @@ export default function AgentsPage() {
 
     try {
       const headers = { Authorization: `Bearer ${getToken()}` };
-      const [agentsRes, trackingRes, usersRes] = await Promise.all([
+      const [agentsRes, trackingRes, usersRes, mappingsRes] = await Promise.all([
         fetch("/api/agents", { headers }),
         fetch("/api/tracking", { headers }),
         fetch("/api/users", { headers }),
+        fetch("/api/mappings", { headers }),
       ]);
 
       if (!agentsRes.ok || !trackingRes.ok || !usersRes.ok) {
         throw new Error("Failed to load agent management data.");
       }
 
-      const [agentsPayload, trackingPayload, usersPayload] = await Promise.all([
+      const [agentsPayload, trackingPayload, usersPayload, mappingsPayload] = await Promise.all([
         agentsRes.json() as Promise<{ agents: Agent[] }>,
         trackingRes.json() as Promise<{ trackingIds: TrackingId[] }>,
         usersRes.json() as Promise<{ users: AdminUser[] }>,
+        mappingsRes.ok
+          ? (mappingsRes.json() as Promise<{ mappings: ProductMapping[] }>)
+          : Promise.resolve({ mappings: [] }),
       ]);
 
       setAgents(agentsPayload.agents);
       setTrackingIds(trackingPayload.trackingIds);
       setUsers(usersPayload.users);
+      setProductMappings(mappingsPayload.mappings || []);
+      setEditingAgentId((current) => retainInlineEditingAgentId(current, agentsPayload.agents));
     } catch (error) {
       console.error(error);
       setPageError(error instanceof Error ? error.message : "Failed to load agent management data.");
@@ -213,14 +245,27 @@ export default function AgentsPage() {
     return grouped;
   }, [users]);
 
-  const filteredAgents = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLowerCase();
+  const mappingsByAgent = useMemo(() => {
+    const grouped = new Map<number, ProductMapping[]>();
 
-    if (!normalizedQuery) {
-      return agents;
+    for (const mapping of productMappings) {
+      const existing = grouped.get(mapping.agent_id) || [];
+      existing.push(mapping);
+      grouped.set(mapping.agent_id, existing);
     }
 
-    return agents.filter((agent) => {
+    return grouped;
+  }, [productMappings]);
+
+  const filteredAgents = useMemo(() => {
+    const normalizedQuery = searchQuery.trim().toLowerCase();
+    const activityFilteredAgents = filterAgentsByActivity(agents, activityFilter);
+
+    if (!normalizedQuery) {
+      return activityFilteredAgents;
+    }
+
+    return activityFilteredAgents.filter((agent) => {
       const relatedTrackingIds = trackingByAgent.get(agent.id) || [];
       const relatedUsers = usersByAgent.get(agent.id) || [];
 
@@ -246,7 +291,23 @@ export default function AgentsPage() {
 
       return haystack.includes(normalizedQuery);
     });
-  }, [agents, searchQuery, trackingByAgent, usersByAgent]);
+  }, [activityFilter, agents, searchQuery, trackingByAgent, usersByAgent]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAgents.length / AGENTS_PER_PAGE));
+  const paginatedAgents = useMemo(() => {
+    const startIndex = (currentPage - 1) * AGENTS_PER_PAGE;
+    return filteredAgents.slice(startIndex, startIndex + AGENTS_PER_PAGE);
+  }, [currentPage, filteredAgents]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, activityFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const summary = useMemo(() => {
     const visibleAgentIds = new Set(filteredAgents.map((agent) => agent.id));
@@ -325,6 +386,62 @@ export default function AgentsPage() {
 
     if (!response.ok) {
       setPageError("Failed to update agent status.");
+      return;
+    }
+
+    await fetchAll();
+  }
+
+  async function handleDeleteAgent(agent: Agent, agentTrackingIds: TrackingId[]) {
+    const marketplaces = [...new Set(agentTrackingIds.map((item) => item.marketplace))];
+    const confirmed = window.confirm(
+      `Delete inactive agent "${agent.name}"?\n\n` +
+        `Tags: ${agentTrackingIds.length}\n` +
+        `Products to remap: ${agent.product_count}\n` +
+        `Marketplaces: ${marketplaces.join(", ") || "None"}\n\n` +
+        `All linked products will move to the site primary tag for the same marketplace.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/agents/${agent.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    if (!response.ok) {
+      const data = (await response.json()) as unknown;
+      setPageError(extractApiErrorMessage(data, "Failed to delete agent"));
+      return;
+    }
+
+    await fetchAll();
+  }
+
+  async function handleDeleteAllTracking(agent: Agent, agentTrackingIds: TrackingId[]) {
+    const marketplaces = [...new Set(agentTrackingIds.map((item) => item.marketplace))];
+    const confirmed = window.confirm(
+      `Delete all tracking for inactive agent "${agent.name}"?\n\n` +
+        `Tags: ${agentTrackingIds.length}\n` +
+        `Products to remap: ${agent.product_count}\n` +
+        `Marketplaces: ${marketplaces.join(", ") || "None"}\n\n` +
+        `The agent will stay inactive, but all linked products will move to site primary tags.`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await fetch(`/api/agents/${agent.id}/tracking`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    if (!response.ok) {
+      const data = (await response.json()) as unknown;
+      setPageError(extractApiErrorMessage(data, "Failed to delete all tracking"));
       return;
     }
 
@@ -414,7 +531,7 @@ export default function AgentsPage() {
   }
 
   async function handleDeleteTag(id: number) {
-    if (!window.confirm("Delete this tag?")) {
+    if (!window.confirm("Delete this tag? Linked products will move to the site primary tag for the same marketplace.")) {
       return;
     }
 
@@ -582,13 +699,24 @@ export default function AgentsPage() {
       </div>
 
       <div className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4 mb-6">
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search by agent, slug, email, tag, alias, login..."
-          className="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
-        />
+        <div className="grid grid-cols-1 md:grid-cols-[1fr_180px] gap-4">
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search by agent, slug, email, tag, alias, login..."
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+          />
+          <select
+            value={activityFilter}
+            onChange={(event) => setActivityFilter(event.target.value as AgentActivityFilter)}
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900] appearance-auto"
+          >
+            <option className="bg-gray-800" value="ALL">All agents</option>
+            <option className="bg-gray-800" value="ACTIVE">Active only</option>
+            <option className="bg-gray-800" value="INACTIVE">Inactive only</option>
+          </select>
+        </div>
       </div>
 
       {pageError ? (
@@ -664,9 +792,18 @@ export default function AgentsPage() {
         <p className="text-[#6b6b85] m-0">Loading agent management...</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {filteredAgents.map((agent) => {
+          {paginatedAgents.map((agent) => {
             const agentTrackingIds = sortTrackingIds(trackingByAgent.get(agent.id) || []);
             const linkedUsers = sortUsers(usersByAgent.get(agent.id) || []);
+            const linkedProducts = mappingsByAgent.get(agent.id) || [];
+            const homepageProductCount = getHomepageProductCountForAgent(
+              agent.id,
+              linkedProducts
+            );
+            const marketplaceProductCounts = getMarketplaceProductCountsForAgent(
+              agent.id,
+              linkedProducts
+            );
 
             return (
               <section key={agent.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
@@ -694,6 +831,9 @@ export default function AgentsPage() {
                       </span>
                       <span className="px-2.5 py-1 rounded-full bg-white/5 text-[#d5d5e4]">
                         {agent.product_count} products
+                      </span>
+                      <span className="px-2.5 py-1 rounded-full bg-white/5 text-[#d5d5e4]">
+                        {homepageProductCount} on homepage
                       </span>
                       <span className="px-2.5 py-1 rounded-full bg-white/5 text-[#d5d5e4]">
                         {agent.total_clicks} clicks
@@ -726,6 +866,22 @@ export default function AgentsPage() {
                     >
                       {agent.is_active ? "Deactivate" : "Activate"}
                     </button>
+                    {agent.is_active !== 1 ? (
+                      <>
+                        <button
+                          onClick={() => void handleDeleteAllTracking(agent, agentTrackingIds)}
+                          className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-300 text-xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors"
+                        >
+                          Delete All Tracking
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteAgent(agent, agentTrackingIds)}
+                          className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors"
+                        >
+                          Delete Agent
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
@@ -759,6 +915,75 @@ export default function AgentsPage() {
                       <div className="mt-1">Slug issues: set alias slug per marketplace inside the tag section.</div>
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-5 rounded-2xl border border-white/5 bg-[#111827]/80 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[0.68rem] uppercase tracking-[0.16em] text-[#8b8ba7]">
+                        Product Allocation
+                      </div>
+                      <div className="mt-2 text-sm text-[#d5d5e4]">
+                        Admin can review exactly which products belong to this slug and how many are promoted on the homepage.
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[0.72rem]">
+                      {marketplaceProductCounts.length > 0 ? (
+                        marketplaceProductCounts.map((item) => (
+                          <span
+                            key={`${agent.id}-${item.marketplace}`}
+                            className="rounded-full bg-white/5 px-2.5 py-1 text-[#d5d5e4]"
+                          >
+                            {item.marketplace}: {item.count}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="rounded-full bg-white/5 px-2.5 py-1 text-[#8b8ba7]">
+                          No linked products
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {linkedProducts.length > 0 ? (
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      {linkedProducts.slice(0, 8).map((mapping) => (
+                        <article
+                          key={mapping.id}
+                          className="rounded-xl border border-white/8 bg-white/5 p-3"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white/8 px-2 py-0.5 text-[11px] font-semibold text-[#d5d5e4]">
+                              {mapping.tracking_marketplace}
+                            </span>
+                            <code className="rounded bg-[#ff9900]/10 px-2 py-0.5 text-[11px] font-semibold text-[#ffcf8a]">
+                              {mapping.tracking_tag}
+                            </code>
+                            {mapping.show_on_homepage === 1 ? (
+                              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+                                Homepage
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-3 text-sm font-semibold text-[#f0f0f5]">
+                            {mapping.custom_title || mapping.product_title}
+                          </div>
+                          <div className="mt-1 text-xs text-[#8b8ba7]">
+                            {mapping.asin}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-[#8b8ba7]">
+                      No products linked to this agent yet.
+                    </div>
+                  )}
+                  {linkedProducts.length > 8 ? (
+                    <p className="mt-3 text-xs text-[#8b8ba7]">
+                      Showing the first 8 linked products here. Full mapping control stays on the admin products page.
+                    </p>
+                  ) : null}
                 </div>
 
                 {isInlineEditingAgent(editingAgentId, agent.id) ? (
@@ -1187,6 +1412,32 @@ export default function AgentsPage() {
             <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">
               No agents yet. Create your first agent above.
             </p>
+          ) : null}
+
+          {filteredAgents.length > 0 ? (
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+              <div className="text-sm text-[#a0a0b8]">
+                Page {currentPage} of {totalPages}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-sm text-[#d5d5e4] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-sm text-[#d5d5e4] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/10 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           ) : null}
 
           {agents.length > 0 && filteredAgents.length === 0 ? (

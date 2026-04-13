@@ -1,6 +1,8 @@
 import { createRequestHandler } from "react-router";
 import { ASIN_IMPORT_ENABLED } from "../server/utils/asin-import";
 import { apiApp } from "../server/api";
+import { createBlogImageResponse } from "../server/services/blog";
+import { generateScheduledBlogDraft, publishDueScheduledBlogPosts } from "../server/services/blog-generation";
 import { syncAgentSheetSources } from "../server/services/sheet-control";
 import { getSheetSyncConfig, syncProductsFromSheet } from "../server/services/sheet-sync";
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
@@ -204,6 +206,10 @@ export default {
       return apiApp.fetch(request, env, ctx);
     }
 
+    if (url.pathname.startsWith("/api/public/blog-images/")) {
+      return createBlogImageResponse(env, url.pathname);
+    }
+
     // API routes → Hono (/api/*) — admin panel + public endpoints
     if (url.pathname.startsWith("/api/")) {
       return apiApp.fetch(request, env, ctx);
@@ -245,6 +251,12 @@ export default {
   },
   async scheduled(_event, env, ctx) {
     try {
+      await publishDueScheduledBlogPosts(env.DB);
+      ctx.waitUntil(generateScheduledBlogDraft(env).catch((error) => {
+        const message = error instanceof Error ? error.message : "Unknown scheduled blog error";
+        console.error(`[BLOG_SCHEDULE] Scheduled blog generation failed: ${message}`, error);
+      }));
+
       if (!ASIN_IMPORT_ENABLED) {
         return;
       }

@@ -11,6 +11,24 @@ export interface PersonalizedBlogSummary {
   updated_at: string;
 }
 
+export function filterBlogPostsForMarketplace<T extends PersonalizedBlogSummary>(
+  posts: T[],
+  preferredMarketplace: PublicMarketplace
+): T[] {
+  return posts.filter((post) => {
+    const postMarketplace = post.generation_marketplace?.trim().toUpperCase();
+    if (!postMarketplace) {
+      return true;
+    }
+
+    if (post.generation_source === "manual") {
+      return true;
+    }
+
+    return postMarketplace === preferredMarketplace;
+  });
+}
+
 function toTimestamp(value: string | null | undefined): number {
   if (!value) {
     return Number.NEGATIVE_INFINITY;
@@ -68,4 +86,3 @@ export function buildMarketplaceAwareDealsHref(
   url.searchParams.set("market", preferredMarketplace);
   return `${url.pathname}${url.search}`;
 }
-

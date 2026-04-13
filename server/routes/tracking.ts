@@ -4,6 +4,10 @@ import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createTrackingIdSchema, updateTrackingIdSchema } from '../schemas';
 import { ensurePublicSlugAlias } from '../services/public-slugs';
+import {
+  requireSitePrimaryTrackingTarget,
+  remapAgentTrackingToSitePrimary,
+} from '../services/site-primary-remap';
 
 const tracking = new Hono<AppEnv>();
 
@@ -187,6 +191,16 @@ tracking.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
+  const current = await c.env.DB.prepare(
+    'SELECT id, agent_id, marketplace, tag FROM tracking_ids WHERE id = ?'
+  )
+    .bind(id)
+    .first<{ id: number; agent_id: number; marketplace: string; tag: string }>();
+
+  if (!current) {
+    throw new HTTPException(404, { message: 'Tag not found' });
+  }
+
   // Check if in use
   const usage = await c.env.DB.prepare(
     'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ?'
@@ -195,8 +209,19 @@ tracking.delete('/:id', async (c) => {
     .first<{ count: number }>();
 
   if (usage && usage.count > 0) {
-    throw new HTTPException(409, {
-      message: `Cannot delete: tag is used in ${usage.count} mapping(s). Remove mappings first.`,
+    try {
+      const replacement = await requireSitePrimaryTrackingTarget(c.env.DB, current.marketplace, id);
+      await remapAgentTrackingToSitePrimary(c.env.DB, id, replacement);
+    } catch (error) {
+      throw new HTTPException(409, {
+        message: error instanceof Error ? error.message : 'Missing site-primary replacement tag.',
+      });
+    }
+
+    await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
+
+    return c.json({
+      message: `Moved ${usage.count} linked mapping${usage.count > 1 ? 's' : ''} to the ${current.marketplace} site-primary tag and deleted ${current.tag}.`,
     });
   }
 

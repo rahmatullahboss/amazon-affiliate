@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { env } from "cloudflare:workers";
 import { apiApp } from "../../server/api";
+import { publishDueScheduledBlogPosts } from "../../server/services/blog-generation";
 import { DbFactory } from "../factories/db";
 import { generateAdminToken } from "../factories/token";
 
@@ -306,5 +307,34 @@ describe("AI blog draft generation", () => {
     expect(savedPost).not.toBeNull();
     expect(savedPost?.excerpt?.length ?? 0).toBeLessThanOrEqual(220);
     expect(savedPost?.seo_description?.length ?? 0).toBeLessThanOrEqual(180);
+  });
+
+  it("publishes due scheduled blog posts during the scheduler maintenance step", async () => {
+    await env.DB.prepare(
+      `INSERT INTO blog_posts (
+         title, slug, content, status, scheduled_for, is_deleted
+       ) VALUES (
+         'Scheduled publish test',
+         'scheduled-publish-test',
+         'This is a scheduled post body with enough length to be valid and published later.\n\nIt should flip to published when the maintenance step runs.',
+         'draft',
+         '2000-01-01T00:00:00.000Z',
+         0
+       )`
+    ).run();
+
+    const changed = await publishDueScheduledBlogPosts(env.DB);
+    expect(changed).toBe(1);
+
+    const row = await env.DB.prepare(
+      `SELECT status, published_at
+       FROM blog_posts
+       WHERE slug = ?`
+    )
+      .bind("scheduled-publish-test")
+      .first<{ status: string; published_at: string | null }>();
+
+    expect(row?.status).toBe("published");
+    expect(row?.published_at).toBeTruthy();
   });
 });

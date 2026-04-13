@@ -1,6 +1,6 @@
 ---
 name: typescript-react
-description: "Typescript React for amazon-affiliate. 57 gotchas, 79 conventions, 67 fixes, 1 error→fix pairs."
+description: "Typescript React for amazon-affiliate. 62 gotchas, 87 conventions, 72 fixes, 2 error→fix pairs."
 domain: typescript-react
 composesFrom:
   - react
@@ -12,7 +12,7 @@ enabled: true
 
 # Typescript React
 
-Auto-compiled from **363 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
+Auto-compiled from **386 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript-react files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -20,6 +20,11 @@ Auto-compiled from **363 real patterns** in **amazon-affiliate**. This skill is 
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in TrackingId — avoids | -   const [trackingIds, setTrackingIds] = useState<TrackingId[]>([]); +   const TAG_GROUPS_PER_PAGE  |
+| ⚠️ GOTCHA: Fixed null crash in Mapping — avoids un | - import { useState, useEffect } from "react"; + import { useEffect, useMemo, useState } from "react |
+| ⚠️ GOTCHA: Fixed null crash in DashboardTrackingId | - export default function Dashboard() { + interface DashboardTrackingId { -   const [data, setData]  |
+| ⚠️ GOTCHA: Fixed null crash in Agent — avoids unne | -   created_at?: string; +   is_site_primary?: number; -   agent_name: string; agent_slug: string; a |
+| ⚠️ GOTCHA: Fixed null crash in Link — avoids unnec | - import type { Route } from "./+types/blogs"; + import { Link } from "react-router"; - import { get |
 | ⚠️ GOTCHA: Fixed null crash in Mapping — paralleli | -  + import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links"; - const getToken  |
 | ⚠️ GOTCHA: Fixed null crash in ProductMapping — pa | - interface ProductPagination { + interface ProductMapping { -   page: number; +   id: number; -   p |
 | ⚠️ GOTCHA: Fixed null crash in MARKETPLACES — avoi | - import { copyTextToClipboard } from "../../utils/clipboard"; + import { extractApiErrorMessage } f |
@@ -65,11 +70,6 @@ Auto-compiled from **363 real patterns** in **amazon-affiliate**. This skill is 
 | ⚠️ GOTCHA: Strengthened types Failed — prevents nu | -     } catch (err) { console.error("Failed to fetch dashboard data:", err); } +     } catch (reques |
 | ⚠️ GOTCHA: Fixed null crash in Boolean — paralleli | - export default function ProductsPage() { + function analyzeBulkAsins(text: string) { -   const [pr |
 | ⚠️ GOTCHA: Fixed null crash in AdminUser — paralle | - import { extractApiErrorMessage } from "../../utils/api-errors"; +  -  + interface AdminUser { - i |
-| ⚠️ GOTCHA: Fixed null crash in AgentsPage — improv | - } +   user_count: number; -  +   last_click_at: string - null; - const getToken = () => localStora |
-| ⚠️ GOTCHA: Fixed null crash in Array — parallelize | -   revenueAmount: number; +   returnedItems: number; -   commissionAmount: number; +   revenueAmoun |
-| ⚠️ GOTCHA: Fixed null crash in SubmissionResponse  | - } +   bridge_page_url: string; -  +   redirect_url: string; - interface SubmissionResponse { + } - |
-| ⚠️ GOTCHA: Fixed null crash in ProductSummary — pa | - interface ImportResult { + interface ProductSummary { -   asin: string; +   totalProducts: number; |
-| ⚠️ GOTCHA: Fixed null crash in ProductPagination — | - interface ImportResult { + interface ProductPagination { -   asin: string; +   page: number; -   s |
 
 ## 🔧 Problem Playbooks
 
@@ -77,108 +77,120 @@ Auto-compiled from **363 real patterns** in **amazon-affiliate**. This skill is 
 
 | Error Pattern | Fix | Seen |
 |-------|-----|------|
+| `- - Fixed null crash in Math — avoids unnecessary ` | problem-fix in agent-rules.md | 3x |
 | `- import { extractApiErrorMessage } from "../../ut` | Fixed null crash in Route — avoids unnecessary re-renders in | 2x |
 
+### Fixed null crash in System
+-         <div className="grid gap-3">
++         <>
+-           {paginatedLogs.map((log) => (
++           <div className="grid gap-3">
+-             <article key={log.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
++             {paginatedLogs.map((log) => (
+-               <div className="flex justify-between gap-4 mb-3 flex-wrap">
++               <article key={log.id} clas
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: System
+3. identifier: Date
+4. identifier: JSON
+5. identifier: Page
+
+### Fixed null crash in AgentFormState — avoids unnecessary re-renders in React
+- 
++   const [currentPage, setCurrentPage] = useState(1);
+-   const [showCreateAgentForm, setShowCreateAgentForm] = useState(false);
++ 
+-   const [editingAgentId, setEditingAgentId] = useState<number | null>(null);
++   const [showCreateAgentForm, setShowCreateAgentForm] = useState(false);
+-   const [agentForm, setAgentForm] = useState<AgentFormState>(EMPTY_AGENT_FORM);
++   const [editingAgentId, s
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: AgentFormState
+3. identifier: TagFormMode
+4. identifier: TagFormState
+5. identifier: UserFormMode
+
+### Fixed null crash in TrackingId — avoids unnecessary re-renders in React
+- 
++ const AGENTS_PER_PAGE = 8;
+- const getToken = () => getAuthToken();
++ 
+- 
++ const getToken = () => getAuthToken();
+- function sortTrackingIds(items: TrackingId[]): TrackingId[] {
++ 
+-   return [...items].sort((left, right) => {
++ function sortTrackingIds(items: TrackingId[]): TrackingId[] {
+-     if (left.marketplace !== right.marketplace) {
++   return [...items].sort((left, right) => {
+-    
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: TrackingId
+3. identifier: AdminUser
+4. identifier: AgentsPage
+5. identifier: Agent
+
+### Fixed null crash in SELECT — prevents null/undefined runtime crashes
+-   const marketplace = (input.generationMarketplace || input.preferredMarketplace || "US").toUpperCase();
++ 
+- 
++   if (!asin) {
+-   if (!asin) {
++     return null;
+-     return null;
++   }
+-   }
++ 
+- 
++   const productMarketplace =
+-   const tagRow = await input.db
++     input.generationMarketplace ||
+-     .prepare(
++     (
+-       `SELECT tag
++       await input.db
+-        FROM tracking_ids
++
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: SELECT
+3. identifier: FROM
+4. identifier: WHERE
+5. identifier: AND
+
+### Fixed null crash in Dealsrky — prevents null/undefined runtime crashes
+- 
++   const [theme, setTheme] = useState<"dark" | "light">("dark");
+-   useEffect(() => {
++ 
+-     document.title = "Dealsrky | RKY Tag Store";
++   useEffect(() => {
+- 
++     if (typeof window === "undefined") {
+-     const restoredUser = restoreAuthSession();
++       return;
+-     if (!restoredUser) {
++     }
+-       navigate("/admin/login");
++ 
+-       return;
++     const savedTheme = window.lo
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Dealsrky
+3. identifier: RKY
+4. identifier: Tag
+5. identifier: Store
+
 ### Fixed null crash in ProductRow — prevents null/undefined runtime crashes
-- import { buildAmazonUrl } from "../../server/utils/types";
-+ import { buildSeoMeta } from "../utils/seo";
-- import { buildSeoMeta } from "../utils/seo";
-+ import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
-- import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
-+ 
-- 
-+ interface ProductRow {
-- interface ProductRow {
-+   i
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ProductRow
-3. identifier: RelatedProductRow
-4. identifier: ProductDetailData
-5. identifier: Explore
-
-### Fixed null crash in MarketplaceSelectionSource — protects against XSS and CSR...
-- import { TrustBadges } from "../components/home/TrustBadges";
-+ import {
-- import {
-+   buildSeoMeta,
--   buildSeoMeta,
-+   toSiteBrandingMeta,
--   toSiteBrandingMeta,
-+ } from "../utils/seo";
-- } from "../utils/seo";
-+ import {
-- import {
-+   HOME_HERO_EYEBROW,
--   HOME_HERO_EYEBROW,
-+   HOME_HERO_TITLE,
--   HOME_HERO_TITLE,
-+ } from "../utils/affiliate-copy";
-- } from "../utils/affiliate-copy"
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: MarketplaceSelectionSource
-3. identifier: PublicMarketplace
-4. identifier: BlogPostSummary
-5. identifier: ProductRow
-
-### Fixed null crash in Select — parallelizes async operations for speed
--   async function handleProductImageUpload(event: React.ChangeEvent<HTMLInputElement>) {
-+   async function handleBulkMappingAssign() {
--     const file = event.target.files?.[0];
-+     if (selectedProductIds.length === 0) {
--     if (!file) {
-+       setError("Select products first.");
--     setUploadingProductImage(true);
-+     if (!bulkMappingDraft.agent_id || !bulkMappingDraft.tracking_id) {
-
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: Select
-3. identifier: POST
-4. identifier: Content
-5. identifier: Type
-
-### Fixed null crash in ImportResult — parallelizes async operations for speed
-- 
-+   const [bulkMappingDraft, setBulkMappingDraft] = useState({ agent_id: 0, tracking_id: 0 });
--   const [bulkAsins, setBulkAsins] = useState("");
-+   const [bulkAssigningMappings, setBulkAssigningMappings] = useState(false);
--   const [bulkMarketplace, setBulkMarketplace] = useState("US");
-+ 
--   const [bulkPrefix, setBulkPrefix] = useState("");
-+   const [bulkAsins, setBulkAsins] = useState("
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: ImportResult
-3. identifier: HTMLInputElement
-4. identifier: SheetSyncConfig
-5. identifier: SheetSyncLog
-
-### Fixed null crash in JSON — filters out falsy/null values explicitly
--         body: JSON.stringify({ ...form, agent_id: Number(form.agent_id), alias_slug: form.alias_slug || null }),
-+         body: JSON.stringify({
--       });
-+           ...(editingId
--       if (!res.ok) {
-+             ? {
--         const data = (await res.json()) as unknown;
-+                 tag: form.tag,
--         throw new Error(
-+                 label: form.label || null,
--           ex
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: JSON
-3. identifier: Number
-4. identifier: Error
-5. identifier: Failed
-
-### Fixed null crash in BlogPostData — prev
+-
 
 ... [Truncated — see individual observations for full content]

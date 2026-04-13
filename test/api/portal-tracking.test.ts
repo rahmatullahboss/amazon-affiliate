@@ -722,4 +722,169 @@ describe("Portal Tracking API", () => {
     expect(message).toContain("amazon.es");
     expect(message).toContain("correct country");
   });
+
+  it("deletes an admin tracking tag and remaps linked products to the marketplace site-primary tag", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 60, "site-primary-owner", "Site Primary Owner");
+    await DbFactory.seedAgent(env.DB, 61, "tracked-agent", "Tracked Agent");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (860, 'B0DELTRACK1', 'Delete Tracking Product', 'http://img.com/delete.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+         (960, 60, 'site-primary-us-20', 'US', 1, 1, 1),
+         (961, 61, 'tracked-agent-us-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (1060, 61, 860, 961, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/961", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(response.status).toBe(200);
+
+    const deletedTracking = await env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE id = 961`
+    ).first<{ id: number }>();
+    const remapped = await env.DB.prepare(
+      `SELECT agent_id, tracking_id
+       FROM agent_products
+       WHERE id = 1060`
+    ).first<{ agent_id: number; tracking_id: number }>();
+
+    expect(deletedTracking).toBeNull();
+    expect(remapped).toEqual({ agent_id: 60, tracking_id: 960 });
+  });
+
+  it("blocks tracking delete when the marketplace site-primary tag is missing", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 62, "tracked-no-primary", "Tracked No Primary");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (861, 'B0NOPRIMARY', 'No Primary Product', 'http://img.com/no-primary.jpg', 'DE', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES (962, 62, 'tracked-agent-de-21', 'DE', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (1061, 62, 861, 962, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/962", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "Missing active site-primary tag for marketplace: DE",
+    });
+  });
+
+  it("deletes a tag and remaps linked products to the marketplace site-primary tag even when queried with force", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 41, "force-delete-agent", "Force Delete Agent");
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+         (741, 41, 'old-us-tag-20', 'US', 0, 0, 1),
+         (742, 41, 'default-us-tag-20', 'US', 1, 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (841, 'B0FORCE001', 'Force Product', 'http://img.com/force.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, is_active)
+       VALUES (941, 41, 841, 741, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/741?force=1", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Origin: "http://localhost" },
+      }),
+      env as any,
+      { waitUntil: () => {} } as any
+    );
+
+    expect(response.status).toBe(200);
+
+    const remapped = await env.DB.prepare(
+      `SELECT agent_id, tracking_id
+       FROM agent_products
+       WHERE id = 941`
+    ).first<{ agent_id: number; tracking_id: number }>();
+
+    const deletedTag = await env.DB.prepare(
+      `SELECT id
+       FROM tracking_ids
+       WHERE id = 741`
+    ).first<{ id: number }>();
+
+    expect(remapped).toEqual({ agent_id: 41, tracking_id: 742 });
+    expect(deletedTag).toBeNull();
+  });
+
+  it("blocks delete when no replacement site-primary tag exists", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 42, "blocked-force-agent", "Blocked Force Agent");
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (751, 42, 'old-es-tag-21', 'ES', 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (851, 'B0FORCE002', 'Blocked Product', 'http://img.com/blocked.jpg', 'ES', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, is_active)
+       VALUES (951, 42, 851, 751, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/tracking/751?force=1", {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}`, Origin: "http://localhost" },
+      }),
+      env as any,
+      { waitUntil: () => {} } as any
+    );
+
+    expect(response.status).toBe(409);
+  });
 });

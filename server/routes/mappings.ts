@@ -229,7 +229,7 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
 
   const data = c.req.valid('json');
   const current = await c.env.DB.prepare(
-    `SELECT ap.id, ap.agent_id, ap.product_id, ap.tracking_id, ap.custom_title,
+    `SELECT ap.id, ap.agent_id, ap.product_id, ap.tracking_id, ap.custom_title, ap.show_on_homepage,
             a.slug as agent_slug, p.asin, p.marketplace
      FROM agent_products ap
      JOIN agents a ON a.id = ap.agent_id
@@ -243,6 +243,7 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
       product_id: number;
       tracking_id: number;
       custom_title: string | null;
+      show_on_homepage: number;
       agent_slug: string;
       asin: string;
       marketplace: string;
@@ -273,12 +274,18 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
     `UPDATE agent_products
      SET tracking_id = ?,
          custom_title = ?,
+         show_on_homepage = ?,
          is_active = 1
      WHERE id = ?`
   )
     .bind(
       nextTrackingId,
       data.custom_title === undefined ? current.custom_title : data.custom_title || null,
+      data.show_on_homepage === undefined
+        ? current.show_on_homepage
+        : data.show_on_homepage
+          ? 1
+          : 0,
       id
     )
     .run();

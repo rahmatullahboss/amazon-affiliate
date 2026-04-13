@@ -21,12 +21,14 @@ interface Agent {
 const getToken = () => getAuthToken();
 
 export default function AdminUsersPage() {
+  const USERS_PER_PAGE = 12;
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [form, setForm] = useState({
     username: "",
     email: "",
@@ -82,6 +84,22 @@ export default function AdminUsersPage() {
       return haystacks.some((value) => value.toLowerCase().includes(query));
     });
   }, [searchQuery, users]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / USERS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * USERS_PER_PAGE;
+    return filteredUsers.slice(start, start + USERS_PER_PAGE);
+  }, [currentPage, filteredUsers]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   const handleCreate = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -210,7 +228,7 @@ export default function AdminUsersPage() {
         <p className="text-[#a0a0b8] m-0">Loading users...</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {filteredUsers.map((user) => (
+          {paginatedUsers.map((user) => (
             <div key={user.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="min-w-0 w-full sm:w-auto">
                 <div className="flex flex-wrap items-center gap-2 mb-1">
@@ -233,6 +251,31 @@ export default function AdminUsersPage() {
               </button>
             </div>
           ))}
+          {filteredUsers.length > 0 ? (
+            <div className="flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[#94a3b8]">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          ) : null}
           {users.length === 0 ? (
             <p className="text-center text-[#6b6b85] p-8 m-0 border border-white/10 rounded-2xl border-dashed">
               No users yet.

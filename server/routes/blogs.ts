@@ -9,7 +9,9 @@ import {
   buildBlogImageUrl,
   buildStoredImageKey,
   createUniqueBlogSlug,
+  deriveBlogStatus,
   estimateReadingMinutes,
+  resolveBlogAmazonCtaUrl,
 } from "../services/blog";
 import { generateScheduledBlogDraft } from "../services/blog-generation";
 
@@ -22,42 +24,98 @@ function mapBlogPost(
   cover_image_url: string | null;
   reading_minutes: number;
   excerpt_text: string;
+  resolved_cta_url: string | null;
 } {
   return {
     ...row,
+    status: deriveBlogStatus(row),
     cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
     reading_minutes: estimateReadingMinutes(row.content),
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
+    resolved_cta_url: null,
   };
+}
+
+function validateScheduledFields(input: {
+  status: "draft" | "scheduled" | "published";
+  scheduledFor: string | null | undefined;
+}) {
+  if (input.status !== "scheduled") {
+    return;
+  }
+
+  if (!input.scheduledFor) {
+    throw new HTTPException(400, {
+      message: "Scheduled posts require a future publish time.",
+    });
+  }
+
+  const scheduledAt = new Date(input.scheduledFor);
+  if (Number.isNaN(scheduledAt.getTime()) || scheduledAt.getTime() <= Date.now()) {
+    throw new HTTPException(400, {
+      message: "Scheduled publish time must be in the future.",
+    });
+  }
 }
 
 blogs.get("/", async (c) => {
   const status = c.req.query("status");
 
   const query =
-    status === "draft" || status === "published"
+    status === "scheduled"
       ? c.env.DB.prepare(
           `SELECT *
            FROM blog_posts
-           WHERE is_deleted = 0 AND status = ?
-           ORDER BY
-             updated_at DESC,
-             published_at DESC`
-        ).bind(status)
+           WHERE is_deleted = 0
+             AND status = 'draft'
+             AND scheduled_for IS NOT NULL
+             AND datetime(scheduled_for) > datetime('now')
+           ORDER BY datetime(scheduled_for) ASC, updated_at DESC`
+        )
+      : status === "draft"
+        ? c.env.DB.prepare(
+            `SELECT *
+             FROM blog_posts
+             WHERE is_deleted = 0
+               AND status = 'draft'
+               AND (scheduled_for IS NULL OR datetime(scheduled_for) <= datetime('now'))
+             ORDER BY updated_at DESC, published_at DESC`
+          )
+        : status === "published"
+          ? c.env.DB.prepare(
+              `SELECT *
+               FROM blog_posts
+               WHERE is_deleted = 0 AND status = 'published'
+               ORDER BY published_at DESC, updated_at DESC`
+            )
       : c.env.DB.prepare(
           `SELECT *
            FROM blog_posts
            WHERE is_deleted = 0
            ORDER BY
-             CASE WHEN status = 'draft' THEN 0 ELSE 1 END,
+             CASE
+               WHEN status = 'draft' AND scheduled_for IS NOT NULL AND datetime(scheduled_for) > datetime('now') THEN 0
+               WHEN status = 'draft' THEN 1
+               ELSE 2
+             END,
              updated_at DESC`
         );
 
   const { results } = await query.all<BlogPostRow>();
 
-  return c.json({
-    posts: (results ?? []).map((row) => mapBlogPost(c.env, row)),
-  });
+  const posts = await Promise.all(
+    (results ?? []).map(async (row) => ({
+      ...mapBlogPost(c.env, row),
+      resolved_cta_url: await resolveBlogAmazonCtaUrl({
+        db: c.env.DB,
+        ctaUrl: row.cta_url,
+        generationFocusAsin: row.generation_focus_asin,
+        generationMarketplace: row.generation_marketplace,
+      }),
+    }))
+  );
+
+  return c.json({ posts });
 });
 
 blogs.post("/generate-ai-draft", async (c) => {
@@ -137,7 +195,17 @@ blogs.get("/:id", async (c) => {
     throw new HTTPException(404, { message: "Blog post not found" });
   }
 
-  return c.json({ post: mapBlogPost(c.env, row) });
+  return c.json({
+    post: {
+      ...mapBlogPost(c.env, row),
+      resolved_cta_url: await resolveBlogAmazonCtaUrl({
+        db: c.env.DB,
+        ctaUrl: row.cta_url,
+        generationFocusAsin: row.generation_focus_asin,
+        generationMarketplace: row.generation_marketplace,
+      }),
+    },
+  });
 });
 
 blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
@@ -149,15 +217,18 @@ blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
 
   const excerpt = buildBlogExcerpt(payload.content, payload.excerpt);
   const status = payload.status;
+  const scheduledFor = status === "scheduled" ? payload.scheduled_for || null : null;
+  validateScheduledFields({ status, scheduledFor });
+  const storedStatus = status === "scheduled" ? "draft" : status;
   const publishedAt =
-    status === "published" ? payload.published_at || new Date().toISOString() : null;
+    storedStatus === "published" ? payload.published_at || new Date().toISOString() : null;
 
   const result = await c.env.DB.prepare(
     `INSERT INTO blog_posts (
        title, slug, excerpt, content, cover_image_key, cover_image_alt,
        cta_label, cta_url, cta_disclosure,
-       seo_title, seo_description, status, is_featured, published_at, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
+       seo_title, seo_description, status, is_featured, published_at, scheduled_for, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`
   )
     .bind(
       payload.title.trim(),
@@ -171,9 +242,10 @@ blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
       payload.cta_disclosure?.trim() || null,
       payload.seo_title?.trim() || null,
       payload.seo_description?.trim() || null,
-      status,
+      storedStatus,
       payload.is_featured ? 1 : 0,
-      publishedAt
+      publishedAt,
+      scheduledFor
     )
     .run();
 
@@ -192,7 +264,15 @@ blogs.post("/", zValidator("json", createBlogPostSchema), async (c) => {
 
   return c.json(
     {
-      post: mapBlogPost(c.env, row),
+      post: {
+        ...mapBlogPost(c.env, row),
+        resolved_cta_url: await resolveBlogAmazonCtaUrl({
+          db: c.env.DB,
+          ctaUrl: row.cta_url,
+          generationFocusAsin: row.generation_focus_asin,
+          generationMarketplace: row.generation_marketplace,
+        }),
+      },
       message: "Blog post created successfully",
     },
     201
@@ -234,8 +314,16 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
       ? buildBlogExcerpt(nextContent, payload.excerpt ?? current.excerpt)
       : current.excerpt;
   const nextStatus = payload.status || current.status;
+  const storedNextStatus = nextStatus === "scheduled" ? "draft" : nextStatus;
+  const nextScheduledFor =
+    nextStatus === "scheduled"
+      ? payload.scheduled_for === undefined
+        ? current.scheduled_for
+        : payload.scheduled_for
+      : null;
+  validateScheduledFields({ status: nextStatus, scheduledFor: nextScheduledFor });
   const nextPublishedAt =
-    nextStatus === "published"
+    storedNextStatus === "published"
       ? payload.published_at || current.published_at || new Date().toISOString()
       : null;
 
@@ -255,6 +343,7 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
          status = ?,
          is_featured = ?,
          published_at = ?,
+         scheduled_for = ?,
          updated_at = datetime('now')
      WHERE id = ?`
   )
@@ -276,9 +365,10 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
       payload.seo_description === undefined
         ? current.seo_description
         : payload.seo_description?.trim() || null,
-      nextStatus,
+      storedNextStatus,
       payload.is_featured === undefined ? current.is_featured : payload.is_featured ? 1 : 0,
       nextPublishedAt,
+      nextScheduledFor,
       id
     )
     .run();
@@ -296,7 +386,15 @@ blogs.put("/:id", zValidator("json", updateBlogPostSchema), async (c) => {
   }
 
   return c.json({
-    post: mapBlogPost(c.env, row),
+    post: {
+      ...mapBlogPost(c.env, row),
+      resolved_cta_url: await resolveBlogAmazonCtaUrl({
+        db: c.env.DB,
+        ctaUrl: row.cta_url,
+        generationFocusAsin: row.generation_focus_asin,
+        generationMarketplace: row.generation_marketplace,
+      }),
+    },
     message: "Blog post updated successfully",
   });
 });

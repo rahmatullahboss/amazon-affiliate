@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 
 type SubmissionStatus = "pending_review" | "rejected" | "active";
@@ -21,15 +21,33 @@ interface ProductSubmission {
 const getToken = () => getAuthToken();
 
 export default function ProductSubmissionsPage() {
+  const SUBMISSIONS_PER_PAGE = 10;
   const [submissions, setSubmissions] = useState<ProductSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | SubmissionStatus>("all");
   const [actingId, setActingId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     void fetchSubmissions();
   }, [statusFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(submissions.length / SUBMISSIONS_PER_PAGE));
+  const paginatedSubmissions = useMemo(() => {
+    const start = (currentPage - 1) * SUBMISSIONS_PER_PAGE;
+    return submissions.slice(start, start + SUBMISSIONS_PER_PAGE);
+  }, [currentPage, submissions]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   async function fetchSubmissions() {
     setLoading(true);
@@ -139,7 +157,7 @@ export default function ProductSubmissionsPage() {
       ) : null}
 
       <div className="flex flex-col gap-4">
-        {submissions.map((submission) => (
+        {paginatedSubmissions.map((submission) => (
           <article key={submission.id} className="grid grid-cols-1 sm:grid-cols-[120px_1fr] gap-4 bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-4">
             <div className="bg-white rounded-xl flex items-center justify-center min-h-[120px] aspect-square sm:aspect-auto">
               <img
@@ -204,6 +222,31 @@ export default function ProductSubmissionsPage() {
           </article>
         ))}
       </div>
+      {submissions.length > 0 ? (
+        <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-[#94a3b8]">
+            Page {currentPage} of {totalPages}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+              disabled={currentPage === 1}
+              className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+              disabled={currentPage === totalPages}
+              className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

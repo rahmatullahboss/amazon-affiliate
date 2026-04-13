@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getAuthToken } from "../../utils/auth-session";
 
 interface AuditLog {
@@ -12,13 +12,27 @@ interface AuditLog {
 }
 
 export default function AuditLogsPage() {
+  const LOGS_PER_PAGE = 12;
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     void fetchLogs();
   }, []);
+
+  const totalPages = Math.max(1, Math.ceil(logs.length / LOGS_PER_PAGE));
+  const paginatedLogs = useMemo(() => {
+    const start = (currentPage - 1) * LOGS_PER_PAGE;
+    return logs.slice(start, start + LOGS_PER_PAGE);
+  }, [currentPage, logs]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   async function fetchLogs() {
     try {
@@ -70,31 +84,58 @@ export default function AuditLogsPage() {
       {logs.length === 0 ? (
         <p className="text-[#6b6b85]">No audit entries yet.</p>
       ) : (
-        <div className="grid gap-3">
-          {logs.map((log) => (
-            <article key={log.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
-              <div className="flex justify-between gap-4 mb-3 flex-wrap">
-                <div>
-                  <div className="text-[#f0f0f5] font-bold">{log.action}</div>
-                  <div className="text-[#8d8da6] text-sm">
-                    {log.entityType}{log.entityId ? ` · ${log.entityId}` : ""}
+        <>
+          <div className="grid gap-3">
+            {paginatedLogs.map((log) => (
+              <article key={log.id} className="bg-[#1a1a28]/90 border border-white/5 rounded-2xl p-5">
+                <div className="flex justify-between gap-4 mb-3 flex-wrap">
+                  <div>
+                    <div className="text-[#f0f0f5] font-bold">{log.action}</div>
+                    <div className="text-[#8d8da6] text-sm">
+                      {log.entityType}{log.entityId ? ` · ${log.entityId}` : ""}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-slate-300 text-sm">
+                      {log.username || "System"}
+                    </div>
+                    <div className="text-[#6b6b85] text-xs">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-slate-300 text-sm">
-                    {log.username || "System"}
-                  </div>
-                  <div className="text-[#6b6b85] text-xs">
-                    {new Date(log.createdAt).toLocaleString()}
-                  </div>
-                </div>
+                <pre className="m-0 p-3.5 rounded-xl bg-white/5 text-[#a0a0b8] text-xs overflow-x-auto whitespace-pre-wrap font-mono">
+                  {JSON.stringify(log.details, null, 2)}
+                </pre>
+              </article>
+            ))}
+          </div>
+          {logs.length > 0 ? (
+            <div className="mt-4 flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-[#94a3b8]">
+                Page {currentPage} of {totalPages}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
               </div>
-              <pre className="m-0 p-3.5 rounded-xl bg-white/5 text-[#a0a0b8] text-xs overflow-x-auto whitespace-pre-wrap font-mono">
-                {JSON.stringify(log.details, null, 2)}
-              </pre>
-            </article>
-          ))}
-        </div>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );

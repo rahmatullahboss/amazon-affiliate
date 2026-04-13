@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import type { Route } from "./+types/blogs";
 import { getAuthToken } from "../../utils/auth-session";
 import { compressImageFile } from "../../utils/image-compression";
 import { extractApiErrorMessage } from "../../utils/api-errors";
 import { normalizeOptionalUrl, validateBlogDraft } from "../../utils/blog-admin";
-import { formatBlogDate, slugifyClientTitle, type BlogPostSummary } from "../../utils/blog";
+import { SimpleRichEditor } from "../../components/blog/SimpleRichEditor";
+import { buildBlogContentHtml, formatBlogDate, slugifyClientTitle, type BlogPostSummary } from "../../utils/blog";
+import { PUBLIC_MARKETPLACES } from "../../utils/marketplace";
 
 interface BlogApiResponse {
   posts: BlogPostSummary[];
@@ -23,7 +26,8 @@ interface BlogFormState {
   cta_disclosure: string;
   seo_title: string;
   seo_description: string;
-  status: "draft" | "published";
+  status: "draft" | "scheduled" | "published";
+  scheduled_for: string;
   is_featured: boolean;
 }
 
@@ -41,6 +45,7 @@ const emptyForm: BlogFormState = {
   seo_title: "",
   seo_description: "",
   status: "published",
+  scheduled_for: "",
   is_featured: false,
 };
 
@@ -60,6 +65,13 @@ export default function AdminBlogsPage() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "draft" | "scheduled" | "published">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "ai" | "manual">("all");
+  const [marketFilter, setMarketFilter] = useState<"all" | "global" | (typeof PUBLIC_MARKETPLACES)[number]>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const POSTS_PER_PAGE = 10;
 
   useEffect(() => {
     void fetchPosts();
@@ -80,6 +92,84 @@ export default function AdminBlogsPage() {
     () => posts.find((post) => post.id === selectedId) || null,
     [posts, selectedId]
   );
+
+  const summary = useMemo(() => {
+    const drafts = posts.filter((post) => post.status === "draft").length;
+    const published = posts.filter((post) => post.status === "published").length;
+    const aiDrafts = posts.filter(
+      (post) => post.status === "draft" && post.generation_source === "ai"
+    ).length;
+    const featured = posts.filter((post) => post.is_featured === 1).length;
+
+    return {
+      total: posts.length,
+      drafts,
+      published,
+      aiDrafts,
+      featured,
+    };
+  }, [posts]);
+
+  const filteredPosts = useMemo(() => {
+    const normalizedSearch = searchQuery.trim().toLowerCase();
+
+    return posts.filter((post) => {
+      if (statusFilter !== "all" && post.status !== statusFilter) {
+        return false;
+      }
+
+      if (sourceFilter === "ai" && post.generation_source !== "ai") {
+        return false;
+      }
+
+      if (sourceFilter === "manual" && post.generation_source === "ai") {
+        return false;
+      }
+
+      if (marketFilter !== "all") {
+        const postMarketplace = post.generation_marketplace?.trim().toUpperCase() || "GLOBAL";
+        if (marketFilter === "global" && postMarketplace !== "GLOBAL") {
+          return false;
+        }
+        if (marketFilter !== "global" && postMarketplace !== marketFilter) {
+          return false;
+        }
+      }
+
+      if (!normalizedSearch) {
+        return true;
+      }
+
+      const searchableText = [
+        post.title,
+        post.slug,
+        post.generation_provider,
+        post.generation_topic,
+        post.generation_focus_asin,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearch);
+    });
+  }, [posts, searchQuery, sourceFilter, statusFilter, marketFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / POSTS_PER_PAGE));
+  const paginatedPosts = useMemo(() => {
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    return filteredPosts.slice(start, start + POSTS_PER_PAGE);
+  }, [currentPage, filteredPosts]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, sourceFilter, statusFilter, marketFilter]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   async function fetchPosts(selected?: number | "new") {
     setLoading(true);
@@ -121,22 +211,23 @@ export default function AdminBlogsPage() {
     }
   }
 
-  function populateForm(post: BlogPostSummary) {
-    setSelectedId(post.id);
-    setForm({
-      title: post.title,
-      slug: post.slug,
-      excerpt: post.excerpt || "",
-      content: post.content,
-      cover_image_key: post.cover_image_key || "",
-      cover_image_url: post.cover_image_url || "",
-      cover_image_alt: post.cover_image_alt || "",
+function populateForm(post: BlogPostSummary) {
+  setSelectedId(post.id);
+  setForm({
+    title: post.title,
+    slug: post.slug,
+    excerpt: post.excerpt || "",
+    content: buildBlogContentHtml(post.content),
+    cover_image_key: post.cover_image_key || "",
+    cover_image_url: post.cover_image_url || "",
+    cover_image_alt: post.cover_image_alt || "",
       cta_label: post.cta_label || "",
-      cta_url: post.cta_url || "",
+      cta_url: post.resolved_cta_url || post.cta_url || "",
       cta_disclosure: post.cta_disclosure || "",
       seo_title: post.seo_title || "",
       seo_description: post.seo_description || "",
       status: post.status,
+      scheduled_for: post.scheduled_for ? post.scheduled_for.slice(0, 16) : "",
       is_featured: post.is_featured === 1,
     });
     setSlugTouched(true);
@@ -160,12 +251,13 @@ export default function AdminBlogsPage() {
       }
 
       const normalizedCtaUrl = form.cta_url ? normalizeOptionalUrl(form.cta_url) : "";
+      const normalizedContent = buildBlogContentHtml(form.content);
 
       const requestPayload = {
         title: form.title,
         slug: form.slug || null,
         excerpt: form.excerpt || null,
-        content: form.content,
+        content: normalizedContent,
         cover_image_key: form.cover_image_key || null,
         cover_image_alt: form.cover_image_alt || null,
         cta_label: form.cta_label || null,
@@ -174,6 +266,9 @@ export default function AdminBlogsPage() {
         seo_title: form.seo_title || null,
         seo_description: form.seo_description || null,
         status: form.status,
+        scheduled_for: form.status === "scheduled" && form.scheduled_for
+          ? new Date(form.scheduled_for).toISOString()
+          : null,
         is_featured: form.is_featured,
       };
 
@@ -198,6 +293,7 @@ export default function AdminBlogsPage() {
       setForm((current) => ({
         ...current,
         cta_url: normalizedCtaUrl,
+        content: normalizedContent,
       }));
       await fetchPosts(responsePayload.post?.id ?? "new");
     } catch (requestError) {
@@ -356,13 +452,135 @@ export default function AdminBlogsPage() {
         </div>
       ) : null}
 
+      {summary.drafts > 0 ? (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="m-0 text-xs font-bold uppercase tracking-[0.22em] text-amber-200">Approval Queue</p>
+              <p className="mt-2 mb-0 leading-7">
+                {summary.drafts} post{summary.drafts === 1 ? "" : "s"} currently waiting for review and approval.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter("draft");
+                setSourceFilter("all");
+                setCurrentPage(1);
+              }}
+              className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-[#111111] transition hover:brightness-105"
+            >
+              Show drafts
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6b7280]">Total posts</p>
+          <p className="mt-3 text-3xl font-black text-[#f8fafc]">{summary.total}</p>
+        </div>
+        <div className="rounded-2xl border border-amber-500/15 bg-[#111827] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-amber-300/80">Drafts</p>
+          <p className="mt-3 text-3xl font-black text-amber-200">{summary.drafts}</p>
+        </div>
+        <div className="rounded-2xl border border-sky-500/15 bg-[#111827] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-sky-300/80">AI drafts</p>
+          <p className="mt-3 text-3xl font-black text-sky-200">{summary.aiDrafts}</p>
+        </div>
+        <div className="rounded-2xl border border-emerald-500/15 bg-[#111827] p-4">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-emerald-300/80">Published</p>
+          <p className="mt-3 text-3xl font-black text-emerald-200">{summary.published}</p>
+          <p className="mt-2 text-xs text-[#94a3b8]">Featured: {summary.featured}</p>
+        </div>
+      </div>
+
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="rounded-2xl border border-white/10 bg-[#111827] p-4">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-[#f0f0f5]">Posts</h2>
-            <span className="text-xs uppercase tracking-[0.18em] text-[#6b7280]">
-              {posts.length} total
-            </span>
+          <div className="mb-4 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-[#f0f0f5]">Posts</h2>
+              <span className="text-xs uppercase tracking-[0.18em] text-[#6b7280]">
+                {filteredPosts.length} shown
+              </span>
+            </div>
+
+            <div className="grid gap-3">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                placeholder="Search title, slug, ASIN, provider..."
+              />
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7280]">Status</span>
+                  <select
+                    value={statusFilter}
+                    onChange={(event) =>
+                      setStatusFilter(
+                        event.target.value === "draft" ||
+                          event.target.value === "scheduled" ||
+                          event.target.value === "published"
+                          ? event.target.value
+                          : "all"
+                      )
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="draft">Draft only</option>
+                    <option value="scheduled">Scheduled only</option>
+                    <option value="published">Published only</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7280]">Source</span>
+                  <select
+                    value={sourceFilter}
+                    onChange={(event) =>
+                      setSourceFilter(
+                        event.target.value === "ai" || event.target.value === "manual"
+                          ? event.target.value
+                          : "all"
+                      )
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  >
+                    <option value="all">All sources</option>
+                    <option value="ai">AI drafts</option>
+                    <option value="manual">Manual posts</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#6b7280]">Market</span>
+                  <select
+                    value={marketFilter}
+                    onChange={(event) =>
+                      setMarketFilter(
+                        event.target.value === "global" ||
+                          (PUBLIC_MARKETPLACES as readonly string[]).includes(event.target.value)
+                          ? (event.target.value as typeof marketFilter)
+                          : "all"
+                      )
+                    }
+                    className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  >
+                    <option value="all">All markets</option>
+                    <option value="global">Global only</option>
+                    {PUBLIC_MARKETPLACES.map((marketplace) => (
+                      <option key={marketplace} value={marketplace}>
+                        {marketplace}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
           </div>
 
           {loading ? (
@@ -373,61 +591,141 @@ export default function AdminBlogsPage() {
             <p className="rounded-xl border border-dashed border-white/10 bg-white/5 p-4 text-sm text-[#a0a0b8]">
               No blog posts yet. Create your first draft.
             </p>
+          ) : filteredPosts.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-white/10 bg-white/5 p-5 text-sm text-[#a0a0b8]">
+              <p className="font-semibold text-[#f0f0f5]">No posts match this filter.</p>
+              <p className="mt-2 leading-7">
+                Clear the search or switch filters to see more drafts and published posts.
+              </p>
+            </div>
           ) : (
             <div className="space-y-3">
-              {posts.map((post) => (
-                <button
+              {paginatedPosts.map((post) => (
+                <div
                   key={post.id}
-                  type="button"
                   onClick={() => populateForm(post)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      populateForm(post);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
                   className={`w-full rounded-xl border p-4 text-left transition-colors ${
                     selectedPost?.id === post.id
                       ? "border-[#ff9900]/40 bg-[#ff9900]/10"
                       : "border-white/10 bg-white/5 hover:bg-white/[0.07]"
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[#f0f0f5]">{post.title}</p>
-                      <p className="mt-1 text-xs text-[#6b7280]">/{post.slug}</p>
+                  <div className="flex items-start gap-3">
+                    <div className="h-[72px] w-[72px] shrink-0 overflow-hidden rounded-xl border border-white/10 bg-[#0f172a]">
+                      {post.cover_image_url ? (
+                        <img
+                          src={post.cover_image_url}
+                          alt={post.cover_image_alt || post.title}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-[0.2em] text-[#6b7280]">
+                          No image
+                        </div>
+                      )}
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
-                          post.status === "published"
-                            ? "bg-emerald-500/15 text-emerald-300"
-                            : "bg-amber-500/15 text-amber-300"
-                        }`}
-                      >
-                        {post.status}
-                      </span>
-                      {post.generation_source === "ai" ? (
-                        <span className="rounded-full bg-sky-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300">
-                          AI Draft
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
 
-                  <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#94a3b8]">
-                    <span>{formatBlogDate(post.published_at)}</span>
-                    <span>•</span>
-                    <span>{post.reading_minutes} min read</span>
-                    {post.generation_source === "ai" && post.generation_provider ? (
-                      <>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-sm font-semibold text-[#f0f0f5]">{post.title}</p>
+                          <p className="mt-1 truncate text-xs text-[#6b7280]">/{post.slug}</p>
+                        </div>
+                        <div className="flex shrink-0 flex-col items-end gap-2">
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
+                              post.status === "published"
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : post.status === "scheduled"
+                                  ? "bg-sky-500/15 text-sky-300"
+                                  : "bg-amber-500/15 text-amber-300"
+                            }`}
+                          >
+                            {post.status}
+                          </span>
+                          {post.generation_source === "ai" ? (
+                            <span className="rounded-full bg-sky-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-300">
+                              AI Draft
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-[#94a3b8]">
+                        <span>
+                          {post.status === "scheduled" && post.scheduled_for
+                            ? `Scheduled ${formatBlogDate(post.scheduled_for)}`
+                            : formatBlogDate(post.published_at)}
+                        </span>
                         <span>•</span>
-                        <span className="text-sky-300">{post.generation_provider}</span>
-                      </>
-                    ) : null}
-                    {post.is_featured === 1 ? (
-                      <>
-                        <span>•</span>
-                        <span className="text-[#ffcc80]">Featured</span>
-                      </>
-                    ) : null}
+                        <span>{post.reading_minutes} min read</span>
+                        {post.generation_source === "ai" && post.generation_provider ? (
+                          <>
+                            <span>•</span>
+                            <span className="text-sky-300">{post.generation_provider}</span>
+                          </>
+                        ) : null}
+                        {post.is_featured === 1 ? (
+                          <>
+                            <span>•</span>
+                            <span className="text-[#ffcc80]">Featured</span>
+                          </>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {post.status === "published" ? (
+                          <Link
+                            to={`/blog/${post.slug}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20"
+                          >
+                            View live site
+                          </Link>
+                        ) : null}
+                        <span className="inline-flex items-center rounded-lg border border-white/10 bg-[#0f172a] px-3 py-1.5 text-xs font-semibold text-[#a0a0b8]">
+                          {post.generation_focus_asin ? `ASIN ${post.generation_focus_asin}` : "No focus ASIN"}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                </button>
+                </div>
               ))}
+
+              <div className="flex flex-col gap-3 border-t border-white/10 pt-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-[#94a3b8]">
+                  Page {currentPage} of {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((current) => Math.max(1, current - 1))}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage((current) => Math.min(totalPages, current + 1))}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border border-white/10 bg-[#0f172a] px-3 py-2 text-xs font-semibold text-[#f8fafc] transition hover:border-[#ff9900]/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -467,8 +765,39 @@ export default function AdminBlogsPage() {
                 {selectedPost.generation_focus_asin ? ` · Focus ASIN: ${selectedPost.generation_focus_asin}` : ""}
               </p>
               <p className="mt-2 mb-0 leading-7 text-sky-100/80">
-                Review, edit, and switch status to <strong>published</strong> when ready to make this article live.
+                Review, edit, and switch status to <strong>published</strong> or <strong>scheduled</strong> when ready.
               </p>
+              {selectedPost.status === "published" ? (
+                <div className="mt-3">
+                  <Link
+                    to={`/blog/${selectedPost.slug}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-lg border border-sky-300/30 bg-sky-400/10 px-3 py-2 text-xs font-semibold text-sky-50 transition-colors hover:bg-sky-400/20"
+                  >
+                    View live site
+                  </Link>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {selectedPost?.status === "published" && selectedPost.generation_source !== "ai" ? (
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-sm text-emerald-100">
+              <p className="m-0 font-semibold">Published post</p>
+              <p className="mt-2 mb-0 leading-7 text-emerald-100/90">
+                This article is already live on the public site.
+              </p>
+              <div className="mt-3">
+                <Link
+                  to={`/blog/${selectedPost.slug}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center rounded-lg border border-emerald-300/30 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-50 transition-colors hover:bg-emerald-400/20"
+                >
+                  View live site
+                </Link>
+              </div>
             </div>
           ) : null}
 
@@ -485,12 +814,11 @@ export default function AdminBlogsPage() {
 
           <label className="space-y-2">
             <span className="text-sm font-semibold text-[#f0f0f5]">Article Content</span>
-            <textarea
+            <SimpleRichEditor
               value={form.content}
-              onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))}
-              rows={18}
-              className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm leading-7 text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
-              placeholder="Write the article here. Separate paragraphs with blank lines."
+              onChange={(nextValue) => setForm((current) => ({ ...current, content: nextValue }))}
+              disabled={saving}
+              placeholder="Write the article here. Use the toolbar for headings, lists, and emphasis."
             />
           </label>
 
@@ -569,6 +897,27 @@ export default function AdminBlogsPage() {
                 placeholder="Affiliate link. As an Amazon Associate, DealsRky earns from qualifying purchases."
               />
             </label>
+
+            {selectedPost?.resolved_cta_url ? (
+              <div className="mt-5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
+                  Live Amazon CTA Preview
+                </p>
+                <p className="mt-2 break-all text-sm leading-6 text-emerald-50">
+                  {selectedPost.resolved_cta_url}
+                </p>
+                <div className="mt-3">
+                  <a
+                    href={selectedPost.resolved_cta_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-lg border border-emerald-300/25 bg-emerald-500/15 px-3 py-2 text-xs font-semibold text-emerald-50 transition-colors hover:bg-emerald-500/25"
+                  >
+                    Open Amazon CTA
+                  </a>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -601,17 +950,53 @@ export default function AdminBlogsPage() {
                 onChange={(event) =>
                   setForm((current) => ({
                     ...current,
-                    status: event.target.value === "published" ? "published" : "draft",
+                    status:
+                      event.target.value === "published"
+                        ? "published"
+                        : event.target.value === "scheduled"
+                          ? "scheduled"
+                          : "draft",
+                    scheduled_for:
+                      event.target.value === "scheduled" ? current.scheduled_for : "",
                   }))
                 }
                 className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
               >
                 <option value="draft">Draft</option>
+                <option value="scheduled">Scheduled</option>
                 <option value="published">Published</option>
               </select>
             </label>
 
-            <label className="mt-8 flex items-center gap-3 rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc]">
+            {form.status === "scheduled" ? (
+              <label className="space-y-2">
+                <span className="text-sm font-semibold text-[#f0f0f5]">Publish Time</span>
+                <input
+                  type="datetime-local"
+                  value={form.scheduled_for}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, scheduled_for: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc] outline-none transition focus:border-[#ff9900]/40"
+                  required
+                />
+              </label>
+            ) : (
+              <label className="mt-8 flex items-center gap-3 rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc]">
+                <input
+                  type="checkbox"
+                  checked={form.is_featured}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, is_featured: event.target.checked }))
+                  }
+                />
+                Mark as featured
+              </label>
+            )}
+          </div>
+
+          {form.status === "scheduled" ? (
+            <label className="flex items-center gap-3 rounded-xl border border-white/10 bg-[#0f172a] px-4 py-3 text-sm text-[#f8fafc]">
               <input
                 type="checkbox"
                 checked={form.is_featured}
@@ -621,7 +1006,7 @@ export default function AdminBlogsPage() {
               />
               Mark as featured
             </label>
-          </div>
+          ) : null}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

@@ -1,7 +1,10 @@
 import type { Route } from "./+types/blog";
 import { Link } from "react-router";
 import { BlogCard } from "../components/blog/BlogCard";
-import { orderBlogPostsForMarketplace } from "../utils/blog-personalization";
+import {
+  filterBlogPostsForMarketplace,
+  orderBlogPostsForMarketplace,
+} from "../utils/blog-personalization";
 import { buildSeoMeta } from "../utils/seo";
 import type { BlogPostSummary } from "../utils/blog";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
@@ -45,7 +48,10 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
   }));
-  const orderedPosts = orderBlogPostsForMarketplace(posts, preferredMarketplace);
+  const orderedPosts = orderBlogPostsForMarketplace(
+    filterBlogPostsForMarketplace(posts, preferredMarketplace),
+    preferredMarketplace
+  );
 
   return {
     featuredPost: orderedPosts[0] || null,

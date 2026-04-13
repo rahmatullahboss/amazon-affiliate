@@ -1,6 +1,6 @@
 ---
 name: typescript
-description: "Typescript for amazon-affiliate. 80 gotchas, 248 conventions, 107 fixes."
+description: "Typescript for amazon-affiliate. 81 gotchas, 251 conventions, 110 fixes."
 domain: typescript
 triggers:
   - glob: "**/*.ts"
@@ -11,7 +11,7 @@ enabled: true
 
 # Typescript
 
-Auto-compiled from **1107 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
+Auto-compiled from **1119 real patterns** in **amazon-affiliate**. This skill is auto-routed to agents when working on typescript files.
 
 ## ⚠️ Anti-Patterns & Gotchas
 
@@ -19,6 +19,7 @@ Auto-compiled from **1107 real patterns** in **amazon-affiliate**. This skill is
 
 | ❌ Don't | Details |
 |----------|----------|
+| ⚠️ GOTCHA: Fixed null crash in AppLoadContext — re | - import { syncAgentSheetSources } from "../server/services/sheet-control"; + import { createBlogIma |
 | ⚠️ GOTCHA: Fixed null crash in AppLoadContext — re | - import { createBlogImageResponse } from "../server/services/blog"; + import { syncAgentSheetSource |
 | ⚠️ GOTCHA: Fixed null crash in Explicitly — extern | -           `Sitemap: ${PUBLIC_SITE_URL}/sitemap.xml`, +           "", -         ].join("\n"), +     |
 | ⚠️ GOTCHA: Fixed null crash in Bindings — reduces  | - import { generateScheduledBlogDraft } from "../server/services/blog-generation"; + import { create |
@@ -68,9 +69,65 @@ Auto-compiled from **1107 real patterns** in **amazon-affiliate**. This skill is
 | ⚠️ GOTCHA: Fixed null crash in AmazonProductFetchE | - const AGENT_PRODUCT_SELECT = `SELECT + function isAmazonProductFetchError( -   a.slug as agent_slu |
 | ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | -   let deferredStatusError: DynamicLinkResolutionError - null = null; +   const resolutionCandidate |
 | ⚠️ GOTCHA: Fixed null crash in AmazonProductFetchE | -   ensureProductRecord, +   AmazonProductFetchError, -   extractAsinFromInput, +   ensureProductRec |
-| ⚠️ GOTCHA: Fixed null crash in DynamicLinkResoluti | - import { DynamicLinkResolutionError, ensureDynamicLinkByAgentSlug } from '../services/dynamic-link |
 
 ## 🔧 Problem Playbooks
+
+### problem-fix in blog.ts
+File updated (external): app/utils/blog.ts
+
+Content summary (85 lines):
+export interface BlogPostSummary {
+  id: number;
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  excerpt_text?: string;
+  content: string;
+  cover_image_key?: string | null;
+  cover_image_url: string | null;
+  cover_image_alt: string | null;
+  resolved_cta_url?: string | null;
+  cta_label?: string | null;
+  cta_ur
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### problem-fix in blogs.ts
+File updated (external): server/routes/blogs.ts
+
+Content summary (375 lines):
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
+import { zValidator } from "@hono/zod-validator";
+import type { AppEnv, BlogPostRow } from "../utils/types";
+import { createBlogPostSchema, updateBlogPostSchema } from "../schemas";
+import {
+  buildBlogExcerpt,
+  buildBlogImageKey,
+  buildB
+
+**Actionable Steps:**
+1. Modified 1 files
+
+### Fixed null crash in Bindings — prevents null/undefined runtime crashes
+- import type { Bindings } from "../utils/types";
++ import { buildAmazonUrl } from "../utils/types";
+- 
++ import type { Bindings } from "../utils/types";
+- export const BLOG_STATUSES = ["draft", "published"] as const;
++ 
+- export type BlogStatus = (typeof BLOG_STATUSES)[number];
++ export const BLOG_STATUSES = ["draft", "published"] as const;
+- 
++ export type BlogStatus = (typeof BLOG_STATUSES)[num
+
+**Actionable Steps:**
+1. Modified 1 files
+2. identifier: Bindings
+3. identifier: BlogStatus
+4. identifier: BlogPostRecord
+5. identifier: Promise
 
 ### Fixed null crash in GenerationProductCandidate — offloads heavy computation o...
 - function buildTopicLabel(product: GenerationProductCandidate): string {
@@ -123,59 +180,6 @@ interface GenerationProductCandidate {
 
 ### Fixed null crash in SELECT — prevents null/undefined runtime crashes
 - import { createTrackingIdSchema } from '../schemas';
-+ import { createTrackingIdSchema, updateTrackingIdSchema } from '../schemas';
-- tracking.put('/:id', async (c) => {
-+ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
--   const body = await c.req.json<{
-+   const body = c.req.valid('json');
--     label?: string;
-+ 
--     is_default?: boolean;
-+   const current =
-
-**Actionable Steps:**
-1. Modified 1 files
-2. identifier: SELECT
-3. identifier: FROM
-4. identifier: WHERE
-5. identifier: HTTPException
-
-### problem-fix in blog-generation.ts
-File updated (external): server/services/blog-generation.ts
-
-Content summary (679 lines):
-import { z } from "zod";
-import type { Bindings } from "../utils/types";
-import { buildBlogExcerpt, createUniqueBlogSlug } from "./blog";
-
-type BlogGenerationStatus = "success" | "skipped" | "failed";
-type BlogGenerationProvider = "workers_ai" | "ollama_cloud";
-
-interface GenerationProductCandidate {
-  asin: 
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### problem-fix in api-errors.test.ts
-File updated (external): test/unit/api-errors.test.ts
-
-Content summary (36 lines):
-import { describe, expect, it } from "vitest";
-import { extractApiErrorMessage } from "../../app/utils/api-errors";
-
-describe("extractApiErrorMessage", () => {
-  it("returns nested zod issue messages with a field path", () => {
-    expect(
-      extractApiErrorMessage(
-        {
-          error: {
-            issues
-
-**Actionable Steps:**
-1. Modified 1 files
-
-### Fixed null crash in Bindings — reduces initial bundle size with code splitting
-- import { shouldRedirectToPublicAppUrl } from "../server/utils/ur
++ import { createTrackingIdSc
 
 ... [Truncated — see individual observations for full content]

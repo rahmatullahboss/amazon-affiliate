@@ -93,4 +93,90 @@ describe("Blogs API", () => {
     expect(updatePayload.post.cta_url).toBe("https://www.amazon.co.uk/dp/B0TEST1234?tag=testuk-21");
     expect(updatePayload.post.cta_disclosure).toBe("Affiliate link for Amazon UK.");
   });
+
+  it("creates a scheduled post with a future publish time", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    const token = await generateEditorToken("editor", env.JWT_SECRET || "test-secret");
+    const ctx = { waitUntil: () => undefined } as never;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/blogs", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          title: "Scheduled Desk Setup Guide",
+          slug: "scheduled-desk-setup-guide",
+          content:
+            "This scheduled article contains enough body text to pass validation and wait for a future publish time.\n\nIt explains what readers should compare before choosing accessories and how to review options carefully before buying.",
+          status: "scheduled",
+          scheduled_for: "2099-04-13T06:00:00.000Z",
+        }),
+      }),
+      env as never,
+      ctx
+    );
+
+    expect(response.status).toBe(201);
+
+    const row = await env.DB.prepare(
+      `SELECT status, scheduled_for
+       FROM blog_posts
+       WHERE slug = ?`
+    )
+      .bind("scheduled-desk-setup-guide")
+      .first<{ status: string; scheduled_for: string | null }>();
+
+    expect(row?.status).toBe("draft");
+    expect(row?.scheduled_for).toBe("2099-04-13T06:00:00.000Z");
+
+    const listResponse = await apiApp.fetch(
+      new Request("http://localhost/api/blogs?status=scheduled", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as never,
+      ctx
+    );
+
+    expect(listResponse.status).toBe(200);
+    const listPayload = (await listResponse.json()) as {
+      posts: Array<{ slug: string; status: string }>;
+    };
+    expect(listPayload.posts.some((post) => post.slug === "scheduled-desk-setup-guide")).toBe(true);
+    expect(listPayload.posts.find((post) => post.slug === "scheduled-desk-setup-guide")?.status).toBe("scheduled");
+  });
+
+  it("rejects scheduled posts without a future publish time", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    const token = await generateEditorToken("editor", env.JWT_SECRET || "test-secret");
+    const ctx = { waitUntil: () => undefined } as never;
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/blogs", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          title: "Invalid scheduled post",
+          slug: "invalid-scheduled-post",
+          content:
+            "This scheduled article contains enough body text to pass validation but is missing the required schedule metadata.\n\nThat should cause the API to reject it.",
+          status: "scheduled",
+        }),
+      }),
+      env as never,
+      ctx
+    );
+
+    expect(response.status).toBe(400);
+  });
 });

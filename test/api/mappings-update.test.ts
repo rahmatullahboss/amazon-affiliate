@@ -60,6 +60,51 @@ describe("Mappings update API", () => {
     expect(mapping?.tracking_id).toBe(802);
   });
 
+  it("lets admin toggle homepage visibility for a specific mapping", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 44, "home-agent", "Home Agent");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (931, 'B0MAP00031', 'Homepage Product', 'https://example.com/home.webp', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (831, 44, 'home-agent-20', 'US', 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active, show_on_homepage)
+       VALUES (731, 44, 931, 831, NULL, 1, 0)`
+    ).run();
+
+    const adminToken = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/mappings/731", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          show_on_homepage: true,
+        }),
+      }),
+      env as never,
+      { waitUntil: () => undefined } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const mapping = await env.DB.prepare(
+      `SELECT show_on_homepage
+       FROM agent_products
+       WHERE id = 731`
+    ).first<{ show_on_homepage: number }>();
+
+    expect(mapping?.show_on_homepage).toBe(1);
+  });
+
   it("bulk assigns one active tag across selected products for the same agent", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 42, "bulk-agent", "Bulk Agent");
@@ -151,7 +196,14 @@ describe("Mappings update API", () => {
 
     expect(response.status).toBe(400);
 
-    const payload = (await response.json()) as { message: string };
-    expect(payload.message).toContain("Selected tag is for US");
+    const payload = (await response.json()) as Record<string, unknown>;
+    const message =
+      typeof payload.message === "string"
+        ? payload.message
+        : typeof payload.error === "string"
+          ? payload.error
+          : JSON.stringify(payload);
+
+    expect(message).toContain("Selected tag is for US");
   });
 });

@@ -3,12 +3,15 @@ import { Link } from "react-router";
 import { ProductCard } from "../components/home/ProductCard";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
+  filterBlogPostsForMarketplace,
+  orderBlogPostsForMarketplace,
+} from "../utils/blog-personalization";
+import {
   buildSeoMeta,
   toSiteBrandingMeta,
 } from "../utils/seo";
 import {
   HOME_HERO_EYEBROW,
-  HOME_HERO_TITLE,
 } from "../utils/affiliate-copy";
 import {
   resolveMarketplaceContext,
@@ -16,6 +19,12 @@ import {
   type PublicMarketplace,
 } from "../utils/marketplace";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import { getHomepageFeedRows } from "../../server/services/homepage-feed";
+import {
+  buildComparisonGroups,
+  buildHomePageSections,
+  getHomepageKeywordLabel,
+} from "../utils/homepage";
 import type { BlogPostSummary } from "../utils/blog";
 
 interface ProductRow {
@@ -26,6 +35,9 @@ interface ProductRow {
   category: string | null;
   marketplace: string | null;
   created_at: string;
+  agent_slug: string | null;
+  source_type: "mapping" | "fallback";
+  public_href: string;
 }
 
 interface HomeLoaderData {
@@ -39,6 +51,18 @@ interface HomeLoaderData {
     og_description: string;
     og_image_url: string;
   } | null;
+}
+
+function buildHomepageProductPath(
+  agentSlug: string | null,
+  marketplace: string | null,
+  asin: string
+): string {
+  if (!agentSlug || !marketplace) {
+    return `/deals/${asin}`;
+  }
+
+  return `/${agentSlug}/${marketplace.toLowerCase()}/${asin}`;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -65,21 +89,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const selectedMarketplace = marketplaceContext.marketplace;
 
   const [productsResult, postsResult] = await Promise.all([
-    env.DB.prepare(
-      `
-        SELECT id, asin, title, image_url, category, marketplace, created_at
-        FROM products
-        WHERE is_active = 1 AND status = 'active' AND marketplace = ?
-        ORDER BY created_at DESC
-        LIMIT 36
-      `
-    ).bind(selectedMarketplace).all<ProductRow>(),
+    getHomepageFeedRows(env.DB, selectedMarketplace, 44),
     env.DB.prepare(
       `SELECT *
        FROM blog_posts
        WHERE is_deleted = 0 AND status = 'published'
        ORDER BY is_featured DESC, published_at DESC, updated_at DESC
-       LIMIT 3`
+       LIMIT 7`
     ).all<
       BlogPostSummary & {
         cover_image_key: string | null;
@@ -93,15 +109,24 @@ export async function loader({ request, context }: Route.LoaderArgs) {
      LIMIT 1`
   ).first<HomeLoaderData["siteBranding"]>();
 
-  const posts = (postsResult.results || []).map((row) => ({
+  const allPosts = (postsResult.results || []).map((row) => ({
     ...row,
     cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
   }));
+  const posts = orderBlogPostsForMarketplace(
+    filterBlogPostsForMarketplace(allPosts, selectedMarketplace),
+    selectedMarketplace
+  );
 
   return {
-    products: productsResult.results || [],
+    products: productsResult.map((product) => ({
+      ...product,
+      public_href: product.agent_slug
+        ? buildHomepageProductPath(product.agent_slug, product.marketplace, product.asin)
+        : `/deals/${product.asin}`,
+    })),
     posts,
     selectedMarketplace,
     selectionSource: marketplaceContext.source,
@@ -129,6 +154,20 @@ const editorialHighlights = [
 
 const marketplaceLabels = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 
+const quickAccessLinks = [
+  { label: "Trending Deals", to: "/deals" },
+  { label: "Latest Deals", to: "/deals" },
+  { label: "Top 10 Deals", to: "/deals" },
+  { label: "About / Contact / Policy", to: "/about" },
+];
+
+const socialLinks = [
+  { label: "Facebook", href: "/contact" },
+  { label: "Instagram", href: "/contact" },
+  { label: "Telegram", href: "/contact" },
+  { label: "WhatsApp", href: "/contact" },
+];
+
 function getMarketplaceStatusCopy(
   source: MarketplaceSelectionSource,
   selectedMarketplace: PublicMarketplace,
@@ -152,8 +191,12 @@ function getMarketplaceStatusCopy(
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { products, posts, selectedMarketplace, selectionSource, detectedMarketplace } =
     loaderData as HomeLoaderData;
-  const featuredProducts = products.slice(0, 6);
-  const latestProducts = products.slice(6, 12);
+  const { featuredPost, supportingPosts, primaryProducts, trendingProducts, topDealProducts } =
+    buildHomePageSections({
+      posts,
+      products,
+    });
+  const comparisonGroups = buildComparisonGroups(primaryProducts);
   const statusCopy = getMarketplaceStatusCopy(
     selectionSource,
     selectedMarketplace,
@@ -169,26 +212,26 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               {HOME_HERO_EYEBROW}
             </p>
             <h1 className="max-w-xl text-4xl font-black leading-tight text-gray-950 md:text-6xl">
-              {HOME_HERO_TITLE}
+              Blog-first product research that turns traffic into informed buyers
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 md:text-lg">
-              DealsRky publishes concise buying guidance, curated recommendations,
-              and marketplace-aware product pages so you can compare options before
-              continuing to Amazon for current pricing and checkout.
+              DealsRky now leads with editorial content. Visitors discover buying guides,
+              comparisons, and practical articles first, then move into marketplace-aware
+              product pages when they want to evaluate a specific item.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                to="/deals"
+                to="/blog"
                 className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
-                Browse curated picks
+                Read latest articles
               </Link>
               <Link
-                to="/disclosure"
+                to="/deals"
                 className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary"
               >
-                Read affiliate disclosure
+                Browse product pages
               </Link>
             </div>
           </div>
@@ -265,143 +308,366 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-12 lg:px-6">
-        <div className="grid gap-4 md:grid-cols-3">
-          {editorialHighlights.map((item) => (
-            <article
-              key={item.title}
-              className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
+      <section className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {quickAccessLinks.map((link) => (
+            <Link
+              key={link.label}
+              to={link.to}
+              className="rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm font-bold text-gray-700 transition hover:border-primary hover:text-primary"
             >
-              <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                Our Promise
-              </p>
-              <h2 className="mt-4 text-2xl font-bold text-gray-900">
-                {item.title}
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-gray-600">
-                {item.description}
-              </p>
-            </article>
+              {link.label}
+            </Link>
           ))}
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
-        <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
+      <section className="mx-auto max-w-7xl px-4 pb-14 lg:px-6">
+        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              Editor's picks
-            </p>
-            <h2 className="mt-2 text-3xl font-black text-gray-950">
-              Recent recommendations worth reviewing
-            </h2>
-          </div>
-          <Link
-            to="/deals"
-            className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
-          >
-            View full catalog
-          </Link>
-        </div>
-
-        {featuredProducts.length > 0 ? (
-          <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {featuredProducts.map((product) => (
-              <ProductCard key={product.id} item={product} />
-            ))}
-          </div>
-        ) : (
-          <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
-            <h3 className="text-lg font-bold text-gray-900">Check back soon for new recommendations</h3>
-            <p className="mt-2 text-sm text-gray-600">
-              Our editors are reviewing the next batch of product pages and buying guides.
-              Please check back shortly.
-            </p>
-          </div>
-        )}
-      </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-14 lg:px-6">
-        <div className="grid gap-8 rounded-[2rem] border border-gray-200 bg-white p-8 shadow-sm lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              How it works
-            </p>
-            <h2 className="mt-3 text-3xl font-black text-gray-950">
-              Simple path from product research to the final retailer page
-            </h2>
-            <div className="mt-8 grid gap-5">
-              {[
-                "We review catalog data, product positioning, and marketplace availability before publishing a page.",
-                "You browse concise research notes, comparisons, and recommendation summaries without clutter.",
-                "When you are ready, continue to Amazon to review live pricing, shipping, and final checkout details.",
-              ].map((step, index) => (
-                <div key={step} className="flex gap-4 rounded-2xl bg-gray-50 p-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-primary font-bold text-white">
-                    {index + 1}
-                  </div>
-                  <p className="text-sm leading-6 text-gray-700">{step}</p>
-                </div>
-              ))}
+            <div className="rounded-[2rem] border border-gray-200 bg-[linear-gradient(135deg,#0f2020_0%,#153f3f_55%,#1b5656_100%)] px-6 py-8 text-white shadow-[0_24px_70px_-40px_rgba(15,64,64,0.6)] md:px-8">
+              <p className="text-xs font-bold uppercase tracking-[0.35em] text-primary/90">
+                Today&apos;s Best Amazon Deals
+              </p>
+              <h2 className="mt-4 max-w-3xl text-3xl font-black leading-tight md:text-5xl">
+                Discover top-rated Amazon finds before everyone else
+              </h2>
+              <p className="mt-5 max-w-2xl text-base leading-7 text-white/75">
+                Fresh picks updated daily for shoppers in the US, Canada, and Europe. Explore trending products, compare smarter, and jump to the best fit when you are ready to buy.
+              </p>
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  to="/deals"
+                  className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                >
+                  Shop Latest Deals
+                </Link>
+                <Link
+                  to="/blog"
+                  className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-bold text-white transition-colors hover:border-white/50"
+                >
+                  See Smart Buying Guides
+                </Link>
+              </div>
             </div>
-          </div>
 
-          <div className="rounded-[1.75rem] bg-[#edf4f4] p-6">
-            <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-              Fresh catalog
-            </p>
-            <h3 className="mt-3 text-2xl font-bold text-gray-900">Recently published</h3>
-            <div className="mt-6 grid gap-4">
-              {latestProducts.length > 0 ? (
-                latestProducts.map((product) => (
-                  <Link
-                    key={product.id}
-                    to={`/deals/${product.asin}`}
-                    className="rounded-2xl border border-white bg-white p-4 transition-transform hover:-translate-y-0.5 hover:shadow-sm"
-                  >
-                    <p className="text-xs uppercase tracking-[0.25em] text-gray-400">
-                      {product.marketplace || "US"}
-                    </p>
-                    <p className="mt-2 line-clamp-2 text-sm font-semibold text-gray-900">
-                      {product.title}
-                    </p>
-                  </Link>
-                ))
+            <div className="mt-10 flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                  Latest 30 Products
+                </p>
+                <h2 className="mt-2 text-3xl font-black text-gray-950">
+                  30 fresh product picks worth checking today
+                </h2>
+              </div>
+              <Link
+                to="/deals"
+                className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
+              >
+                View all deals
+              </Link>
+            </div>
+
+            {primaryProducts.length > 0 ? (
+              <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+                {primaryProducts.map((product, index) => (
+                  <ProductCard
+                    key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-primary`}
+                    item={{
+                      ...product,
+                      title: getHomepageKeywordLabel(product.category, product.title, index),
+                    }}
+                    href={product.public_href}
+                    variant="homepageCompact"
+                    badgeLabel="Popular pick"
+                    description={`Buyer-friendly pick for ${selectedMarketplace} shoppers looking for a smarter option.`}
+                    primaryCtaLabel="Check Price"
+                    secondaryCtaLabel="Details Check"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
+                <h3 className="text-lg font-bold text-gray-900">Check back soon for new recommendations</h3>
+                <p className="mt-2 text-sm text-gray-600">
+                  Our editors are reviewing the next batch of product pages and buying guides.
+                  Please check back shortly.
+                </p>
+              </div>
+            )}
+
+            <div className="mt-14 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+              <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                    Quick Comparisons
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black text-gray-950">
+                    Compare similar picks before you choose one
+                  </h2>
+                </div>
+                <Link
+                  to="/blog"
+                  className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
+                >
+                  View buying guides
+                </Link>
+              </div>
+
+              {comparisonGroups.length > 0 ? (
+                <div className="mt-6 grid gap-6">
+                  {comparisonGroups.map((group) => (
+                    <div key={group.category} className="overflow-hidden rounded-[1.5rem] border border-gray-200">
+                      <div className="border-b border-gray-200 bg-gray-50 px-5 py-4">
+                        <p className="text-xs font-bold uppercase tracking-[0.28em] text-primary">
+                          Comparison Table
+                        </p>
+                        <h3 className="mt-2 text-xl font-bold text-gray-900">
+                          Related {group.category} products
+                        </h3>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {group.products.map((product, index) => (
+                          <div
+                            key={`${group.category}-${product.asin}`}
+                            className="grid gap-4 px-5 py-4 md:grid-cols-[88px_minmax(0,1fr)_auto]"
+                          >
+                            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#f5f8f8] p-3">
+                              <img
+                                src={product.image_url}
+                                alt={product.title || product.asin}
+                                className="max-h-full max-w-full object-contain mix-blend-multiply"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-xs font-bold uppercase tracking-[0.22em] text-gray-400">
+                                Product Image
+                              </p>
+                              <h4 className="mt-2 text-base font-semibold text-gray-900">
+                                {product.title}
+                              </h4>
+                              <p className="mt-2 text-sm leading-6 text-gray-600">
+                                {getHomepageKeywordLabel(product.category, product.title || product.asin, index)}
+                              </p>
+                            </div>
+                            <div className="flex items-center">
+                              <Link
+                                to={product.public_href}
+                                className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                              >
+                                Check Price
+                              </Link>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : (
-                <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-6 text-sm text-gray-600">
-                  No recent products yet.
+                <div className="mt-6 rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
+                  Comparison tables will appear automatically when enough related products are available in the same category.
                 </div>
               )}
             </div>
-          </div>
-        </div>
-      </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
-        <div className="rounded-[2.5rem] bg-gray-900 px-6 py-16 text-center text-white sm:px-12 sm:py-20 lg:px-16">
-          <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-            Featured guide
-          </p>
-          <h2 className="mt-4 text-3xl font-black md:text-5xl">
-            Start with practical buying guides, not rush-driven deals
-          </h2>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-gray-300">
-            DealsRky works best when you use product pages and articles for research first, then continue to Amazon for the latest price, delivery details, reviews, and checkout.
-          </p>
-          <div className="mt-10 flex flex-wrap justify-center gap-4">
-            <Link
-              to="/blog"
-              className="rounded-full bg-primary px-8 py-4 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
-            >
-              Read the Buying Guide
-            </Link>
-            <Link
-              to="/deals"
-              className="rounded-full border border-gray-600 px-8 py-4 text-sm font-bold text-white transition-colors hover:border-gray-400 hover:text-white"
-            >
-              Browse curated picks
-            </Link>
+            <section className="mt-14">
+              <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                    Fresh Articles
+                  </p>
+                  <h2 className="mt-2 text-3xl font-black text-gray-950">
+                    Helpful buying guides with featured images
+                  </h2>
+                </div>
+                <Link
+                  to="/blog"
+                  className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
+                >
+                  Visit the blog
+                </Link>
+              </div>
+
+              {featuredPost ? (
+                <div className="mt-8 grid gap-6">
+                  <div className="grid gap-8 overflow-hidden rounded-[2rem] border border-gray-200 bg-white shadow-sm lg:grid-cols-[1.05fr_0.95fr]">
+                    <Link to={`/blog/${featuredPost.slug}`} className="block h-full bg-[#edf5f5]">
+                      {featuredPost.cover_image_url ? (
+                        <img
+                          src={featuredPost.cover_image_url}
+                          alt={featuredPost.cover_image_alt || featuredPost.title}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full min-h-[280px] items-center justify-center bg-[linear-gradient(135deg,#103737_0%,#185757_100%)] text-white">
+                          <span className="text-xs font-bold uppercase tracking-[0.35em] text-white/75">
+                            Featured article
+                          </span>
+                        </div>
+                      )}
+                    </Link>
+
+                    <div className="p-8">
+                      <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                        Featured article
+                      </p>
+                      <h3 className="mt-4 text-3xl font-black leading-tight text-gray-950">
+                        <Link to={`/blog/${featuredPost.slug}`} className="transition-colors hover:text-primary">
+                          {featuredPost.title}
+                        </Link>
+                      </h3>
+                      <p className="mt-4 text-base leading-8 text-gray-600">
+                        {featuredPost.excerpt_text || featuredPost.excerpt || ""}
+                      </p>
+                      <Link
+                        to={`/blog/${featuredPost.slug}`}
+                        className="mt-8 inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                      >
+                        Read featured article
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {supportingPosts.length > 0
+                      ? supportingPosts.map((post) => <BlogCard key={post.id} post={post} />)
+                      : editorialHighlights.map((item) => (
+                          <article
+                            key={item.title}
+                            className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm"
+                          >
+                            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+                              Our Promise
+                            </p>
+                            <h3 className="mt-4 text-2xl font-bold text-gray-900">
+                              {item.title}
+                            </h3>
+                            <p className="mt-3 text-sm leading-6 text-gray-600">
+                              {item.description}
+                            </p>
+                          </article>
+                        ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
+                  <h3 className="text-lg font-bold text-gray-900">Blog articles are coming soon</h3>
+                  <p className="mt-2 text-sm text-gray-600">
+                    We are preparing comparison posts, buying guides, and deeper product research pieces.
+                  </p>
+                </div>
+              )}
+            </section>
           </div>
+
+          <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                Trending Deals
+              </p>
+              <div className="mt-5 grid gap-3">
+                {trendingProducts.length > 0 ? (
+                  trendingProducts.map((product, index) => (
+                    <Link
+                      key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-trending`}
+                      to={product.public_href}
+                      className="rounded-2xl border border-gray-200 px-4 py-4 transition hover:border-primary hover:bg-primary/5"
+                    >
+                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
+                        {getHomepageKeywordLabel(product.category, product.title, index)}
+                      </p>
+                      <p className="mt-2 line-clamp-2 text-sm font-semibold text-gray-900">
+                        {product.title}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                    More trending products will show up here as soon as new listings are published.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                Email Subscription
+              </p>
+              <h3 className="mt-3 text-2xl font-bold text-gray-900">
+                Get the best deals in your inbox
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                Join the list for fresh product finds, trending picks, and daily deal updates designed for serious Amazon shoppers.
+              </p>
+              <div className="mt-5 flex flex-col gap-3">
+                <Link
+                  to="/contact"
+                  className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                >
+                  Join Free Email Alerts
+                </Link>
+                <Link
+                  to="/contact"
+                  className="text-sm font-semibold text-primary transition-colors hover:text-primary-hover"
+                >
+                  Get Telegram / WhatsApp updates
+                </Link>
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                Social Media Links
+              </p>
+              <div className="mt-5 grid gap-3">
+                {socialLinks.map((link) => (
+                  <Link
+                    key={link.label}
+                    to={link.href}
+                    className="rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                Marketplace Scope
+              </p>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                Built for shoppers in the USA, Canada, and Europe. We avoid fixed price mentions so product recommendations stay useful across multiple Amazon marketplaces.
+              </p>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
+              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                Top 10 Deals Today
+              </p>
+              <div className="mt-5 grid gap-3">
+                {topDealProducts.length > 0 ? (
+                  topDealProducts.slice(0, 5).map((product) => (
+                    <Link
+                      key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-top`}
+                      to={product.public_href}
+                      className="rounded-2xl border border-gray-200 px-4 py-4 transition hover:border-primary hover:bg-primary/5"
+                    >
+                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">
+                        {product.title}
+                      </p>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
+                    Top deal cards will appear here when more homepage products are available.
+                  </div>
+                )}
+              </div>
+            </div>
+          </aside>
         </div>
       </section>
 

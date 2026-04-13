@@ -66,6 +66,23 @@ interface GenerateDraftResult {
   reason?: string;
 }
 
+export async function publishDueScheduledBlogPosts(db: D1Database): Promise<number> {
+  const result = await db
+    .prepare(
+      `UPDATE blog_posts
+       SET status = 'published',
+           published_at = COALESCE(scheduled_for, datetime('now')),
+           updated_at = datetime('now')
+       WHERE is_deleted = 0
+         AND status = 'draft'
+         AND scheduled_for IS NOT NULL
+         AND datetime(scheduled_for) <= datetime('now')`
+    )
+    .run();
+
+  return Number(result.meta.changes ?? 0);
+}
+
 interface WorkersAiResult {
   response?: string;
   usage?: {

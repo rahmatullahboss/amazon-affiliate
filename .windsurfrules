@@ -1,5 +1,5 @@
 # amazon-affiliate — Project Memory
-# Auto-synced | 2468 observations
+# Auto-synced | 2668 observations
 
 **Stack:** TypeScript · React + Tailwind
 
@@ -35,6 +35,7 @@ Example:
 
 # 📐 Conventions
 
+- Git Commit: feat: implement AI-driven scheduled blog draft generation wi — confirmed 3x
 - Version your API from day 1 (/api/v1/)
 - Use consistent response format across all endpoints
 - Implement soft delete for important data — don't hard delete without confirmation
@@ -42,7 +43,6 @@ Example:
 - Make layouts responsive from the start — mobile-first approach
 - Disable submit button during form submission — prevent double-submit
 - Always add empty states ("No items yet" with call-to-action)
-- Always add error states with retry button — not just blank screen
 
 # ⚡ Available Tools (ON-DEMAND only)
 - `sys_core_02(title, content, category)` — Save a note + auto-detect conflicts
@@ -54,4 +54,4 @@ Example:
 > ℹ️ DO NOT call sys_core_14() or sys_core_08() at startup — context above IS your context.
 
 ---
-*Auto-synced | 2026-04-11*
+*Auto-synced | 2026-04-12*

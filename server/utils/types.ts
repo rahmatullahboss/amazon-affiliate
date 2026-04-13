@@ -144,7 +144,7 @@ export interface BlogPostRow {
   cta_disclosure: string | null;
   seo_title: string | null;
   seo_description: string | null;
-  status: 'draft' | 'published';
+  status: 'draft' | 'scheduled' | 'published';
   generation_source: 'manual' | 'ai';
   generation_provider: string | null;
   generation_topic: string | null;
@@ -153,6 +153,7 @@ export interface BlogPostRow {
   is_featured: number;
   is_deleted: number;
   published_at: string | null;
+  scheduled_for: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

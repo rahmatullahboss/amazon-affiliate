@@ -5,6 +5,12 @@ import type { AppEnv } from '../utils/types';
 import { createAgentSchema, updateAgentSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import { writeAuditLog } from '../services/audit-log';
+import {
+  collectAgentDeleteMarketplaces,
+  ensureSitePrimaryCoverageForMarketplaces,
+  remapAgentAnalyticsToSitePrimary,
+  remapAgentProductsForAgentToSitePrimary,
+} from '../services/site-primary-remap';
 
 const agents = new Hono<AppEnv>();
 
@@ -177,26 +183,113 @@ agents.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid agent ID' });
 
-  const agent = await c.env.DB.prepare('SELECT slug FROM agents WHERE id = ?')
-    .bind(id).first<{ slug: string }>();
+  const agent = await c.env.DB.prepare('SELECT slug, is_active FROM agents WHERE id = ?')
+    .bind(id).first<{ slug: string; is_active: number }>();
   if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
+  if (agent.is_active === 1) {
+    throw new HTTPException(409, { message: 'Deactivate the agent before deleting it.' });
+  }
 
-  await c.env.DB.prepare('UPDATE agents SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    .bind(id).run();
+  const marketplaces = await collectAgentDeleteMarketplaces(c.env.DB, id);
+
+  try {
+    const replacements = await ensureSitePrimaryCoverageForMarketplaces(c.env.DB, marketplaces);
+
+    await remapAgentProductsForAgentToSitePrimary(c.env.DB, id, replacements);
+    await remapAgentAnalyticsToSitePrimary(c.env.DB, id, replacements);
+  } catch (error) {
+    throw new HTTPException(409, {
+      message: error instanceof Error ? error.message : 'Missing site-primary replacement tags.',
+    });
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE users
+     SET agent_id = NULL,
+         is_active = 0,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE agent_id = ?`
+  )
+    .bind(id)
+    .run();
+
+  await c.env.DB.prepare('DELETE FROM agents WHERE id = ?')
+    .bind(id)
+    .run();
 
   const cache = new CacheService(c.env.KV);
   c.executionCtx.waitUntil(cache.invalidateForAgent(agent.slug));
   c.executionCtx.waitUntil(
     writeAuditLog(c.env.DB, {
       userId: c.get('userId'),
-      action: 'agent.deactivated',
+      action: 'agent.deleted',
       entityType: 'agent',
       entityId: id,
       details: { slug: agent.slug },
     })
   );
 
-  return c.json({ message: 'Agent deactivated' });
+  return c.json({ message: 'Agent deleted and remapped to site-primary tags.' });
+});
+
+/**
+ * DELETE /api/agents/:id/tracking — Delete all tracking for an inactive agent
+ */
+agents.delete('/:id/tracking', async (c) => {
+  const id = parseInt(c.req.param('id'));
+  if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid agent ID' });
+
+  const agent = await c.env.DB.prepare('SELECT slug, is_active FROM agents WHERE id = ?')
+    .bind(id).first<{ slug: string; is_active: number }>();
+  if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
+  if (agent.is_active === 1) {
+    throw new HTTPException(409, { message: 'Deactivate the agent before deleting all tracking.' });
+  }
+
+  const marketplacesResult = await c.env.DB.prepare(
+    `SELECT DISTINCT marketplace
+     FROM tracking_ids
+     WHERE agent_id = ?`
+  )
+    .bind(id)
+    .all<{ marketplace: string }>();
+
+  const marketplaces = (marketplacesResult.results ?? []).map((row) => row.marketplace);
+  const excludedTrackingIdsByMarketplace = new Map<string, number>();
+  const currentTrackingRows = await c.env.DB.prepare(
+    `SELECT id, marketplace
+     FROM tracking_ids
+     WHERE agent_id = ?`
+  )
+    .bind(id)
+    .all<{ id: number; marketplace: string }>();
+
+  for (const row of currentTrackingRows.results ?? []) {
+    excludedTrackingIdsByMarketplace.set(row.marketplace, row.id);
+  }
+
+  try {
+    const replacements = await ensureSitePrimaryCoverageForMarketplaces(
+      c.env.DB,
+      marketplaces,
+      excludedTrackingIdsByMarketplace
+    );
+
+    await remapAgentProductsForAgentToSitePrimary(c.env.DB, id, replacements);
+  } catch (error) {
+    throw new HTTPException(409, {
+      message: error instanceof Error ? error.message : 'Missing site-primary replacement tags.',
+    });
+  }
+
+  await c.env.DB.prepare('DELETE FROM tracking_ids WHERE agent_id = ?')
+    .bind(id)
+    .run();
+
+  const cache = new CacheService(c.env.KV);
+  c.executionCtx.waitUntil(cache.invalidateForAgent(agent.slug));
+
+  return c.json({ message: 'All tracking removed and linked products remapped to site-primary tags.' });
 });
 
 export default agents;
