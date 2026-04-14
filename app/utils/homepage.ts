@@ -159,3 +159,22 @@ export function buildComparisonGroups<TProduct extends ComparisonProductLike>(
     .filter((group) => group.products.length >= 3)
     .slice(0, 3);
 }
+
+function buildStableSeed(input: string): number {
+  return input.split("").reduce((seed, char) => seed + char.charCodeAt(0), 0);
+}
+
+export function selectTopDealProducts<TProduct extends HomepageProductLike>(
+  products: TProduct[],
+  marketplace: string
+): TProduct[] {
+  const seed = buildStableSeed(marketplace.toUpperCase());
+
+  return [...products]
+    .sort((left, right) => {
+      const leftScore = (left.id * 17 + seed) % 101;
+      const rightScore = (right.id * 17 + seed) % 101;
+      return rightScore - leftScore;
+    })
+    .slice(0, 10);
+}

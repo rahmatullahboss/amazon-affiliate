@@ -2,8 +2,7 @@ import type { Route } from "./+types/blog";
 import { Link } from "react-router";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
-  filterBlogPostsForMarketplace,
-  orderBlogPostsForMarketplace,
+  selectBlogPostsForMarketplace,
 } from "../utils/blog-personalization";
 import { buildSeoMeta } from "../utils/seo";
 import type { BlogPostSummary } from "../utils/blog";
@@ -48,10 +47,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
   }));
-  const orderedPosts = orderBlogPostsForMarketplace(
-    filterBlogPostsForMarketplace(posts, preferredMarketplace),
-    preferredMarketplace
-  );
+  const orderedPosts = selectBlogPostsForMarketplace(posts, preferredMarketplace);
 
   return {
     featuredPost: orderedPosts[0] || null,

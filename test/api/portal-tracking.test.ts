@@ -148,7 +148,7 @@ describe("Portal Tracking API", () => {
 
     expect(payload.importCapabilities).toEqual({
       newAsinImportEnabled: true,
-      batchAsinImportEnabled: false,
+      batchAsinImportEnabled: true,
     });
   });
 
@@ -721,6 +721,81 @@ describe("Portal Tracking API", () => {
     const message = payload.error || payload.message || "";
     expect(message).toContain("amazon.es");
     expect(message).toContain("correct country");
+  });
+
+  it("accepts fallback Amazon API keys when the primary key is not configured", async () => {
+    await DbFactory.seedAgent(env.DB, 62, "fallback-agent", "Fallback Agent");
+    await env.DB.prepare(
+      `INSERT INTO users (id, username, email, password_hash, role, agent_id, is_active)
+       VALUES (162, 'fallback-agent', 'fallback@example.com', 'hash', 'agent', 62, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (962, 62, 'fallback-agent-us-20', 'US', 1, 1)`
+    ).run();
+
+    const token = await generateAgentToken(62, "fallback-agent", env.JWT_SECRET || "test-secret");
+    const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
+    const previousPrimaryKey = env.AMAZON_API_KEY;
+    const previousFallbackKey = env.AMAZON_API_KEY_FALLBACK;
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = "";
+    (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = "fallback-key";
+
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            product_title: "Fallback Key Product",
+            product_photo: "https://img.example/fallback.webp",
+            product_category: "Electronics",
+            product_description: "Fallback path product",
+            about_product: ["Fast setup"],
+            product_photos: ["https://img.example/fallback-1.webp"],
+            aplus_images: ["https://img.example/fallback-aplus.webp"],
+          },
+        }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      )
+    );
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/portal/products/submit", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          asin: "B0FALLBK01",
+          marketplace: "US",
+          custom_title: null,
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = previousPrimaryKey;
+    (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = previousFallbackKey;
+
+    expect(response.status).toBe(201);
+
+    const product = await env.DB.prepare(
+      `SELECT title, image_url
+       FROM products
+       WHERE asin = 'B0FALLBK01' AND marketplace = 'US'`
+    ).first<{ title: string; image_url: string }>();
+
+    expect(product).toEqual({
+      title: "Fallback Key Product",
+      image_url: "https://img.example/fallback.webp",
+    });
   });
 
   it("deletes an admin tracking tag and remaps linked products to the marketplace site-primary tag", async () => {

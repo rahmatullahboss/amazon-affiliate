@@ -89,6 +89,12 @@ function isLegacyCtaPromptLine(value: string): boolean {
   );
 }
 
+function isLegacyInlineCtaUrlLine(value: string): boolean {
+  return /^(buy now|check now|check price|view price|shop now|see price)\s*:\s*https?:\/\/\S+$/i.test(
+    value.trim()
+  );
+}
+
 function stripLegacyInlineCtaLines(content: string): string {
   const lines = content.split(/\r?\n/);
   const cleaned: string[] = [];
@@ -105,6 +111,10 @@ function stripLegacyInlineCtaLines(content: string): string {
     }
 
     if (isAmazonUrlOnlyLine(currentLine)) {
+      continue;
+    }
+
+    if (isLegacyInlineCtaUrlLine(currentLine)) {
       continue;
     }
 
@@ -127,6 +137,24 @@ function splitColonSectionLine(line: string): { heading: string; body: string } 
   }
 
   return { heading, body };
+}
+
+function isStandaloneHeadingLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (/[.:!?]$/.test(trimmed)) {
+    return false;
+  }
+
+  if (!/^[A-Z][A-Za-z0-9/&,'()\- ]{2,80}$/.test(trimmed)) {
+    return false;
+  }
+
+  const wordCount = trimmed.split(/\s+/).length;
+  return wordCount <= 8;
 }
 
 function renderPlainTextBlogBlocks(content: string): string {
@@ -171,6 +199,12 @@ function renderPlainTextBlogBlocks(content: string): string {
       flushListItems();
       blocks.push(`<h3>${renderInlineBlogText(colonSection.heading)}</h3>`);
       blocks.push(`<p>${renderInlineBlogText(colonSection.body)}</p>`);
+      continue;
+    }
+
+    if (isStandaloneHeadingLine(line)) {
+      flushListItems();
+      blocks.push(`<h2>${renderInlineBlogText(line)}</h2>`);
       continue;
     }
 
@@ -247,6 +281,14 @@ export function buildBlogContentHtml(content: string): string {
     )
     .replace(/<p>\s*<\/p>/gi, "")
     .replace(/<p>\s*(https?:\/\/[^<\s]+)\s*<\/p>/gi, "")
+    .replace(
+      /<p>\s*<strong>\s*(?:buy now|check now|check price|view price|shop now|see price)\s*:?\s*<\/strong>\s*https?:\/\/[^<\s]+\s*<\/p>/gi,
+      ""
+    )
+    .replace(
+      /<p>\s*(?:buy now|check now|check price|view price|shop now|see price)\s*:?\s*https?:\/\/[^<\s]+\s*<\/p>/gi,
+      ""
+    )
     .replace(
       /<p>\s*(?:check|cheak|view|see|shop|buy|browse|read|open|go)\b[\w\s-]{0,50}(?:amazon|price|deal|now|here)?\s*<\/p>\s*(?=<p>\s*https?:\/\/)/gi,
       ""

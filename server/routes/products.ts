@@ -23,6 +23,7 @@ import {
   getAmazonProductFetchErrorMessage,
   regenerateProductEditorialContent,
   refreshProductRecord,
+  resolveAmazonApiKeys,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
 import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog';
@@ -242,8 +243,13 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
     throw new HTTPException(409, { message: 'Product already exists' });
   }
 
-  const apiKey = c.env.AMAZON_API_KEY;
-  if (!apiKey) {
+  const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
+  const apiKeys = resolveAmazonApiKeys({
+    primaryApiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys,
+  });
+
+  if (apiKeys.length === 0) {
     throw new HTTPException(503, {
       message: 'ASIN fetch API not configured. Please add product manually.',
     });
@@ -253,15 +259,15 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
     const productData = await fetchAmazonProductDataWithFallback({
       asin,
       marketplace,
-      primaryApiKey: apiKey,
-      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+      primaryApiKey: c.env.AMAZON_API_KEY,
+      fallbackApiKeys,
     });
     const product = await ensureProductRecord({
       db: c.env.DB,
       asin,
       marketplace,
-      apiKey,
-      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+      apiKey: c.env.AMAZON_API_KEY,
+      fallbackApiKeys,
       title: productData.title,
       imageUrl: productData.imageUrl,
       category: productData.category,

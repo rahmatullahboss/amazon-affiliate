@@ -1,5 +1,7 @@
 import type { Route } from "./+types/home";
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { ShareButtons } from "../components/ShareButtons";
 import { ProductCard } from "../components/home/ProductCard";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
@@ -11,19 +13,18 @@ import {
   toSiteBrandingMeta,
 } from "../utils/seo";
 import {
-  HOME_HERO_EYEBROW,
-} from "../utils/affiliate-copy";
-import {
   resolveMarketplaceContext,
   type MarketplaceSelectionSource,
   type PublicMarketplace,
 } from "../utils/marketplace";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import { buildAmazonUrl } from "../../server/utils/types";
 import { getHomepageFeedRows } from "../../server/services/homepage-feed";
 import {
   buildComparisonGroups,
   buildHomePageSections,
   getHomepageKeywordLabel,
+  selectTopDealProducts,
 } from "../utils/homepage";
 import type { BlogPostSummary } from "../utils/blog";
 
@@ -38,6 +39,7 @@ interface ProductRow {
   agent_slug: string | null;
   source_type: "mapping" | "fallback";
   public_href: string;
+  direct_amazon_url: string | null;
 }
 
 interface HomeLoaderData {
@@ -126,6 +128,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       public_href: product.agent_slug
         ? buildHomepageProductPath(product.agent_slug, product.marketplace, product.asin)
         : `/deals/${product.asin}`,
+      direct_amazon_url: product.tracking_tag
+        ? buildAmazonUrl(product.asin, product.tracking_tag, product.marketplace || "US")
+        : null,
     })),
     posts,
     selectedMarketplace,
@@ -161,12 +166,7 @@ const quickAccessLinks = [
   { label: "About / Contact / Policy", to: "/about" },
 ];
 
-const socialLinks = [
-  { label: "Facebook", href: "/contact" },
-  { label: "Instagram", href: "/contact" },
-  { label: "Telegram", href: "/contact" },
-  { label: "WhatsApp", href: "/contact" },
-];
+const HOMEPAGE_GUIDE_SKIP_KEY = "homepage-guide-skipped";
 
 function getMarketplaceStatusCopy(
   source: MarketplaceSelectionSource,
@@ -191,11 +191,14 @@ function getMarketplaceStatusCopy(
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { products, posts, selectedMarketplace, selectionSource, detectedMarketplace } =
     loaderData as HomeLoaderData;
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [isGuideSkipped, setIsGuideSkipped] = useState(false);
   const { featuredPost, supportingPosts, primaryProducts, trendingProducts, topDealProducts } =
     buildHomePageSections({
       posts,
       products,
     });
+  const randomizedTopDeals = selectTopDealProducts(topDealProducts.length > 0 ? topDealProducts : primaryProducts, selectedMarketplace);
   const comparisonGroups = buildComparisonGroups(primaryProducts);
   const statusCopy = getMarketplaceStatusCopy(
     selectionSource,
@@ -203,106 +206,60 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     detectedMarketplace
   );
 
+  useEffect(() => {
+    const skipped = window.localStorage.getItem(HOMEPAGE_GUIDE_SKIP_KEY) === "1";
+    setIsGuideSkipped(skipped);
+  }, []);
+
+  function handleGuideSkip() {
+    window.localStorage.setItem(HOMEPAGE_GUIDE_SKIP_KEY, "1");
+    setIsGuideSkipped(true);
+    setIsGuideOpen(false);
+  }
+
+  function handleGuideOpen() {
+    setIsGuideOpen(true);
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_34%,#f4f6f6_100%)]">
       <section className="border-b border-gray-200 bg-white/80">
-        <div className="mx-auto flex max-w-7xl flex-col gap-12 px-4 py-16 lg:flex-row lg:items-center lg:justify-between lg:px-6">
+        <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
           <div className="max-w-2xl">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.35em] text-primary">
-              {HOME_HERO_EYEBROW}
+              Smart picks for everyday buyers
             </p>
             <h1 className="max-w-xl text-4xl font-black leading-tight text-gray-950 md:text-6xl">
-              Blog-first product research that turns traffic into informed buyers
+              Find useful Amazon products faster and buy with more confidence
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 md:text-lg">
-              DealsRky now leads with editorial content. Visitors discover buying guides,
-              comparisons, and practical articles first, then move into marketplace-aware
-              product pages when they want to evaluate a specific item.
+              Browse fresh product picks, quick comparisons, and simple buyer-friendly guides built to help shoppers in the US, Canada, and Europe choose better products faster.
             </p>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link
-                to="/blog"
+                to="/deals"
                 className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >
-                Read latest articles
+                Shop Latest Deals
               </Link>
               <Link
-                to="/deals"
+                to="/blog"
                 className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary"
               >
-                Browse product pages
+                Read Smart Buying Guides
               </Link>
             </div>
-          </div>
-
-          <div className="w-full max-w-xl rounded-[2rem] border border-white/60 bg-[#0d1e1e] p-6 text-white shadow-[0_30px_80px_-35px_rgba(8,102,102,0.45)]">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-primary/80">
-                  Supported Marketplaces
-                </p>
-                <h2 className="mt-2 text-2xl font-bold">Research First, Then Continue</h2>
-              </div>
-              <div className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white/80">
-                Editorial guidance
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {marketplaceLabels.map((label) => (
-                <Link
-                  key={label}
-                  to={`/?market=${label}`}
-                  onClick={() => {
-                    document.cookie = `preferred_marketplace=${encodeURIComponent(label)}; Path=/; Max-Age=31536000; SameSite=Lax`;
-                  }}
-                  className={`group rounded-2xl border px-4 py-4 transition-all ${
-                    label === selectedMarketplace
-                      ? "border-primary bg-primary/20 shadow-[0_18px_45px_-28px_rgba(255,153,0,0.65)]"
-                      : "border-white/10 bg-white/5 hover:border-primary/35 hover:bg-white/10"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.25em] text-white/50">
-                        Marketplace
-                      </p>
-                      <p className="mt-2 text-xl font-bold">{label}</p>
-                    </div>
-                    {label === selectedMarketplace ? (
-                      <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-black">
-                        Selected
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-3 text-sm text-white/70">
-                    {label === selectedMarketplace
-                      ? "This marketplace is currently active across the homepage feed."
-                      : "Switch the page to this country’s storefront picks."}
-                  </p>
-                  {detectedMarketplace === label && label !== selectedMarketplace ? (
-                    <div className="mt-3 inline-flex rounded-full border border-sky-300/30 bg-sky-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-200">
-                      Suggested for your location
-                    </div>
-                  ) : null}
-                  {detectedMarketplace === label && label === selectedMarketplace && selectionSource === "geo" ? (
-                    <div className="mt-3 inline-flex rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-200">
-                      Auto-selected for you
-                    </div>
-                  ) : null}
-                </Link>
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                "Latest picks updated daily",
+                "Buyer-focused product captions",
+                "Quick details before checkout",
+              ].map((item) => (
+                <div key={item} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-700 shadow-sm">
+                  {item}
+                </div>
               ))}
-            </div>
-
-            <div className="mt-6 rounded-2xl border border-primary/20 bg-primary/10 p-5">
-              <p className="text-sm leading-6 text-white/85">
-                {statusCopy}
-              </p>
-              <p className="mt-3 text-sm leading-6 text-white/65">
-                Choose any country card above to instantly switch the homepage feed,
-                then continue through the matching marketplace when you open a product.
-              </p>
             </div>
           </div>
         </div>
@@ -378,10 +335,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       title: getHomepageKeywordLabel(product.category, product.title, index),
                     }}
                     href={product.public_href}
+                    primaryHref={product.direct_amazon_url || product.public_href}
                     variant="homepageCompact"
                     badgeLabel="Popular pick"
                     description={`Buyer-friendly pick for ${selectedMarketplace} shoppers looking for a smarter option.`}
-                    primaryCtaLabel="Check Price"
+                    primaryCtaLabel="Check Price on Amazon"
                     secondaryCtaLabel="Details Check"
                   />
                 ))}
@@ -453,10 +411,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                             </div>
                             <div className="flex items-center">
                               <Link
-                                to={product.public_href}
+                                to={product.direct_amazon_url || product.public_href}
                                 className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
                               >
-                                Check Price
+                                View on Amazon
                               </Link>
                             </div>
                           </div>
@@ -619,18 +577,16 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
             <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                Social Media Links
+                Share DealsRky
               </p>
-              <div className="mt-5 grid gap-3">
-                {socialLinks.map((link) => (
-                  <Link
-                    key={link.label}
-                    to={link.href}
-                    className="rounded-2xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+              <h3 className="mt-3 text-2xl font-bold text-gray-900">
+                Share this page with other shoppers
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-gray-600">
+                Send the latest deals page to Facebook, X, WhatsApp, Telegram, or copy the direct link.
+              </p>
+              <div className="mt-5">
+                <ShareButtons title="DealsRky Latest Deals" url="/" />
               </div>
             </div>
 
@@ -648,8 +604,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 Top 10 Deals Today
               </p>
               <div className="mt-5 grid gap-3">
-                {topDealProducts.length > 0 ? (
-                  topDealProducts.slice(0, 5).map((product) => (
+                {randomizedTopDeals.length > 0 ? (
+                  randomizedTopDeals.map((product) => (
                     <Link
                       key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-top`}
                       to={product.public_href}
@@ -670,6 +626,118 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </aside>
         </div>
       </section>
+
+      <div className="fixed bottom-5 right-4 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+        {!isGuideSkipped ? (
+          <div className="rounded-full bg-primary px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-white shadow-lg">
+            Details available
+          </div>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleGuideOpen}
+          className="inline-flex items-center gap-2 rounded-full bg-gray-950 px-5 py-3 text-sm font-bold text-white shadow-[0_18px_40px_-20px_rgba(0,0,0,0.45)] transition hover:bg-primary"
+        >
+          <span className="inline-flex h-2.5 w-2.5 rounded-full bg-primary" />
+          View details
+        </button>
+      </div>
+
+      {isGuideOpen ? (
+        <div className="fixed inset-0 z-50 flex items-end bg-gray-950/45 p-3 sm:items-center sm:justify-center sm:p-6">
+          <div className="w-full max-w-3xl rounded-[2rem] bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 pb-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
+                  Marketplace Guide
+                </p>
+                <h2 className="mt-2 text-2xl font-black text-gray-950">
+                  See details or skip if you do not need them
+                </h2>
+                <p className="mt-3 text-sm leading-6 text-gray-600">
+                  {statusCopy}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsGuideOpen(false)}
+                className="rounded-full border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 transition hover:border-primary hover:text-primary"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {marketplaceLabels.map((label) => (
+                <Link
+                  key={label}
+                  to={`/?market=${label}`}
+                  onClick={() => {
+                    document.cookie = `preferred_marketplace=${encodeURIComponent(label)}; Path=/; Max-Age=31536000; SameSite=Lax`;
+                    setIsGuideOpen(false);
+                  }}
+                  className={`group rounded-2xl border p-4 transition-all ${
+                    label === selectedMarketplace
+                      ? "border-primary bg-primary/10 shadow-[0_18px_45px_-28px_rgba(255,153,0,0.45)]"
+                      : "border-gray-200 bg-gray-50 hover:border-primary hover:bg-primary/5"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.25em] text-gray-400">
+                        Marketplace
+                      </p>
+                      <p className="mt-2 text-xl font-bold text-gray-950">{label}</p>
+                    </div>
+                    {label === selectedMarketplace ? (
+                      <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.15em] text-white">
+                        Selected
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-3 text-sm text-gray-600">
+                    {label === selectedMarketplace
+                      ? "This marketplace is active for your homepage feed."
+                      : "Switch to this country to see matching storefront picks."}
+                  </p>
+                  {detectedMarketplace === label && label !== selectedMarketplace ? (
+                    <div className="mt-3 inline-flex rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-sky-700">
+                      Suggested for your location
+                    </div>
+                  ) : null}
+                  {detectedMarketplace === label && label === selectedMarketplace && selectionSource === "geo" ? (
+                    <div className="mt-3 inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-emerald-700">
+                      Auto-selected for you
+                    </div>
+                  ) : null}
+                </Link>
+              ))}
+            </div>
+
+            <div className="mt-6 flex flex-col gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm leading-6 text-gray-600">
+                Open this guide anytime from the corner button if you want marketplace details later.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={handleGuideSkip}
+                  className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-primary hover:text-primary"
+                >
+                  Skip
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsGuideOpen(false)}
+                  className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+                >
+                  Continue browsing
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <section className="border-t border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6 lg:py-24">

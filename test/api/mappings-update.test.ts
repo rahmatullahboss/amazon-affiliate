@@ -105,6 +105,58 @@ describe("Mappings update API", () => {
     expect(mapping?.show_on_homepage).toBe(1);
   });
 
+  it("reactivates an inactive mapping when admin adds tracking back to a product", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 45, "reactivate-agent", "Reactivate Agent");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (941, 'B0MAP00041', 'Reactivated Product', 'https://example.com/reactivate.webp', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES (841, 45, 'reactivate-agent-20', 'US', 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (741, 45, 941, 841, 'Old title', 0)`
+    ).run();
+
+    const adminToken = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/mappings", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          agent_id: 45,
+          product_id: 941,
+          tracking_id: 841,
+          custom_title: null,
+        }),
+      }),
+      env as never,
+      { waitUntil: () => undefined } as never
+    );
+
+    expect(response.status).toBe(201);
+
+    const mapping = await env.DB.prepare(
+      `SELECT tracking_id, is_active, custom_title
+       FROM agent_products
+       WHERE id = 741`
+    ).first<{ tracking_id: number; is_active: number; custom_title: string | null }>();
+
+    expect(mapping).toEqual({
+      tracking_id: 841,
+      is_active: 1,
+      custom_title: null,
+    });
+  });
+
   it("bulk assigns one active tag across selected products for the same agent", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 42, "bulk-agent", "Bulk Agent");

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMarketplaceAwareDealsHref,
+  getBlogMarketplaceBadge,
   filterBlogPostsForMarketplace,
   orderBlogPostsForMarketplace,
+  selectBlogPostsForMarketplace,
   type PersonalizedBlogSummary,
 } from "../../app/utils/blog-personalization";
 
@@ -71,5 +73,20 @@ describe("blog personalization helpers", () => {
     const filtered = filterBlogPostsForMarketplace(basePosts, "FR");
 
     expect(filtered.map((post) => post.slug)).toEqual(["global-manual-guide"]);
+  });
+
+  it("keeps all published posts visible while prioritizing marketplace matches first", () => {
+    const selected = selectBlogPostsForMarketplace(basePosts, "FR");
+
+    expect(selected.map((post) => post.slug)).toEqual([
+      "global-manual-guide",
+      "us-vacuum-guide",
+      "de-vacuum-guide",
+    ]);
+  });
+
+  it("builds a readable badge for global and marketplace-specific posts", () => {
+    expect(getBlogMarketplaceBadge("manual", null)).toBe("Global guide");
+    expect(getBlogMarketplaceBadge("ai", "CA")).toBe("CA guide");
   });
 });

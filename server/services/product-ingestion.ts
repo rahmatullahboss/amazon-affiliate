@@ -441,6 +441,10 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
   const asin = normalizeAsin(input.asin);
   const marketplace = input.marketplace;
   const status = input.status || "active";
+  const resolvedApiKeys = resolveAmazonApiKeys({
+    primaryApiKey: input.apiKey,
+    fallbackApiKeys: input.fallbackApiKeys,
+  });
 
   let product = await input.db
     .prepare(
@@ -463,7 +467,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
     let fetched: AmazonProductData | null = null;
 
     if (!explicitTitle || !explicitImageUrl) {
-      if (input.apiKey) {
+      if (resolvedApiKeys.length > 0) {
         fetched = await fetchAmazonProductDataWithFallback({
           asin,
           marketplace,

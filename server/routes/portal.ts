@@ -13,6 +13,7 @@ import {
   ensureProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
+  resolveAmazonApiKeys,
 } from '../services/product-ingestion';
 import {
   buildCanonicalBridgeUrl,
@@ -896,8 +897,13 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
       });
     }
 
-    const apiKey = c.env.AMAZON_API_KEY;
-    if (!apiKey) {
+    const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
+    const apiKeys = resolveAmazonApiKeys({
+      primaryApiKey: c.env.AMAZON_API_KEY,
+      fallbackApiKeys,
+    });
+
+    if (apiKeys.length === 0) {
       throw new HTTPException(503, {
         message: 'Amazon product API is not configured. Product link generation needs live product data.',
       });
@@ -908,8 +914,8 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
         db: c.env.DB,
         asin: resolvedAsin,
         marketplace,
-        apiKey,
-        fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+        apiKey: c.env.AMAZON_API_KEY,
+        fallbackApiKeys,
         status: 'active',
         requireRealProductData: true,
       });

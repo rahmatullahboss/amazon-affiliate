@@ -86,6 +86,26 @@ describe("blog utils", () => {
     ).toBe("<p>A practical buying paragraph.</p><p>Another useful paragraph.</p>");
   });
 
+  it("removes inline buy now labels that already include a deals or amazon url", () => {
+    expect(
+      buildBlogContentHtml(
+        [
+          "A practical buying paragraph.",
+          "Buy Now: https://dealsrky.com/deals/B0FWKD9TS2",
+          "Another useful paragraph.",
+        ].join("\n")
+      )
+    ).toBe("<p>A practical buying paragraph.</p><p>Another useful paragraph.</p>");
+  });
+
+  it("removes html buy now paragraphs that include a raw deals url", () => {
+    expect(
+      buildBlogContentHtml(
+        "<p>Summary paragraph.</p><p><strong>Buy Now:</strong> https://dealsrky.com/deals/B0FWKD9TS2</p><p>Closing paragraph.</p>"
+      )
+    ).toBe("<p>Summary paragraph.</p><p>Closing paragraph.</p>");
+  });
+
   it("turns colon-led feature lines into clearer sub-sections", () => {
     expect(
       buildBlogContentHtml(
@@ -96,6 +116,23 @@ describe("blog utils", () => {
       )
     ).toBe(
       "<h3>Absorption and Leak-Proof Protection</h3><p>Four layers help reduce leaks during long days.</p><h3>High-Waisted Comfort and Stability</h3><p>Soft support helps the fit stay in place.</p>"
+    );
+  });
+
+  it("treats plain standalone section titles as headings for better article structure", () => {
+    expect(
+      buildBlogContentHtml(
+        [
+          "How It Compares to Alternatives",
+          "The wireless CarPlay adapter market includes several brands with similar feature claims.",
+          "Related Picks",
+          "If you are evaluating car tech upgrades, you may also be interested in:",
+          "Conclusion",
+          "The Fahren Wireless CarPlay Adapter is a straightforward solution for drivers.",
+        ].join("\n")
+      )
+    ).toBe(
+      "<h2>How It Compares to Alternatives</h2><p>The wireless CarPlay adapter market includes several brands with similar feature claims.</p><h2>Related Picks</h2><p>If you are evaluating car tech upgrades, you may also be interested in:</p><h2>Conclusion</h2><p>The Fahren Wireless CarPlay Adapter is a straightforward solution for drivers.</p>"
     );
   });
 

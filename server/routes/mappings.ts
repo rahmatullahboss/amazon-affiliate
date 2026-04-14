@@ -63,18 +63,27 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
       .bind(data.agent_id).first<{ id: number; slug: string }>(),
     c.env.DB.prepare('SELECT id, asin, marketplace FROM products WHERE id = ? AND is_active = 1')
       .bind(data.product_id).first<{ id: number; asin: string; marketplace: string }>(),
-    c.env.DB.prepare('SELECT id FROM tracking_ids WHERE id = ? AND agent_id = ? AND is_active = 1')
-      .bind(data.tracking_id, data.agent_id).first<{ id: number }>(),
+    c.env.DB.prepare('SELECT id, marketplace FROM tracking_ids WHERE id = ? AND agent_id = ? AND is_active = 1')
+      .bind(data.tracking_id, data.agent_id).first<{ id: number; marketplace: string }>(),
   ]);
 
   if (!agent) throw new HTTPException(404, { message: 'Agent not found or inactive' });
   if (!product) throw new HTTPException(404, { message: 'Product not found or inactive' });
   if (!trackingId) throw new HTTPException(404, { message: 'Tag not found or not owned by agent' });
+  if (trackingId.marketplace !== product.marketplace) {
+    throw new HTTPException(400, {
+      message: `Selected tag is for ${trackingId.marketplace}. Choose a ${product.marketplace} tag for this product.`,
+    });
+  }
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title)
-       VALUES (?, ?, ?, ?)`
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (?, ?, ?, ?, 1)
+       ON CONFLICT(agent_id, product_id) DO UPDATE SET
+         tracking_id = excluded.tracking_id,
+         custom_title = excluded.custom_title,
+         is_active = 1`
     )
       .bind(data.agent_id, data.product_id, data.tracking_id, data.custom_title || null)
       .run();

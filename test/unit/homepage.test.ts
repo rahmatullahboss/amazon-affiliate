@@ -3,6 +3,7 @@ import {
   buildComparisonGroups,
   buildHomePageSections,
   getHomepageKeywordLabel,
+  selectTopDealProducts,
 } from "../../app/utils/homepage";
 
 describe("homepage sections", () => {
@@ -87,5 +88,22 @@ describe("homepage sections", () => {
       "B0C2",
       "B0C3",
     ]);
+  });
+
+  it("selects up to 10 top deal products using a stable pseudo-random order", () => {
+    const products = Array.from({ length: 12 }, (_, index) => ({
+      id: index + 1,
+      asin: `B0TOP${String(index + 1).padStart(6, "0")}`,
+    }));
+
+    const selected = selectTopDealProducts(products, "US");
+
+    expect(selected).toHaveLength(10);
+    expect(selected.map((product) => product.asin)).not.toEqual(
+      products.slice(0, 10).map((product) => product.asin)
+    );
+    expect(selectTopDealProducts(products, "US").map((product) => product.asin)).toEqual(
+      selected.map((product) => product.asin)
+    );
   });
 });

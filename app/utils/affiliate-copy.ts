@@ -1,5 +1,4 @@
 export const AMAZON_PRIMARY_CTA_LABEL = "View on Amazon";
-export const AMAZON_SECONDARY_CTA_LABEL = "Check on Amazon";
 export const BROWSE_PICKS_LABEL = "Browse Picks";
 export const HOME_HERO_EYEBROW = "Buying Guides & Curated Picks";
 export const HOME_HERO_TITLE =

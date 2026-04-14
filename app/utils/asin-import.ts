@@ -6,7 +6,7 @@ export const ASIN_IMPORT_PAUSED_MESSAGE =
 export const ASIN_IMPORT_PAUSED_DETAIL =
   "Amazon product import is paused for now because live API capacity is unavailable.";
 
-export const BATCH_ASIN_IMPORT_ENABLED = false;
+export const BATCH_ASIN_IMPORT_ENABLED = true;
 
 export const BATCH_ASIN_IMPORT_PAUSED_MESSAGE =
   "Batch ASIN import is temporarily paused. Single ASIN import and saved product links still work.";

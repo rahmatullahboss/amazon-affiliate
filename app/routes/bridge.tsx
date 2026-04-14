@@ -1,6 +1,7 @@
 import type { Route } from "./+types/bridge";
 import { Link, redirect } from "react-router";
 import { useEffect, type MouseEvent } from "react";
+import { ShareButtons } from "../components/ShareButtons";
 import { ImageGallery } from "../components/product/ImageGallery";
 import { recordView } from "../../server/services/analytics";
 import {
@@ -12,7 +13,6 @@ import {
 import {
   AMAZON_DESTINATION_NOTE,
   AMAZON_PRIMARY_CTA_LABEL,
-  AMAZON_SECONDARY_CTA_LABEL,
   INLINE_AFFILIATE_DISCLOSURE,
 } from "../utils/affiliate-copy";
 import { getProductEditorialSections } from "../utils/product-detail";
@@ -282,7 +282,7 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
   ]);
 
   const handleAmazonClick =
-    (ctaPlacement: "mobile" | "primary" | "secondary") =>
+    (ctaPlacement: "mobile" | "primary") =>
     (event: MouseEvent<HTMLAnchorElement>) => {
       const isModifiedClick =
         event.defaultPrevented ||
@@ -418,14 +418,6 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
               >
                 {AMAZON_PRIMARY_CTA_LABEL}
               </a>
-              <a
-                href={data.amazonUrl}
-                rel="nofollow sponsored"
-                onClick={handleAmazonClick("secondary")}
-                className="hidden items-center justify-center rounded-full border border-gray-300 px-6 py-3.5 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary sm:inline-flex"
-              >
-                {AMAZON_SECONDARY_CTA_LABEL}
-              </a>
             </div>
             <p className="mt-4 text-sm leading-6 text-gray-600">
               {AMAZON_DESTINATION_NOTE}
@@ -433,6 +425,17 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
             <p className="mt-2 text-xs leading-5 text-gray-500">
               {INLINE_AFFILIATE_DISCLOSURE}
             </p>
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
+                Share this product
+              </p>
+              <div className="mt-3">
+                <ShareButtons
+                  title={data.product.title}
+                  url={`/${data.agent.slug}/${data.marketplace.toLowerCase()}/${data.product.asin}`}
+                />
+              </div>
+            </div>
 
           </section>
         </div>

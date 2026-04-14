@@ -74,6 +74,26 @@ export function orderBlogPostsForMarketplace<T extends PersonalizedBlogSummary>(
   });
 }
 
+export function selectBlogPostsForMarketplace<T extends PersonalizedBlogSummary>(
+  posts: T[],
+  preferredMarketplace: PublicMarketplace
+): T[] {
+  return orderBlogPostsForMarketplace(posts, preferredMarketplace);
+}
+
+export function getBlogMarketplaceBadge(
+  generationSource: PersonalizedBlogSummary["generation_source"],
+  generationMarketplace: string | null
+): string {
+  const marketplace = generationMarketplace?.trim().toUpperCase();
+
+  if (!marketplace || generationSource === "manual") {
+    return "Global guide";
+  }
+
+  return `${marketplace} guide`;
+}
+
 export function buildMarketplaceAwareDealsHref(
   baseHref: string,
   preferredMarketplace: PublicMarketplace | null

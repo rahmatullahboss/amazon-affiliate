@@ -18,6 +18,7 @@ type ProductCardVariant = "default" | "homepageCompact";
 interface ProductCardProps {
   item: ProductItem;
   href?: string;
+  primaryHref?: string;
   variant?: ProductCardVariant;
   badgeLabel?: string;
   description?: string;
@@ -28,6 +29,7 @@ interface ProductCardProps {
 export function ProductCard({
   item,
   href,
+  primaryHref,
   variant = "default",
   badgeLabel,
   description,
@@ -35,6 +37,7 @@ export function ProductCard({
   secondaryCtaLabel,
 }: ProductCardProps) {
   const url = href || (item.asin ? `/deals/${item.asin}` : `/deals`);
+  const primaryUrl = primaryHref || url;
 
   if (variant === "homepageCompact") {
     return (
@@ -73,7 +76,7 @@ export function ProductCard({
 
         <div className="mt-4 flex items-center gap-3">
           <Link
-            to={url}
+            to={primaryUrl}
             className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
           >
             {primaryCtaLabel}

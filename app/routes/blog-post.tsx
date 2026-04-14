@@ -1,5 +1,6 @@
 import type { Route } from "./+types/blog-post";
 import { Link } from "react-router";
+import { ShareButtons } from "../components/ShareButtons";
 import {
   buildBlogExcerpt,
   buildBlogImageUrl,
@@ -216,6 +217,8 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
   const showMarketplaceProductBlocks =
     !post.generation_marketplace ||
     post.generation_marketplace.trim().toUpperCase() === post.preferredMarketplace;
+  const showFeaturedProductCard = showMarketplaceProductBlocks && Boolean(post.featuredProduct?.imageUrl);
+  const showStandaloneAmazonCta = showMarketplaceProductBlocks && Boolean(amazonCtaHref) && !showFeaturedProductCard;
   const articleSchema = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -264,6 +267,15 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             <span>•</span>
             <span>{post.reading_minutes} min read</span>
           </div>
+
+          <div className="mt-6">
+            <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
+              Share this article
+            </p>
+            <div className="mt-3">
+              <ShareButtons title={post.title} url={`/blog/${post.slug}`} />
+            </div>
+          </div>
         </header>
 
         {post.cover_image_url ? (
@@ -283,7 +295,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
           />
         </div>
 
-        {showMarketplaceProductBlocks && post.featuredProduct?.imageUrl ? (
+        {showFeaturedProductCard ? (
           <div className="mt-8 rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-5 md:flex-row md:items-center">
               <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50 md:w-56 md:shrink-0">
@@ -320,7 +332,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
           </div>
         ) : null}
 
-        {showMarketplaceProductBlocks && post.cta_url && amazonCtaHref ? (
+        {showStandaloneAmazonCta ? (
           <div className="mt-8 rounded-[1.75rem] border border-primary/20 bg-primary/5 p-6">
             <h2 className="text-2xl font-black text-gray-950">Ready to check this on Amazon?</h2>
             <p className="mt-3 text-sm leading-7 text-gray-600">

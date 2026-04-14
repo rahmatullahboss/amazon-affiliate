@@ -2,6 +2,7 @@ import type { Route } from "./+types/product-detail";
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
+import { ShareButtons } from "../components/ShareButtons";
 import { ImageGallery } from "../components/product/ImageGallery";
 import {
   getInitialPublicMarketplace,
@@ -346,6 +347,17 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                     <p className="mt-2 text-xs leading-5 text-gray-500">
                       {INLINE_AFFILIATE_DISCLOSURE}
                     </p>
+                    <div className="mt-5">
+                      <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
+                        Share this product
+                      </p>
+                      <div className="mt-3">
+                        <ShareButtons
+                          title={product.title}
+                          url={`/deals/${product.asin}`}
+                        />
+                      </div>
+                    </div>
                   </div>
                 ) : selectedMarketplace ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">

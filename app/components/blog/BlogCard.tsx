@@ -1,8 +1,14 @@
 import { Link } from "react-router";
 import type { BlogPostSummary } from "../../utils/blog";
 import { formatBlogDate } from "../../utils/blog";
+import { getBlogMarketplaceBadge } from "../../utils/blog-personalization";
 
 export function BlogCard({ post }: { post: BlogPostSummary }) {
+  const marketplaceBadge = getBlogMarketplaceBadge(
+    post.generation_source,
+    post.generation_marketplace
+  );
+
   return (
     <article className="overflow-hidden rounded-[1.75rem] border border-gray-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_-34px_rgba(12,112,112,0.35)]">
       {post.cover_image_url ? (
@@ -26,6 +32,12 @@ export function BlogCard({ post }: { post: BlogPostSummary }) {
       )}
 
       <div className="p-6">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-primary/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">
+            {marketplaceBadge}
+          </span>
+        </div>
+
         <div className="flex flex-wrap items-center gap-3 text-xs font-semibold uppercase tracking-[0.22em] text-gray-400">
           <span>{formatBlogDate(post.published_at)}</span>
           <span>•</span>
