@@ -78,6 +78,75 @@ describe("Creators API response mapping", () => {
       "https://example.com/2.jpg",
     ]);
   });
+
+  it("returns empty result when payload is null", () => {
+    const result = mapCreatorsProductResponse(null);
+    expect(result).toEqual({
+      title: "",
+      imageUrl: "",
+      category: null,
+      description: null,
+      features: [],
+      productImages: [],
+      aplusImages: [],
+    });
+  });
+
+  it("returns empty result when payload is undefined", () => {
+    const result = mapCreatorsProductResponse(undefined);
+    expect(result).toEqual({
+      title: "",
+      imageUrl: "",
+      category: null,
+      description: null,
+      features: [],
+      productImages: [],
+      aplusImages: [],
+    });
+  });
+
+  it("trims whitespace-only strings to empty or null", () => {
+    const result = mapCreatorsProductResponse({
+      title: "   ",
+      mainImage: { url: "  " },
+      category: "  ",
+      description: "  ",
+    });
+    expect(result).toEqual({
+      title: "",
+      imageUrl: "",
+      category: null,
+      description: null,
+      features: [],
+      productImages: [],
+      aplusImages: [],
+    });
+  });
+
+  it("returns empty features when features is not an array", () => {
+    const result = mapCreatorsProductResponse({ features: "not an array" });
+    expect(result.features).toEqual([]);
+  });
+
+  it("returns empty aplusImages when missing or null", () => {
+    expect(mapCreatorsProductResponse({}).aplusImages).toEqual([]);
+    expect(mapCreatorsProductResponse({ aplusImages: null }).aplusImages).toEqual([]);
+  });
+
+  it("skips aplusImage entries with missing url", () => {
+    const result = mapCreatorsProductResponse({
+      aplusImages: [
+        { url: "https://example.com/aplus-1.jpg" },
+        { url: null },
+        {},
+        { url: "https://example.com/aplus-2.jpg" },
+      ],
+    });
+    expect(result.aplusImages).toEqual([
+      "https://example.com/aplus-1.jpg",
+      "https://example.com/aplus-2.jpg",
+    ]);
+  });
 });
 
 describe("Creators API LWA token cache", () => {
@@ -187,6 +256,72 @@ describe("Creators API LWA token cache", () => {
     await expect(
       getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
     ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "unauthorized" });
+  });
+
+  it("throws unauthorized when LWA returns 403", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "forbidden" }), { status: 403 })
+    );
+    await expect(
+      getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "unauthorized" });
+  });
+
+  it("throws upstream_error when LWA returns 500", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("internal error", { status: 500 }));
+    await expect(
+      getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "upstream_error" });
+  });
+
+  it("throws invalid_response when LWA response is missing access_token", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ expires_in: 3600 }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    await expect(
+      getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "invalid_response" });
+  });
+
+  it("throws invalid_response when LWA response is missing expires_in", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ access_token: "x" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    await expect(
+      getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "invalid_response" });
+  });
+
+  it("refreshes the token when called within the 60s refresh buffer", async () => {
+    const nowSpy = vi.spyOn(Date, "now");
+    nowSpy.mockReturnValue(0);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 100 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    await getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read");
+
+    nowSpy.mockReturnValue(50_000);
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-2", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+
+    const token = await getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read");
+
+    expect(token).toBe("token-2");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    nowSpy.mockRestore();
   });
 });
 
@@ -371,5 +506,99 @@ describe("Creators API product fetch", () => {
 
     expect(result.title).toBe("Recovered");
     expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("throws unauthorized when product endpoint returns 403 after a retry", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("forbidden", { status: 403 }));
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-2", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("forbidden", { status: 403 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0TEST001",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "unauthorized" });
+  });
+
+  it("translates 502 to upstream_error", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("bad gateway", { status: 502 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0BADGW01",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "upstream_error" });
+  });
+
+  it("translates 400 to upstream_error with status message", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("bad request", { status: 400 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0BADREQ1",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({
+      name: "AmazonProductFetchError",
+      code: "upstream_error",
+    });
+  });
+
+  it("forwards a custom scope to the LWA token endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ title: "Scoped Product" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    await fetchCreatorsProduct({
+      asin: "B0SCOPE01",
+      marketplace: "US",
+      lwaClientId: "client-id",
+      lwaClientSecret: "client-secret",
+      scope: "my-custom::scope",
+    });
+
+    const lwaCall = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = new URLSearchParams(lwaCall[1].body as string);
+    expect(body.get("scope")).toBe("my-custom::scope");
   });
 });
