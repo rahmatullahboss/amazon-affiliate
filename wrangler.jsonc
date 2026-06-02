@@ -54,6 +54,7 @@
     "BLOG_AI_NEURON_DAILY_LIMIT": "10000",
     "OLLAMA_CLOUD_BASE_URL": "https://api.ollama.com",
     "OLLAMA_CLOUD_MODEL": "minimax-m2.7:cloud",
+    "LWA_CREATORS_SCOPE": "creatorsapi::read",
     "TELEGRAM_BOT_TOKEN": "",
     "TELEGRAM_WEBHOOK_SECRET": ""
   },
@@ -65,6 +66,8 @@
   // - OLLAMA_CLOUD_BASE_URL (optional fallback)
   // - OLLAMA_CLOUD_API_KEY (optional fallback)
   // - OLLAMA_CLOUD_MODEL (optional fallback)
+  // - LWA_CLIENT_ID (Amazon Creators API Login with Amazon client ID)
+  // - LWA_CLIENT_SECRET (Amazon Creators API Login with Amazon client secret)
   // - TELEGRAM_BOT_TOKEN
   // - TELEGRAM_WEBHOOK_SECRET
 }
