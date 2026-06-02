@@ -918,6 +918,9 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
         fallbackApiKeys,
         status: 'active',
         requireRealProductData: true,
+        lwaClientId: c.env.LWA_CLIENT_ID,
+        lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+        lwaScope: c.env.LWA_CREATORS_SCOPE,
       });
 
       product = {
