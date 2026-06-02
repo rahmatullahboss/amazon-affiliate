@@ -261,6 +261,9 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       marketplace,
       primaryApiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      lwaClientId: c.env.LWA_CLIENT_ID,
+      lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+      lwaScope: c.env.LWA_CREATORS_SCOPE,
     });
     const product = await ensureProductRecord({
       db: c.env.DB,
@@ -268,6 +271,9 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       marketplace,
       apiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      lwaClientId: c.env.LWA_CLIENT_ID,
+      lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+      lwaScope: c.env.LWA_CREATORS_SCOPE,
       title: productData.title,
       imageUrl: productData.imageUrl,
       category: productData.category,
@@ -797,6 +803,9 @@ products.post('/enrich', async (c) => {
           marketplace: product.marketplace,
           primaryApiKey: apiKey,
           fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+          lwaClientId: c.env.LWA_CLIENT_ID,
+          lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+          lwaScope: c.env.LWA_CREATORS_SCOPE,
         });
 
         const features = JSON.stringify(productData.features.slice(0, 6));
