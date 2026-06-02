@@ -49,11 +49,42 @@ export async function fetchCreatorsProduct(
   throw new Error("not implemented");
 }
 
+interface CreatorsImageRef {
+  url?: string | null;
+}
+
+interface CreatorsProductPayload {
+  title?: string | null;
+  mainImage?: CreatorsImageRef | null;
+  category?: string | null;
+  description?: string | null;
+  features?: string[] | null;
+  images?: CreatorsImageRef[] | null;
+  aplusImages?: CreatorsImageRef[] | null;
+}
+
+function extractImageUrls(
+  images: CreatorsImageRef[] | null | undefined
+): string[] {
+  if (!Array.isArray(images)) return [];
+  return images
+    .map((image) => image?.url)
+    .filter((url): url is string => typeof url === "string" && url.length > 0);
+}
+
 export function mapCreatorsProductResponse(
   payload: unknown
 ): AmazonProductData {
-  void payload;
-  throw new Error("not implemented");
+  const product = (payload ?? {}) as CreatorsProductPayload;
+  return {
+    title: product.title?.trim() ?? "",
+    imageUrl: product.mainImage?.url?.trim() ?? "",
+    category: product.category?.trim() || null,
+    description: product.description?.trim() || null,
+    features: Array.isArray(product.features) ? product.features : [],
+    productImages: extractImageUrls(product.images),
+    aplusImages: extractImageUrls(product.aplusImages),
+  };
 }
 
 export { AmazonProductFetchError, createAmazonProductFetchError };
