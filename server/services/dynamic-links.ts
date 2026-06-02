@@ -26,6 +26,9 @@ interface EnsureLegacyDynamicLinkInput {
   preferredMarketplace?: string | null;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
 }
 
 interface ProductRouteContext {
@@ -91,6 +94,9 @@ interface EnsureDynamicLinkInput {
   asin: string;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
 }
 
 export class DynamicLinkResolutionError extends Error {
@@ -455,6 +461,9 @@ export async function ensureDynamicLinkByTrackingTag(
         marketplace: tracking.marketplace,
         apiKey: input.apiKey,
         fallbackApiKeys: input.fallbackApiKeys,
+        lwaClientId: input.lwaClientId,
+        lwaClientSecret: input.lwaClientSecret,
+        lwaScope: input.lwaScope,
         status: "active",
         requireRealProductData: true,
       });
@@ -675,6 +684,9 @@ export async function ensureDynamicLinkByAgentSlug(
         marketplace: tracking.marketplace,
         apiKey: input.apiKey,
         fallbackApiKeys: input.fallbackApiKeys,
+        lwaClientId: input.lwaClientId,
+        lwaClientSecret: input.lwaClientSecret,
+        lwaScope: input.lwaScope,
         status: "active",
         requireRealProductData: true,
       });
