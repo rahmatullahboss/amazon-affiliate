@@ -50,6 +50,9 @@ interface SyncProductsFromSheetInput {
   kv: KVNamespace;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   config: SheetSyncConfig;
   credentials: GoogleCredentials;
   triggeredByUserId?: number;
@@ -249,6 +252,9 @@ export async function syncProductsFromSheet(
           marketplace: parsedRow.marketplace,
           apiKey: input.apiKey,
           fallbackApiKeys: input.fallbackApiKeys,
+          lwaClientId: input.lwaClientId,
+          lwaClientSecret: input.lwaClientSecret,
+          lwaScope: input.lwaScope,
           title: parsedRow.title,
           category: parsedRow.category,
           status: parsedRow.productStatus,

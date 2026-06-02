@@ -507,6 +507,9 @@ export async function syncAgentSheetSources(input: {
   credentials: GoogleCredentials;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   triggeredByUserId?: number;
   sourceId?: number;
 }): Promise<AgentSheetSyncSummary> {
@@ -561,6 +564,9 @@ export async function approveSheetSubmissionRow(input: {
   reviewedByUserId?: number;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   statusOverride?: "approved" | "auto_approved";
 }): Promise<SheetSubmissionRowListItem> {
   const row = await input.db
@@ -658,6 +664,9 @@ export async function approveSheetSubmissionRow(input: {
       marketplace: row.marketplace,
       apiKey: input.apiKey,
       fallbackApiKeys: input.fallbackApiKeys,
+      lwaClientId: input.lwaClientId,
+      lwaClientSecret: input.lwaClientSecret,
+      lwaScope: input.lwaScope,
       title: row.title ?? undefined,
       category: row.category ?? undefined,
       status: "active",
@@ -801,6 +810,9 @@ async function syncSingleAgentSheetSource(input: {
   credentials: GoogleCredentials;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   triggeredByUserId?: number;
 }): Promise<{
   totalRows: number;
@@ -902,6 +914,9 @@ async function syncSingleAgentSheetSource(input: {
             reviewedByUserId: input.triggeredByUserId,
             apiKey: input.apiKey,
             fallbackApiKeys: input.fallbackApiKeys,
+            lwaClientId: input.lwaClientId,
+            lwaClientSecret: input.lwaClientSecret,
+            lwaScope: input.lwaScope,
             statusOverride: "auto_approved",
           });
           approvedRows += 1;
