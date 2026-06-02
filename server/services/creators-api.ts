@@ -100,8 +100,89 @@ export async function getCreatorsAccessToken(
 export async function fetchCreatorsProduct(
   input: CreatorsApiInput
 ): Promise<AmazonProductData> {
-  void input;
-  throw new Error("not implemented");
+  const scope = input.scope ?? "creatorsapi::read";
+  const baseUrl = getCreatorsRegionBaseUrl(input.marketplace);
+  const url = `${baseUrl}/products/${encodeURIComponent(input.asin)}?marketplace=${encodeURIComponent(input.marketplace)}`;
+
+  const performFetch = async (accessToken: string) => {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: "application/json",
+      },
+    });
+
+    if (response.status === 404) {
+      throw createAmazonProductFetchError({
+        asin: input.asin,
+        marketplace: input.marketplace,
+        code: "not_found",
+      });
+    }
+    if (response.status === 429) {
+      throw createAmazonProductFetchError({
+        asin: input.asin,
+        marketplace: input.marketplace,
+        code: "rate_limited",
+      });
+    }
+    if (response.status === 401 || response.status === 403) {
+      return { kind: "unauthorized" as const, response };
+    }
+    if (response.status >= 500) {
+      throw createAmazonProductFetchError({
+        asin: input.asin,
+        marketplace: input.marketplace,
+        code: "upstream_error",
+      });
+    }
+    if (!response.ok) {
+      throw createAmazonProductFetchError({
+        asin: input.asin,
+        marketplace: input.marketplace,
+        code: "upstream_error",
+        message: `Creators API responded with ${response.status}`,
+      });
+    }
+    return { kind: "ok" as const, response };
+  };
+
+  let accessToken = await getCreatorsAccessToken(
+    input.lwaClientId,
+    input.lwaClientSecret,
+    scope
+  );
+
+  let result = await performFetch(accessToken);
+  if (result.kind === "unauthorized") {
+    const cacheKey = `${input.lwaClientId}:${scope}`;
+    tokenCache.delete(cacheKey);
+    accessToken = await getCreatorsAccessToken(
+      input.lwaClientId,
+      input.lwaClientSecret,
+      scope
+    );
+    result = await performFetch(accessToken);
+    if (result.kind === "unauthorized") {
+      throw createAmazonProductFetchError({
+        asin: input.asin,
+        marketplace: input.marketplace,
+        code: "unauthorized",
+      });
+    }
+  }
+
+  try {
+    const payload = (await result.response.json()) as unknown;
+    return mapCreatorsProductResponse(payload);
+  } catch {
+    throw createAmazonProductFetchError({
+      asin: input.asin,
+      marketplace: input.marketplace,
+      code: "invalid_response",
+    });
+  }
 }
 
 interface CreatorsImageRef {

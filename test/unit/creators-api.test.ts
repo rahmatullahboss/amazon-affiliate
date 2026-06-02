@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearCreatorsTokenCacheForTests,
+  fetchCreatorsProduct,
   getCreatorsAccessToken,
   getCreatorsRegionBaseUrl,
   mapCreatorsProductResponse,
@@ -186,5 +187,189 @@ describe("Creators API LWA token cache", () => {
     await expect(
       getCreatorsAccessToken("client-id", "client-secret", "creatorsapi::read")
     ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "unauthorized" });
+  });
+});
+
+describe("Creators API product fetch", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    clearCreatorsTokenCacheForTests();
+    fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("calls the regional endpoint with the bearer token and maps the response", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          asin: "B0TEST0001",
+          title: "Test Product",
+          mainImage: { url: "https://example.com/main.jpg" },
+          features: ["Bullet 1"],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+
+    const result = await fetchCreatorsProduct({
+      asin: "B0TEST0001",
+      marketplace: "US",
+      lwaClientId: "client-id",
+      lwaClientSecret: "client-secret",
+    });
+
+    expect(result.title).toBe("Test Product");
+    expect(result.imageUrl).toBe("https://example.com/main.jpg");
+    expect(result.features).toEqual(["Bullet 1"]);
+
+    const productCall = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(productCall[0]).toBe("https://creatorsapi-na.amazon.com/products/B0TEST0001?marketplace=US");
+    const init = productCall[1];
+    expect(init.method).toBe("GET");
+    expect((init.headers as Record<string, string>).Authorization).toBe("Bearer token-1");
+  });
+
+  it("uses the EU endpoint for UK marketplace", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ title: "UK Product" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    await fetchCreatorsProduct({
+      asin: "B0UK00001",
+      marketplace: "UK",
+      lwaClientId: "client-id",
+      lwaClientSecret: "client-secret",
+    });
+
+    const productCall = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(productCall[0]).toBe("https://creatorsapi-eu.amazon.com/products/B0UK00001?marketplace=UK");
+  });
+
+  it("translates 404 to not_found", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0MISSING",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "not_found" });
+  });
+
+  it("translates 429 to rate_limited", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("slow down", { status: 429 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0RATE00",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "rate_limited" });
+  });
+
+  it("translates 500 to upstream_error", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("oops", { status: 500 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0FAIL000",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "upstream_error" });
+  });
+
+  it("translates malformed JSON to invalid_response", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "token-1", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("not json", { status: 200 }));
+
+    await expect(
+      fetchCreatorsProduct({
+        asin: "B0BAD0001",
+        marketplace: "US",
+        lwaClientId: "client-id",
+        lwaClientSecret: "client-secret",
+      })
+    ).rejects.toMatchObject({ name: "AmazonProductFetchError", code: "invalid_response" });
+  });
+
+  it("retries once with a fresh token on 401 from the product endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "stale", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(new Response("expired", { status: 401 }));
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ access_token: "fresh", expires_in: 3600 }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify({ title: "Recovered", mainImage: { url: "https://example.com/r.jpg" } }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })
+    );
+
+    const result = await fetchCreatorsProduct({
+      asin: "B0RETRY01",
+      marketplace: "US",
+      lwaClientId: "client-id",
+      lwaClientSecret: "client-secret",
+    });
+
+    expect(result.title).toBe("Recovered");
+    expect(fetchMock).toHaveBeenCalledTimes(4);
   });
 });
