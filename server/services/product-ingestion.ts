@@ -4,7 +4,7 @@ import {
   EDITORIAL_VARIANT_COUNT,
 } from "./product-editorial";
 
-interface AmazonProductData {
+export interface AmazonProductData {
   title: string;
   imageUrl: string;
   category: string | null;
@@ -165,7 +165,7 @@ function pickPreferredFetchError(
     : current;
 }
 
-function createAmazonProductFetchError(input: {
+export function createAmazonProductFetchError(input: {
   asin: string;
   marketplace: string;
   code: AmazonProductFetchErrorCode;
