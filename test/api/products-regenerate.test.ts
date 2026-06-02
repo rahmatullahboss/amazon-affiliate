@@ -54,6 +54,9 @@ describe("Products regenerate content API", () => {
       description: "Compact air fryer for weeknight meals.",
       features: ["Digital controls", "Basket design", "Fast preheat"],
       updateExistingFromInput: true,
+      lwaClientId: undefined,
+      lwaClientSecret: undefined,
+      lwaScope: undefined,
     });
 
     expect(product.review_content).toContain("Air Fryer");
