@@ -31,15 +31,70 @@ export function getCreatorsRegionBaseUrl(marketplace: Marketplace): string {
   return "https://creatorsapi-eu.amazon.com";
 }
 
+interface CreatorsTokenResponse {
+  access_token: string;
+  expires_in: number;
+}
+
+const TOKEN_REFRESH_BUFFER_MS = 60_000;
+
 export async function getCreatorsAccessToken(
   clientId: string,
   clientSecret: string,
   scope: string
 ): Promise<string> {
-  void clientId;
-  void clientSecret;
-  void scope;
-  throw new Error("not implemented");
+  const cacheKey = `${clientId}:${scope}`;
+  const cached = tokenCache.get(cacheKey);
+  const now = Date.now();
+  if (cached && cached.expiresAt > now + TOKEN_REFRESH_BUFFER_MS) {
+    return cached.token;
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "client_credentials",
+    client_id: clientId,
+    client_secret: clientSecret,
+    scope,
+  });
+
+  const response = await fetch("https://api.amazon.com/auth/o2/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw createAmazonProductFetchError({
+      asin: "",
+      marketplace: "US",
+      code: "unauthorized",
+      message: "LWA token request rejected",
+    });
+  }
+
+  if (!response.ok) {
+    throw createAmazonProductFetchError({
+      asin: "",
+      marketplace: "US",
+      code: "upstream_error",
+      message: `LWA token request failed: ${response.status}`,
+    });
+  }
+
+  const payload = (await response.json()) as Partial<CreatorsTokenResponse>;
+  if (typeof payload.access_token !== "string" || typeof payload.expires_in !== "number") {
+    throw createAmazonProductFetchError({
+      asin: "",
+      marketplace: "US",
+      code: "invalid_response",
+      message: "LWA token response missing access_token or expires_in",
+    });
+  }
+
+  const token = payload.access_token;
+  const expiresAt = now + payload.expires_in * 1000;
+  tokenCache.set(cacheKey, { token, expiresAt });
+  return token;
 }
 
 export async function fetchCreatorsProduct(
