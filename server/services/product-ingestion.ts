@@ -1,8 +1,10 @@
 import { AMAZON_DOMAINS } from "../utils/types";
+import type { Marketplace } from "../schemas";
 import {
   buildProductEditorialReview,
   EDITORIAL_VARIANT_COUNT,
 } from "./product-editorial";
+import { fetchCreatorsProduct } from "./creators-api";
 
 export interface AmazonProductData {
   title: string;
@@ -35,6 +37,9 @@ interface EnsureProductInput {
   marketplace: string;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   title?: string | null;
   imageUrl?: string | null;
   category?: string | null;
@@ -405,7 +410,30 @@ export async function fetchAmazonProductDataWithFallback(input: {
   marketplace: string;
   primaryApiKey?: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
 }): Promise<AmazonProductData> {
+  const lwaConfigured = !!(input.lwaClientId && input.lwaClientSecret);
+  let preferredError: AmazonProductFetchError | null = null;
+
+  if (lwaConfigured) {
+    try {
+      return await fetchCreatorsProduct({
+        asin: input.asin,
+        marketplace: input.marketplace as Marketplace,
+        lwaClientId: input.lwaClientId!,
+        lwaClientSecret: input.lwaClientSecret!,
+        scope: input.lwaScope,
+      });
+    } catch (error) {
+      if (!(error instanceof AmazonProductFetchError)) {
+        throw error;
+      }
+      preferredError = pickPreferredFetchError(preferredError, error);
+    }
+  }
+
   const apiKeys = resolveAmazonApiKeys(input);
   if (apiKeys.length === 0) {
     throw createAmazonProductFetchError({
@@ -414,8 +442,6 @@ export async function fetchAmazonProductDataWithFallback(input: {
       code: "api_not_configured",
     });
   }
-
-  let preferredError: AmazonProductFetchError | null = null;
 
   for (const apiKey of apiKeys) {
     try {
@@ -467,12 +493,19 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
     let fetched: AmazonProductData | null = null;
 
     if (!explicitTitle || !explicitImageUrl) {
-      if (resolvedApiKeys.length > 0) {
+      const hasAnyFetchSource =
+        resolvedApiKeys.length > 0 ||
+        !!(input.lwaClientId && input.lwaClientSecret);
+
+      if (hasAnyFetchSource) {
         fetched = await fetchAmazonProductDataWithFallback({
           asin,
           marketplace,
           primaryApiKey: input.apiKey,
           fallbackApiKeys: input.fallbackApiKeys,
+          lwaClientId: input.lwaClientId,
+          lwaClientSecret: input.lwaClientSecret,
+          lwaScope: input.lwaScope,
         });
       } else if (input.requireRealProductData) {
         throw createAmazonProductFetchError({
@@ -635,6 +668,9 @@ export async function refreshProductRecord(input: {
   db: D1Database;
   apiKey: string;
   fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+  lwaScope?: string;
   asin: string;
   marketplace: string;
   status?: string;
@@ -644,6 +680,9 @@ export async function refreshProductRecord(input: {
     marketplace: input.marketplace,
     primaryApiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
+    lwaClientId: input.lwaClientId,
+    lwaClientSecret: input.lwaClientSecret,
+    lwaScope: input.lwaScope,
   });
 
   return ensureProductRecord({
@@ -652,6 +691,9 @@ export async function refreshProductRecord(input: {
     marketplace: input.marketplace,
     apiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
+    lwaClientId: input.lwaClientId,
+    lwaClientSecret: input.lwaClientSecret,
+    lwaScope: input.lwaScope,
     title: fetched.title,
     imageUrl: fetched.imageUrl,
     category: fetched.category,
