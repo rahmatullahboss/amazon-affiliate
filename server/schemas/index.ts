@@ -288,6 +288,22 @@ export const updateSiteBrandingSettingsSchema = z.object({
   og_image_url: z.string().url('Valid image URL required'),
 });
 
+const socialUrlField = z
+  .string()
+  .max(2000)
+  .optional()
+  .nullable()
+  .transform((value) => (typeof value === 'string' ? value.trim() : ''));
+
+export const updateSocialLinksSettingsSchema = z.object({
+  telegram_url: socialUrlField,
+  telegram_enabled: z.boolean().optional().default(false),
+  whatsapp_url: socialUrlField,
+  whatsapp_enabled: z.boolean().optional().default(false),
+  messenger_url: socialUrlField,
+  messenger_enabled: z.boolean().optional().default(false),
+});
+
 export const triggerAgentSheetSyncSchema = z.object({
   source_id: z.number().int().positive().optional(),
 });

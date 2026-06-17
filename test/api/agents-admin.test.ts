@@ -72,7 +72,7 @@ describe("Admin agent management API", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Deactivate the agent before deleting it.",
+      error: "Deactivate the agent before deleting it. Pass ?force=1 to auto-deactivate and delete.",
     });
   });
 
@@ -260,5 +260,113 @@ describe("Admin agent management API", () => {
     await expect(response.json()).resolves.toMatchObject({
       error: "Missing active site-primary tag for marketplace(s): DE",
     });
+  });
+
+  it("force deletes an active agent by auto-deactivating and remapping", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 910, "site-owner-force", "Site Owner Force");
+    await DbFactory.seedAgent(env.DB, 911, "active-force-delete", "Active Force Delete");
+    await env.DB.prepare(
+      `INSERT INTO users (id, username, email, password_hash, role, agent_id, is_active)
+       VALUES (502, 'force-user', 'force@example.com', 'hash', 'agent', 911, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (605, 'BFORCEDEL1', 'Force Delete Product', 'http://img.com/force.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+         (709, 910, 'site-owner-force-us-20', 'US', 1, 1, 1),
+         (710, 911, 'active-force-us-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (805, 911, 605, 710, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/agents/911?force=1", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as never,
+      { waitUntil: () => undefined } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const deletedAgent = await env.DB.prepare(
+      `SELECT id FROM agents WHERE id = 911`
+    ).first<{ id: number }>();
+    const orphanedTags = await env.DB.prepare(
+      `SELECT id FROM tracking_ids WHERE agent_id = 911`
+    ).all();
+    const remappedRow = await env.DB.prepare(
+      `SELECT agent_id, tracking_id FROM agent_products WHERE id = 805`
+    ).first<{ agent_id: number; tracking_id: number }>();
+    const detachedUser = await env.DB.prepare(
+      `SELECT agent_id, is_active FROM users WHERE id = 502`
+    ).first<{ agent_id: number | null; is_active: number }>();
+
+    expect(deletedAgent).toBeNull();
+    expect(orphanedTags.results).toHaveLength(0);
+    expect(remappedRow).toEqual({ agent_id: 910, tracking_id: 709 });
+    expect(detachedUser).toEqual({ agent_id: null, is_active: 0 });
+  });
+
+  it("force deletes all tracking for an active agent by auto-deactivating", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 912, "site-owner-force-track", "Site Owner Force Track");
+    await DbFactory.seedAgent(env.DB, 913, "active-force-tracking", "Active Force Tracking");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (606, 'BFORCETRK1', 'Force Track Product', 'http://img.com/force-track.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+         (711, 912, 'site-owner-force-track-us-20', 'US', 1, 1, 1),
+         (712, 913, 'active-force-track-us-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (806, 913, 606, 712, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/agents/913/tracking?force=1", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as never,
+      { waitUntil: () => undefined } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const deactivatedAgent = await env.DB.prepare(
+      `SELECT id, is_active FROM agents WHERE id = 913`
+    ).first<{ id: number; is_active: number }>();
+    const remainingTags = await env.DB.prepare(
+      `SELECT id FROM tracking_ids WHERE agent_id = 913`
+    ).all();
+    const remappedRow = await env.DB.prepare(
+      `SELECT agent_id, tracking_id FROM agent_products WHERE id = 806`
+    ).first<{ agent_id: number; tracking_id: number }>();
+
+    expect(deactivatedAgent).toEqual({ id: 913, is_active: 0 });
+    expect(remainingTags.results).toHaveLength(0);
+    expect(remappedRow).toEqual({ agent_id: 912, tracking_id: 711 });
   });
 });

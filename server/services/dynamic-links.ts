@@ -7,6 +7,7 @@ import {
   ensureProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
+  hasAmazonProductFetchSource,
 } from "./product-ingestion";
 
 interface TrackingRouteContext {
@@ -447,7 +448,12 @@ export async function ensureDynamicLinkByTrackingTag(
       throw new DynamicLinkResolutionError(503, ASIN_IMPORT_PAUSED_MESSAGE);
     }
 
-    if (!input.apiKey && !(input.fallbackApiKeys ?? []).length) {
+    if (!hasAmazonProductFetchSource({
+      primaryApiKey: input.apiKey,
+      fallbackApiKeys: input.fallbackApiKeys,
+      lwaClientId: input.lwaClientId,
+      lwaClientSecret: input.lwaClientSecret,
+    })) {
       throw new DynamicLinkResolutionError(
         503,
         "Amazon product API is not configured. Dynamic ASIN links need live product data."
@@ -643,7 +649,12 @@ export async function ensureDynamicLinkByAgentSlug(
     }
   }
 
-  if (!input.apiKey && !(input.fallbackApiKeys ?? []).length) {
+  if (!hasAmazonProductFetchSource({
+    primaryApiKey: input.apiKey,
+    fallbackApiKeys: input.fallbackApiKeys,
+    lwaClientId: input.lwaClientId,
+    lwaClientSecret: input.lwaClientSecret,
+  })) {
     if (preferredMarketplace && preferredTrackingCandidates.length > 0) {
       throw new DynamicLinkResolutionError(
         404,

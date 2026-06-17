@@ -13,7 +13,7 @@ import {
   ensureProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
-  resolveAmazonApiKeys,
+  hasAmazonProductFetchSource,
 } from '../services/product-ingestion';
 import {
   buildCanonicalBridgeUrl,
@@ -898,12 +898,14 @@ portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), 
     }
 
     const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
-    const apiKeys = resolveAmazonApiKeys({
+    const hasFetchSource = hasAmazonProductFetchSource({
       primaryApiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      lwaClientId: c.env.LWA_CLIENT_ID,
+      lwaClientSecret: c.env.LWA_CLIENT_SECRET,
     });
 
-    if (apiKeys.length === 0) {
+    if (!hasFetchSource) {
       throw new HTTPException(503, {
         message: 'Amazon product API is not configured. Product link generation needs live product data.',
       });

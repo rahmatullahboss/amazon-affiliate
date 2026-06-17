@@ -405,6 +405,18 @@ export function resolveAmazonApiKeys(input: {
     .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index);
 }
 
+export function hasAmazonProductFetchSource(input: {
+  primaryApiKey?: string;
+  fallbackApiKeys?: string[];
+  lwaClientId?: string;
+  lwaClientSecret?: string;
+}): boolean {
+  return (
+    Boolean(input.lwaClientId?.trim() && input.lwaClientSecret?.trim()) ||
+    resolveAmazonApiKeys(input).length > 0
+  );
+}
+
 export async function fetchAmazonProductDataWithFallback(input: {
   asin: string;
   marketplace: string;
@@ -666,7 +678,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
 export async function refreshProductRecord(input: {
   db: D1Database;
-  apiKey: string;
+  apiKey?: string;
   fallbackApiKeys?: string[];
   lwaClientId?: string;
   lwaClientSecret?: string;

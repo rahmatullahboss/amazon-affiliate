@@ -99,6 +99,9 @@ redirect.get('/t/:trackingTag/:asin', async (c) => {
       asin,
       apiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+      lwaClientId: c.env.LWA_CLIENT_ID,
+      lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+      lwaScope: c.env.LWA_CREATORS_SCOPE,
     });
 
     ctx = {
@@ -242,6 +245,9 @@ const handleRedirectRequest = async (c: Context<AppEnv>) => {
         preferredMarketplace,
         apiKey: c.env.AMAZON_API_KEY,
         fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+        lwaClientId: c.env.LWA_CLIENT_ID,
+        lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+        lwaScope: c.env.LWA_CREATORS_SCOPE,
       });
 
       return c.redirect(
@@ -303,6 +309,9 @@ const handleRedirectRequest = async (c: Context<AppEnv>) => {
           preferredMarketplace,
           apiKey: c.env.AMAZON_API_KEY,
           fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+          lwaClientId: c.env.LWA_CLIENT_ID,
+          lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+          lwaScope: c.env.LWA_CREATORS_SCOPE,
         });
 
         ctx = {

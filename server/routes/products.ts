@@ -23,7 +23,7 @@ import {
   getAmazonProductFetchErrorMessage,
   regenerateProductEditorialContent,
   refreshProductRecord,
-  resolveAmazonApiKeys,
+  hasAmazonProductFetchSource,
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
 import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog';
@@ -244,12 +244,14 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
   }
 
   const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
-  const apiKeys = resolveAmazonApiKeys({
+  const hasFetchSource = hasAmazonProductFetchSource({
     primaryApiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys,
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
   });
 
-  if (apiKeys.length === 0) {
+  if (!hasFetchSource) {
     throw new HTTPException(503, {
       message: 'ASIN fetch API not configured. Please add product manually.',
     });
@@ -279,6 +281,8 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       category: productData.category,
       description: productData.description,
       features: productData.features,
+      productImages: productData.productImages,
+      aplusImages: productData.aplusImages,
       status: 'active',
       updateExistingFromInput: true,
       requireRealProductData: true,
@@ -400,10 +404,15 @@ products.post('/:id/refresh', async (c) => {
     throw new HTTPException(400, { message: 'Invalid product ID' });
   }
 
-  const apiKey = c.env.AMAZON_API_KEY;
-  if (!apiKey) {
+  const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
+  if (!hasAmazonProductFetchSource({
+    primaryApiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys,
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+  })) {
     throw new HTTPException(503, {
-      message: 'AMAZON_API_KEY not configured. Product refresh is unavailable.',
+      message: 'Amazon product API is not configured. Product refresh is unavailable.',
     });
   }
 
@@ -423,8 +432,11 @@ products.post('/:id/refresh', async (c) => {
   try {
     const refreshed = await refreshProductRecord({
       db: c.env.DB,
-      apiKey,
-      fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+      apiKey: c.env.AMAZON_API_KEY,
+      fallbackApiKeys,
+      lwaClientId: c.env.LWA_CLIENT_ID,
+      lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+      lwaScope: c.env.LWA_CREATORS_SCOPE,
       asin: product.asin,
       marketplace: product.marketplace,
       status: product.status || 'active',
@@ -751,10 +763,15 @@ products.delete('/:id', async (c) => {
  * Rate-limited: processes 5 at a time with 1s delay between batches.
  */
 products.post('/enrich', async (c) => {
-  const apiKey = c.env.AMAZON_API_KEY;
-  if (!apiKey) {
+  const fallbackApiKeys = c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [];
+  if (!hasAmazonProductFetchSource({
+    primaryApiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys,
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+  })) {
     throw new HTTPException(503, {
-      message: 'AMAZON_API_KEY not configured. Add it to .dev.vars or wrangler secrets.',
+      message: 'Amazon product API is not configured. Add Creator API or RapidAPI credentials.',
     });
   }
 
@@ -801,8 +818,8 @@ products.post('/enrich', async (c) => {
         const productData = await fetchAmazonProductDataWithFallback({
           asin: product.asin,
           marketplace: product.marketplace,
-          primaryApiKey: apiKey,
-          fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+          primaryApiKey: c.env.AMAZON_API_KEY,
+          fallbackApiKeys,
           lwaClientId: c.env.LWA_CLIENT_ID,
           lwaClientSecret: c.env.LWA_CLIENT_SECRET,
           lwaScope: c.env.LWA_CREATORS_SCOPE,
@@ -820,6 +837,8 @@ products.post('/enrich', async (c) => {
             rating = ?,
             description = ?,
             features = ?,
+            product_images = ?,
+            aplus_images = ?,
             status = ?,
             fetched_at = CURRENT_TIMESTAMP,
             updated_at = CURRENT_TIMESTAMP
@@ -833,6 +852,8 @@ products.post('/enrich', async (c) => {
           4.5,
           (productData.description || '').substring(0, 2000),
           features,
+          productData.productImages.length ? JSON.stringify(productData.productImages.slice(0, 8)) : null,
+          productData.aplusImages.length ? JSON.stringify(productData.aplusImages.slice(0, 6)) : null,
           'active',
           product.id
         ).run();

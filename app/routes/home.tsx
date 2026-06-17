@@ -224,7 +224,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_34%,#f4f6f6_100%)]">
       <section className="border-b border-gray-200 bg-white/80">
-        <div className="mx-auto max-w-7xl px-4 py-16 lg:px-6">
+        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-center lg:px-6 lg:py-16">
           <div className="max-w-2xl">
             <p className="mb-4 text-xs font-bold uppercase tracking-[0.35em] text-primary">
               Smart picks for everyday buyers
@@ -262,6 +262,13 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               ))}
             </div>
           </div>
+
+          {primaryProducts[0] ? (
+            <HeroFeaturedProduct
+              product={primaryProducts[0]}
+              marketplace={selectedMarketplace}
+            />
+          ) : null}
         </div>
       </section>
 
@@ -828,5 +835,71 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         )}
       </section>
     </div>
+  );
+}
+
+interface HeroFeaturedProductProps {
+  product: ProductRow;
+  marketplace: string;
+}
+
+function HeroFeaturedProduct({ product, marketplace }: HeroFeaturedProductProps) {
+  const label = getHomepageKeywordLabel(product.category, product.title, 0);
+  return (
+    <aside
+      aria-label="Featured product"
+      className="relative w-full max-w-[420px] justify-self-center rounded-[2rem] border border-gray-200 bg-gradient-to-br from-white via-white to-[#f3f9f9] p-5 shadow-[0_30px_80px_-40px_rgba(11,128,128,0.45)] lg:justify-self-end"
+    >
+      <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
+        <span>Featured today</span>
+        <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">
+          {marketplace}
+        </span>
+      </div>
+
+      <Link to={product.public_href} className="mt-4 block">
+        <div className="flex aspect-square w-full items-center justify-center rounded-[1.5rem] bg-white p-6">
+          <img
+            src={product.image_url}
+            alt={product.title}
+            className="max-h-full max-w-full object-contain mix-blend-multiply"
+            loading="eager"
+          />
+        </div>
+      </Link>
+
+      <span className="mt-4 block text-[11px] uppercase tracking-[0.22em] text-gray-500">
+        {product.category || "General pick"}
+      </span>
+      <h3 className="mt-2 line-clamp-2 text-lg font-semibold leading-6 text-gray-900">
+        {label}
+      </h3>
+
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+        <Link
+          to={product.public_href}
+          className="inline-flex flex-1 items-center justify-center rounded-full border border-gray-300 px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:border-primary hover:text-primary"
+        >
+          View details
+        </Link>
+        {product.direct_amazon_url ? (
+          <a
+            href={product.direct_amazon_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex flex-1 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-hover"
+          >
+            Check on Amazon
+          </a>
+        ) : (
+          <Link
+            to={product.public_href}
+            className="inline-flex flex-1 items-center justify-center rounded-full bg-primary px-4 py-2.5 text-sm font-bold text-white transition hover:bg-primary-hover"
+          >
+            See price
+          </Link>
+        )}
+      </div>
+    </aside>
   );
 }

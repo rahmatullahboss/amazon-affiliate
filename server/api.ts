@@ -25,7 +25,10 @@ import auditLogs from './routes/audit-logs';
 import blogs from './routes/blogs';
 import sheetControl from './routes/sheet-control';
 import telegram from './routes/telegram';
+import webhooks from './routes/webhooks';
 import siteBranding from './routes/site-branding';
+import socialLinks from './routes/social-links';
+import { hasAmazonProductFetchSource } from './services/product-ingestion';
 
 const app = new Hono<AppEnv>();
 
@@ -34,7 +37,7 @@ app.use('*', logger());
 app.use('*', secureHeaders());
 const csrfMiddleware = csrf();
 app.use('*', async (c, next) => {
-  if (c.req.path.startsWith('/api/public/telegram')) {
+  if (c.req.path.startsWith('/api/public/telegram') || c.req.path.startsWith('/api/webhooks')) {
     return next();
   }
   return csrfMiddleware(c, next);
@@ -48,8 +51,13 @@ app.get('/api/health', (c) => {
 
   // Validate required secrets
   if (!c.env.JWT_SECRET) warnings.push('JWT_SECRET not set — admin auth will fail');
-  if (!c.env.AMAZON_API_KEY && !c.env.AMAZON_API_KEY_FALLBACK) {
-    warnings.push('Amazon API key not set — ASIN auto-fetch disabled');
+  if (!hasAmazonProductFetchSource({
+    primaryApiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+  })) {
+    warnings.push('Amazon product API credentials not set — ASIN auto-fetch disabled');
   }
 
   // Validate required bindings
@@ -84,6 +92,7 @@ app.get('/api/public/blog-images/*', async (c) => {
 // Public API endpoints for the main site
 app.route('/api/public', publicRoutes);
 app.route('/api/public/telegram', telegram);
+app.route('/api/webhooks', webhooks);
 
 // ─── Protected Routes ────────────────────────────────────
 const adminContent = new Hono<AppEnv>();
@@ -103,6 +112,7 @@ app.route('/api/portal', portalApi);
 
 adminContent.route('/products', products);
 adminContent.route('/blogs', blogs);
+adminContent.route('/social-links', socialLinks);
 
 adminOnly.route('/agents', agents);
 adminOnly.route('/users', users);

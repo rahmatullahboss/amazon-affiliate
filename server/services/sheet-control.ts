@@ -1,6 +1,9 @@
 import { CacheService } from "./cache";
 import { parseSpreadsheetReference, readSheetRows } from "./google-sheets";
-import { ensureProductRecord } from "./product-ingestion";
+import {
+  ensureProductRecord,
+  hasAmazonProductFetchSource,
+} from "./product-ingestion";
 import {
   mapRows,
   parseSheetSyncRow,
@@ -852,8 +855,12 @@ async function syncSingleAgentSheetSource(input: {
         parsedRow,
         duplicateCounts,
         apiKeyAvailable:
-          Boolean(input.apiKey && input.apiKey.trim()) ||
-          Boolean(input.fallbackApiKeys && input.fallbackApiKeys.length > 0),
+          hasAmazonProductFetchSource({
+            primaryApiKey: input.apiKey,
+            fallbackApiKeys: input.fallbackApiKeys,
+            lwaClientId: input.lwaClientId,
+            lwaClientSecret: input.lwaClientSecret,
+          }),
       });
 
       const insertResult = await input.db

@@ -2,10 +2,16 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../utils/types";
 import { safeKvGetJson, safeKvPut } from "../services/kv-safe";
+import {
+  getSocialLinksSettings,
+  toPublicSocialLinks,
+} from "../services/social-links";
 
 const router = new Hono<AppEnv>();
 const AGENT_APP_DOWNLOAD_URL =
   "https://github.com/rahmatullahboss/amazon-affiliate/releases/latest/download/app-release.apk";
+const SOCIAL_LINKS_CACHE_KEY = "public:social-links";
+const SOCIAL_LINKS_CACHE_TTL = 300;
 
 // Get all active categories
 router.get("/categories", async (c) => {
@@ -115,6 +121,27 @@ router.get("/downloads/agent-app.apk", async (c) => {
     status: 200,
     headers,
   });
+});
+
+router.get("/social-links", async (c) => {
+  const cached = await safeKvGetJson<{
+    telegram: { url: string; enabled: boolean } | null;
+    whatsapp: { url: string; enabled: boolean } | null;
+    messenger: { url: string; enabled: boolean } | null;
+  }>(c.env.KV, SOCIAL_LINKS_CACHE_KEY);
+
+  if (cached) {
+    return c.json(cached);
+  }
+
+  const settings = await getSocialLinksSettings(c.env.DB);
+  const payload = toPublicSocialLinks(settings);
+
+  await safeKvPut(c.env.KV, SOCIAL_LINKS_CACHE_KEY, JSON.stringify(payload), {
+    expirationTtl: SOCIAL_LINKS_CACHE_TTL,
+  });
+
+  return c.json(payload);
 });
 
 

@@ -206,6 +206,7 @@ export default function AdminLayout() {
     ? [
         { to: "/admin/products", label: "Products", icon: "📦" },
         { to: "/admin/blogs", label: "Blogs", icon: "📝" },
+        { to: "/admin/social-links", label: "Social Links", icon: "🔗" },
       ]
     : [
         { to: "/admin", label: "Dashboard", icon: "📊", end: true },
@@ -219,12 +220,14 @@ export default function AdminLayout() {
         { to: "/admin/analytics", label: "Analytics", icon: "📈" },
         { to: "/admin/reports", label: "Reports", icon: "🧾" },
         { to: "/admin/blogs", label: "Blogs", icon: "📝" },
+        { to: "/admin/site-branding", label: "Site Branding", icon: "🎨" },
+        { to: "/admin/social-links", label: "Social Links", icon: "💬" },
         { to: "/admin/audit-logs", label: "Audit Logs", icon: "🧾" },
         { to: "/admin/help", label: "Help Center", icon: "❓" },
       ];
 
   return (
-    <div className={`${wrapperClass} flex min-h-screen bg-[#0a0a0f] text-[#f0f0f5]`}>
+    <div className={`${wrapperClass} flex h-screen overflow-hidden bg-[#0a0a0f] text-[#f0f0f5]`}>
       {/* Mobile Top Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-[#12121a]/95 border-b border-white/5 flex items-center justify-between px-4 z-40 backdrop-blur-md">
         <div className="flex items-center gap-3">

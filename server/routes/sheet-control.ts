@@ -163,6 +163,9 @@ router.post("/sync", zValidator("json", triggerAgentSheetSyncSchema), async (c) 
     sourceId: body.source_id,
     apiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+    lwaScope: c.env.LWA_CREATORS_SCOPE,
     triggeredByUserId: c.get("userId"),
     credentials: {
       clientEmail: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
@@ -239,6 +242,9 @@ router.post(
         reviewedByUserId: c.get("userId"),
         apiKey: c.env.AMAZON_API_KEY,
         fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+        lwaClientId: c.env.LWA_CLIENT_ID,
+        lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+        lwaScope: c.env.LWA_CREATORS_SCOPE,
       });
 
       c.executionCtx.waitUntil(

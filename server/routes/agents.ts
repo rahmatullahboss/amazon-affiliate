@@ -229,17 +229,28 @@ agents.put('/:id', zValidator('json', updateAgentSchema), async (c) => {
 });
 
 /**
- * DELETE /api/agents/:id — Soft-delete by deactivating
+ * DELETE /api/agents/:id — Delete an agent (requires deactivation, or pass ?force=1 to auto-deactivate)
  */
 agents.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid agent ID' });
 
+  const force = c.req.query('force') === '1';
+
   const agent = await c.env.DB.prepare('SELECT slug, is_active FROM agents WHERE id = ?')
     .bind(id).first<{ slug: string; is_active: number }>();
   if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
-  if (agent.is_active === 1) {
-    throw new HTTPException(409, { message: 'Deactivate the agent before deleting it.' });
+
+  if (agent.is_active === 1 && !force) {
+    throw new HTTPException(409, { message: 'Deactivate the agent before deleting it. Pass ?force=1 to auto-deactivate and delete.' });
+  }
+
+  if (agent.is_active === 1 && force) {
+    await c.env.DB.prepare(
+      'UPDATE agents SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    )
+      .bind(id)
+      .run();
   }
 
   const marketplaces = await collectAgentDeleteMarketplaces(c.env.DB, id);
@@ -285,17 +296,28 @@ agents.delete('/:id', async (c) => {
 });
 
 /**
- * DELETE /api/agents/:id/tracking — Delete all tracking for an inactive agent
+ * DELETE /api/agents/:id/tracking — Delete all tracking for an agent (requires deactivation, or pass ?force=1)
  */
 agents.delete('/:id/tracking', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid agent ID' });
 
+  const force = c.req.query('force') === '1';
+
   const agent = await c.env.DB.prepare('SELECT slug, is_active FROM agents WHERE id = ?')
     .bind(id).first<{ slug: string; is_active: number }>();
   if (!agent) throw new HTTPException(404, { message: 'Agent not found' });
-  if (agent.is_active === 1) {
-    throw new HTTPException(409, { message: 'Deactivate the agent before deleting all tracking.' });
+
+  if (agent.is_active === 1 && !force) {
+    throw new HTTPException(409, { message: 'Deactivate the agent before deleting all tracking. Pass ?force=1 to auto-deactivate.' });
+  }
+
+  if (agent.is_active === 1 && force) {
+    await c.env.DB.prepare(
+      'UPDATE agents SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+    )
+      .bind(id)
+      .run();
   }
 
   const marketplacesResult = await c.env.DB.prepare(

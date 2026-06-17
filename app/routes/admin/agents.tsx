@@ -423,21 +423,25 @@ export default function AgentsPage() {
     await fetchAll();
   }
 
-  async function handleDeleteAgent(agent: Agent, agentTrackingIds: TrackingId[]) {
+  async function handleDeleteAgent(agent: Agent, agentTrackingIds: TrackingId[], force = false) {
     const marketplaces = [...new Set(agentTrackingIds.map((item) => item.marketplace))];
+    const isActive = agent.is_active === 1;
     const confirmed = window.confirm(
-      `Delete inactive agent "${agent.name}"?\n\n` +
+      `${force && isActive ? "Force delete" : "Delete"} ${isActive ? "active" : "inactive"} agent "${agent.name}"?\n\n` +
         `Tags: ${agentTrackingIds.length}\n` +
         `Products to remap: ${agent.product_count}\n` +
         `Marketplaces: ${marketplaces.join(", ") || "None"}\n\n` +
-        `All linked products will move to the site primary tag for the same marketplace.`
+        (force && isActive
+          ? `The agent will be deactivated and deleted. All linked products will move to site primary tags.`
+          : `All linked products will move to the site primary tag for the same marketplace.`)
     );
 
     if (!confirmed) {
       return;
     }
 
-    const response = await fetch(`/api/agents/${agent.id}`, {
+    const url = `/api/agents/${agent.id}${force ? "?force=1" : ""}`;
+    const response = await fetch(url, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -451,21 +455,25 @@ export default function AgentsPage() {
     await fetchAll();
   }
 
-  async function handleDeleteAllTracking(agent: Agent, agentTrackingIds: TrackingId[]) {
+  async function handleDeleteAllTracking(agent: Agent, agentTrackingIds: TrackingId[], force = false) {
     const marketplaces = [...new Set(agentTrackingIds.map((item) => item.marketplace))];
+    const isActive = agent.is_active === 1;
     const confirmed = window.confirm(
-      `Delete all tracking for inactive agent "${agent.name}"?\n\n` +
+      `Delete all tracking for ${isActive ? "active" : "inactive"} agent "${agent.name}"?\n\n` +
         `Tags: ${agentTrackingIds.length}\n` +
         `Products to remap: ${agent.product_count}\n` +
         `Marketplaces: ${marketplaces.join(", ") || "None"}\n\n` +
-        `The agent will stay inactive, but all linked products will move to site primary tags.`
+        (force && isActive
+          ? `The agent will be deactivated and all linked products will move to site primary tags.`
+          : `The agent will stay inactive, but all linked products will move to site primary tags.`)
     );
 
     if (!confirmed) {
       return;
     }
 
-    const response = await fetch(`/api/agents/${agent.id}/tracking`, {
+    const url = `/api/agents/${agent.id}/tracking${force ? "?force=1" : ""}`;
+    const response = await fetch(url, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${getToken()}` },
     });
@@ -912,7 +920,22 @@ export default function AgentsPage() {
                           Delete Agent
                         </button>
                       </>
-                    ) : null}
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => void handleDeleteAllTracking(agent, agentTrackingIds, true)}
+                          className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-md text-amber-300 text-xs font-medium cursor-pointer hover:bg-amber-500/20 transition-colors"
+                        >
+                          Force Delete All Tracking
+                        </button>
+                        <button
+                          onClick={() => void handleDeleteAgent(agent, agentTrackingIds, true)}
+                          className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded-md text-red-400 text-xs font-medium cursor-pointer hover:bg-red-500/20 transition-colors"
+                        >
+                          Force Delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { env } from 'cloudflare:workers';
 import { apiApp } from '../../server/api';
 import { DbFactory } from '../factories/db';
+import { clearCreatorsTokenCacheForTests } from '../../server/services/creators-api';
 
 vi.mock('../../app/components/product/ImageGallery', () => ({
   ImageGallery: () => null,
@@ -49,6 +50,80 @@ describe('Redirect Engine API', () => {
 
     // Reset fallback cache
     await env.KV.delete('default_tracking_id');
+  });
+
+  it('creates a missing dynamic redirect product through Creators API without RapidAPI keys', async () => {
+    const savedLwaClientId = (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID;
+    const savedLwaClientSecret = (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET;
+    const savedLwaScope = (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE;
+    const savedAmazonApiKey = (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY;
+    const savedAmazonApiKeyFallback = (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK;
+    const originalFetch = globalThis.fetch;
+
+    clearCreatorsTokenCacheForTests();
+    (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID = 'redirect-lwa-id';
+    (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET = 'redirect-lwa-secret';
+    (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE = 'creatorsapi::read';
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = undefined;
+    (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = undefined;
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ access_token: 'redirect-token', expires_in: 3600 }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            asin: 'B0DYN00001',
+            title: 'Dynamic Creators Product',
+            mainImage: { url: 'https://m.media-amazon.com/images/I/dynamic.jpg' },
+            features: ['Dynamic feature'],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await DbFactory.seedAgent(env.DB, 701, 'dynamic-creators-agent', 'Dynamic Creators Agent');
+      await DbFactory.seedTrackingId(env.DB, 1701, 701, 'dynamic-creators-20');
+
+      const waitPromises: Promise<unknown>[] = [];
+      const res = await apiApp.fetch(
+        new Request('http://localhost/go/dynamic-creators-agent/us/B0DYN00001', {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 Creator API test',
+          },
+        }),
+        env as never,
+        {
+          passThroughOnException: () => undefined,
+          waitUntil: (promise: Promise<unknown>) => waitPromises.push(promise),
+        } as never
+      );
+      await Promise.all(waitPromises);
+
+      expect(res.status).toBe(302);
+      expect(res.headers.get('Location')).toContain('amazon.com/dp/B0DYN00001');
+
+      const product = await env.DB.prepare(
+        'SELECT title FROM products WHERE asin = ? AND marketplace = ?'
+      )
+        .bind('B0DYN00001', 'US')
+        .first<{ title: string }>();
+      expect(product?.title).toBe('Dynamic Creators Product');
+    } finally {
+      (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID = savedLwaClientId;
+      (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET = savedLwaClientSecret;
+      (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE = savedLwaScope;
+      (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = savedAmazonApiKey;
+      (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = savedAmazonApiKeyFallback;
+      globalThis.fetch = originalFetch;
+      vi.unstubAllGlobals();
+    }
   });
 
   it('P0-001: Injects valid tracking_id based on Agent Slug and ASIN', async () => {

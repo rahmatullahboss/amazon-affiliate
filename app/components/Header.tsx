@@ -1,6 +1,7 @@
-import { Form, Link, useLocation } from "react-router";
+import { Form, Link, useLoaderData, useLocation } from "react-router";
 import { useState } from "react";
 import { BROWSE_PICKS_LABEL } from "../utils/affiliate-copy";
+import type { PublicLayoutLoaderData } from "../utils/social-links";
 
 const navLinks = [
   { name: "Home", path: "/" },
@@ -14,6 +15,8 @@ const navLinks = [
 export function Header() {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const loaderData = (useLoaderData() ?? {}) as Partial<PublicLayoutLoaderData>;
+  const socialLinks = loaderData.socialLinks ?? null;
 
   return (
     <div className="sticky top-0 z-40 w-full">
@@ -82,6 +85,7 @@ export function Header() {
                 </Link>
               ))}
             </nav>
+            <SocialIconsInline socialLinks={socialLinks} />
             <div className="h-4 w-px bg-gray-200"></div>
             <div className="flex items-center gap-3 text-sm">
               <Link to="/portal/login" className="font-medium text-gray-500 transition-colors hover:text-gray-900">
@@ -148,6 +152,10 @@ export function Header() {
                 {link.name}
               </Link>
             ))}
+            <SocialIconsList
+              socialLinks={socialLinks}
+              onItemClick={() => setIsMobileMenuOpen(false)}
+            />
             <div className="my-1 h-px w-full bg-gray-100"></div>
             <Link to="/portal/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
               Agent Portal
@@ -162,3 +170,122 @@ export function Header() {
     </div>
   );
 }
+
+function SocialIconsInline({ socialLinks }: { socialLinks: PublicLayoutLoaderData["socialLinks"] | null }) {
+  if (!socialLinks) return null;
+  const items: Array<{ key: keyof PublicSocialLinks; label: string; className: string; path: string }> = [];
+  if (socialLinks.telegram) {
+    items.push({
+      key: "telegram",
+      label: "Telegram",
+      className: "bg-[#229ED9] text-white hover:opacity-90",
+      path: TELEGRAM_PATH,
+    });
+  }
+  if (socialLinks.whatsapp) {
+    items.push({
+      key: "whatsapp",
+      label: "WhatsApp",
+      className: "bg-[#25D366] text-white hover:opacity-90",
+      path: WHATSAPP_PATH,
+    });
+  }
+  if (socialLinks.messenger) {
+    items.push({
+      key: "messenger",
+      label: "Messenger",
+      className: "bg-gradient-to-br from-[#00B2FF] to-[#006AFF] text-white hover:opacity-90",
+      path: MESSENGER_PATH,
+    });
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex items-center gap-1.5" aria-label="Social channels">
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={socialLinks[item.key]!.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={item.label}
+          title={item.label}
+          className={`flex h-8 w-8 items-center justify-center rounded-full transition-opacity ${item.className}`}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d={item.path} />
+          </svg>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function SocialIconsList({
+  socialLinks,
+  onItemClick,
+}: {
+  socialLinks: PublicLayoutLoaderData["socialLinks"] | null;
+  onItemClick: () => void;
+}) {
+  if (!socialLinks) return null;
+  const items: Array<{ key: keyof PublicSocialLinks; label: string; className: string; path: string }> = [];
+  if (socialLinks.telegram) {
+    items.push({
+      key: "telegram",
+      label: "Join us on Telegram",
+      className: "bg-[#229ED9] text-white",
+      path: TELEGRAM_PATH,
+    });
+  }
+  if (socialLinks.whatsapp) {
+    items.push({
+      key: "whatsapp",
+      label: "Chat on WhatsApp",
+      className: "bg-[#25D366] text-white",
+      path: WHATSAPP_PATH,
+    });
+  }
+  if (socialLinks.messenger) {
+    items.push({
+      key: "messenger",
+      label: "Message on Messenger",
+      className: "bg-gradient-to-br from-[#00B2FF] to-[#006AFF] text-white",
+      path: MESSENGER_PATH,
+    });
+  }
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {items.map((item) => (
+        <a
+          key={item.key}
+          href={socialLinks[item.key]!.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={onItemClick}
+          className={`flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold ${item.className}`}
+        >
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d={item.path} />
+            </svg>
+          </span>
+          {item.label}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+const TELEGRAM_PATH =
+  "M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19l-9.49 5.99-4.1-1.27c-.88-.25-.89-.86.2-1.27l16.04-6.18c.73-.33 1.43.18 1.15 1.31l-2.73 12.86c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z";
+
+const WHATSAPP_PATH =
+  "M19.11 17.21c-.31-.16-1.83-.9-2.11-1s-.49-.16-.7.16-.8 1-1 1.21-.37.24-.68.08a8.45 8.45 0 0 1-2.49-1.54 9.4 9.4 0 0 1-1.72-2.13c-.18-.31 0-.48.13-.63s.31-.37.47-.55.21-.32.31-.53.05-.4-.08-.55-.7-1.69-1-2.31-.52-.55-.71-.56h-.61a1.17 1.17 0 0 0-.85.4 3.55 3.55 0 0 0-1.11 2.65 6.16 6.16 0 0 0 1.29 3.27 14.14 14.14 0 0 0 5.42 4.78c.76.33 1.35.52 1.81.67a4.36 4.36 0 0 0 2 .12 3.27 3.27 0 0 0 2.14-1.51 2.65 2.65 0 0 0 .19-1.51c-.08-.14-.28-.22-.59-.37zM12 2a10 10 0 0 0-8.46 15.32L2 22l4.82-1.26A10 10 0 1 0 12 2z";
+
+const MESSENGER_PATH =
+  "M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.17.16.14.26.34.27.55l.05 1.79c.02.57.61.94 1.13.71l1.99-.94c.16-.08.34-.1.51-.06.91.25 1.88.38 2.91.38 5.64 0 10-4.13 10-9.7S17.64 2 12 2zm1.13 13.4-2.62-2.78-5.12 2.78 5.62-6 2.67 2.78 5.07-2.78-5.62 6z";
+
+type PublicSocialLinks = NonNullable<PublicLayoutLoaderData["socialLinks"]>;

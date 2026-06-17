@@ -3,6 +3,7 @@ import { env } from "cloudflare:workers";
 import { apiApp } from "../../server/api";
 import { DbFactory } from "../factories/db";
 import { generateAdminToken, generateAgentToken } from "../factories/token";
+import { clearCreatorsTokenCacheForTests } from "../../server/services/creators-api";
 
 describe("Portal Tracking API", () => {
   beforeEach(async () => {
@@ -15,6 +16,88 @@ describe("Portal Tracking API", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("submits a new ASIN through Creators API when RapidAPI keys are absent", async () => {
+    const savedLwaClientId = (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID;
+    const savedLwaClientSecret = (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET;
+    const savedLwaScope = (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE;
+    const savedAmazonApiKey = (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY;
+    const savedAmazonApiKeyFallback = (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK;
+    const originalFetch = globalThis.fetch;
+
+    clearCreatorsTokenCacheForTests();
+    (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID = "portal-lwa-id";
+    (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET = "portal-lwa-secret";
+    (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE = "creatorsapi::read";
+    (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = undefined;
+    (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = undefined;
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ access_token: "portal-token", expires_in: 3600 }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            asin: "B0PORTAL01",
+            title: "Portal Creators Product",
+            mainImage: { url: "https://m.media-amazon.com/images/I/portal.jpg" },
+            features: ["Portal feature"],
+          }),
+          { status: 200, headers: { "content-type": "application/json" } }
+        )
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await DbFactory.seedAgent(env.DB, 501, "portal-creators-agent", "Portal Creators Agent");
+      await env.DB.prepare(
+        `INSERT INTO users (id, username, email, password_hash, role, agent_id, is_active)
+         VALUES (601, 'portal-creators-agent', 'portal-creators@example.com', 'hash', 'agent', 501, 1)`
+      ).run();
+      await env.DB.prepare(
+        `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+         VALUES (1501, 501, 'portal-creators-20', 'US', 1, 1)`
+      ).run();
+      const token = await generateAgentToken(501, "portal-creators-agent", env.JWT_SECRET || "test-secret");
+
+      const response = await apiApp.fetch(
+        new Request("http://localhost/api/portal/products/submit", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+            Origin: "http://localhost",
+          },
+          body: JSON.stringify({
+            asin: "B0PORTAL01",
+            marketplace: "US",
+          }),
+        }),
+        env as never,
+        { waitUntil: () => undefined } as never
+      );
+
+      expect(response.status).toBe(201);
+      const product = await env.DB.prepare(
+        "SELECT title FROM products WHERE asin = ? AND marketplace = ?"
+      )
+        .bind("B0PORTAL01", "US")
+        .first<{ title: string }>();
+      expect(product?.title).toBe("Portal Creators Product");
+    } finally {
+      (env as { LWA_CLIENT_ID?: string }).LWA_CLIENT_ID = savedLwaClientId;
+      (env as { LWA_CLIENT_SECRET?: string }).LWA_CLIENT_SECRET = savedLwaClientSecret;
+      (env as { LWA_CREATORS_SCOPE?: string }).LWA_CREATORS_SCOPE = savedLwaScope;
+      (env as { AMAZON_API_KEY?: string }).AMAZON_API_KEY = savedAmazonApiKey;
+      (env as { AMAZON_API_KEY_FALLBACK?: string }).AMAZON_API_KEY_FALLBACK = savedAmazonApiKeyFallback;
+      globalThis.fetch = originalFetch;
+      vi.unstubAllGlobals();
+    }
   });
 
   it("allows multiple portal-managed tags per marketplace", async () => {

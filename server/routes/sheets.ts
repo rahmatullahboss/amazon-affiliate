@@ -71,6 +71,9 @@ sheets.post('/sync/import', async (c) => {
     kv: c.env.KV,
     apiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+    lwaScope: c.env.LWA_CREATORS_SCOPE,
     config,
     credentials: {
       clientEmail: c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,

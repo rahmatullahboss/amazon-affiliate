@@ -68,7 +68,6 @@ export async function getCreatorsAccessToken(
       asin: "",
       marketplace: "US",
       code: "unauthorized",
-      message: "LWA token request rejected",
     });
   }
 
@@ -77,7 +76,7 @@ export async function getCreatorsAccessToken(
       asin: "",
       marketplace: "US",
       code: "upstream_error",
-      message: `LWA token request failed: ${response.status}`,
+      status: response.status,
     });
   }
 
@@ -87,7 +86,6 @@ export async function getCreatorsAccessToken(
       asin: "",
       marketplace: "US",
       code: "invalid_response",
-      message: "LWA token response missing access_token or expires_in",
     });
   }
 
@@ -142,7 +140,7 @@ export async function fetchCreatorsProduct(
         asin: input.asin,
         marketplace: input.marketplace,
         code: "upstream_error",
-        message: `Creators API responded with ${response.status}`,
+        status: response.status,
       });
     }
     return { kind: "ok" as const, response };

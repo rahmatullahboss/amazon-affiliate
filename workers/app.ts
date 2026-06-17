@@ -38,6 +38,9 @@ interface SitemapEntry {
 type RuntimeSecretEnv = Env & {
   AMAZON_API_KEY?: string;
   AMAZON_API_KEY_FALLBACK?: string;
+  LWA_CLIENT_ID?: string;
+  LWA_CLIENT_SECRET?: string;
+  LWA_CREATORS_SCOPE?: string;
   GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
 };
@@ -275,6 +278,9 @@ export default {
         fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
           ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
           : [],
+        lwaClientId: runtimeEnv.LWA_CLIENT_ID,
+        lwaClientSecret: runtimeEnv.LWA_CLIENT_SECRET,
+        lwaScope: runtimeEnv.LWA_CREATORS_SCOPE,
         credentials: {
           clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,
           privateKey: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
@@ -293,6 +299,9 @@ export default {
         fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
           ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
           : [],
+        lwaClientId: runtimeEnv.LWA_CLIENT_ID,
+        lwaClientSecret: runtimeEnv.LWA_CLIENT_SECRET,
+        lwaScope: runtimeEnv.LWA_CREATORS_SCOPE,
         config,
         credentials: {
           clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,

@@ -37,6 +37,7 @@ export type Bindings = {
   OLLAMA_CLOUD_MODEL?: string;
   TELEGRAM_BOT_TOKEN?: string;
   TELEGRAM_WEBHOOK_SECRET?: string;
+  SHEET_WEBHOOK_SECRET?: string;
   LWA_CLIENT_ID?: string;
   LWA_CLIENT_SECRET?: string;
   LWA_CREATORS_SCOPE?: string;
