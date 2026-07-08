@@ -141,6 +141,7 @@ function parseAdminSheetRows(payload: unknown): AdminSheetSyncRowInput[] {
       marketplace: typeof row.marketplace === "string" ? row.marketplace : "",
       trackingTag: typeof row.trackingTag === "string" ? row.trackingTag : null,
       customTitle: typeof row.customTitle === "string" ? row.customTitle : null,
+      forceUpdateExisting: row.forceUpdateExisting === true,
     };
   });
 }

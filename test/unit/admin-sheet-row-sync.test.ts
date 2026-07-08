@@ -216,6 +216,65 @@ describe("admin sheet row sync", () => {
     });
   });
 
+  it("force refreshes an existing product when requested by the sheet", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6004, 'B0REFRESH1', 'Old Product', 'https://img.test/old.jpg', 'US', 'active', 1)`
+    ).run();
+
+    const refreshSpy = vi
+      .spyOn(productIngestionService, "refreshProductRecord")
+      .mockImplementation(async (input) => {
+        await input.db
+          .prepare(
+            `UPDATE products
+             SET title = 'Fresh Product', image_url = 'https://img.test/fresh.jpg'
+             WHERE asin = ? AND marketplace = ?`
+          )
+          .bind(input.asin, input.marketplace)
+          .run();
+
+        return {
+          id: 6004,
+          asin: input.asin,
+          title: "Fresh Product",
+          image_url: "https://img.test/fresh.jpg",
+          marketplace: input.marketplace,
+          category: null,
+          status: "active",
+          description: null,
+          features: null,
+          review_content: null,
+          product_images: null,
+          aplus_images: null,
+        };
+      });
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 5,
+          asin: "B0REFRESH1",
+          marketplace: "US",
+          trackingTag: null,
+          customTitle: null,
+          forceUpdateExisting: true,
+        },
+      ],
+    });
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 5,
+      status: "updated",
+      productTitle: "Fresh Product",
+      resolvedTrackingTag: "admin-us-20",
+    });
+  });
+
   it("rejects batches larger than 100 rows", async () => {
     const rows: AdminSheetSyncRowInput[] = Array.from({ length: 101 }, (_, index) => ({
       rowNumber: index + 2,

@@ -1,6 +1,7 @@
 import { CacheService } from "./cache";
 import {
   ensureProductRecord,
+  refreshProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
   type ProductRecord,
@@ -16,13 +17,14 @@ export interface AdminSheetSyncRowInput {
   marketplace: string;
   trackingTag?: string | null;
   customTitle?: string | null;
+  forceUpdateExisting?: boolean;
 }
 
 export interface AdminSheetSyncRowResult {
   rowNumber: number;
   asin: string;
   marketplace: string;
-  status: "live" | "existing" | "failed";
+  status: "live" | "existing" | "updated" | "failed";
   productTitle: string | null;
   bridgePageUrl: string | null;
   storefrontUrl: string | null;
@@ -135,23 +137,21 @@ async function syncAdminSheetRow(input: {
       .bind(asin, marketplace)
       .first<ExistingProductRow>();
     const existed = Boolean(product);
+    const shouldRefreshExisting = existed && Boolean(input.row.forceUpdateExisting);
 
-    if (!product) {
+    if (!product || shouldRefreshExisting) {
+      const refreshedOrCreated = shouldRefreshExisting
+        ? await refreshProductRecord({ ...input, asin, marketplace, status: "active" })
+        : await ensureProductRecord({
+            ...input,
+            asin,
+            marketplace,
+            status: "active",
+            requireRealProductData: true,
+          });
+
       product = {
-        ...(await ensureProductRecord({
-          db: input.db,
-          asin,
-          marketplace,
-          apiKey: input.apiKey,
-          fallbackApiKeys: input.fallbackApiKeys,
-          serpApiToken: input.serpApiToken,
-          zyteApiKey: input.zyteApiKey,
-          lwaClientId: input.lwaClientId,
-          lwaClientSecret: input.lwaClientSecret,
-          lwaScope: input.lwaScope,
-          status: "active",
-          requireRealProductData: true,
-        })),
+        ...refreshedOrCreated,
         is_active: 1,
       };
     }
@@ -201,7 +201,7 @@ async function syncAdminSheetRow(input: {
       rowNumber: input.row.rowNumber,
       asin,
       marketplace,
-      status: existed ? "existing" : "live",
+      status: shouldRefreshExisting ? "updated" : existed ? "existing" : "live",
       productTitle: product.title,
       bridgePageUrl: `${baseUrl}/${tracking.agent_slug}/${marketplacePath}/${asin}`,
       storefrontUrl: `${baseUrl}/${tracking.agent_slug}`,
