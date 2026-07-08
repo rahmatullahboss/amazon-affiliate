@@ -6,6 +6,7 @@ import {
   createMappingSchema,
   bulkAssignMappingsSchema,
   bulkMappingSchema,
+  bulkReplaceMappingTrackingSchema,
   updateMappingSchema,
 } from '../schemas';
 import { CacheService } from '../services/cache';
@@ -39,6 +40,7 @@ mappings.get('/', async (c) => {
     `SELECT ap.*,
        a.name as agent_name, a.slug as agent_slug,
        p.asin, p.title as product_title, p.image_url,
+       p.marketplace as product_marketplace,
        t.tag as tracking_tag,
        t.is_active as tracking_is_active,
        t.marketplace as tracking_marketplace
@@ -97,6 +99,7 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
       `SELECT ap.*,
          a.name as agent_name, a.slug as agent_slug,
          p.asin, p.title as product_title,
+         p.marketplace as product_marketplace,
          t.tag as tracking_tag
        FROM agent_products ap
        JOIN agents a ON a.id = ap.agent_id
@@ -232,6 +235,100 @@ mappings.post('/bulk-assign', zValidator('json', bulkAssignMappingsSchema), asyn
   });
 });
 
+mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTrackingSchema), async (c) => {
+  const data = c.req.valid('json');
+
+  const whereClauses = ['old_track.tag = ?'];
+  const bindings: Array<string | number> = [data.old_tracking_tag];
+
+  if (data.marketplace !== 'ALL') {
+    whereClauses.push('p.marketplace = ?');
+    bindings.push(data.marketplace);
+  }
+
+  if (data.mapping_ids?.length) {
+    whereClauses.push(`ap.id IN (${data.mapping_ids.map(() => '?').join(', ')})`);
+    bindings.push(...data.mapping_ids);
+  }
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT
+       ap.id as mapping_id,
+       ap.product_id,
+       a.id as agent_id,
+       a.slug as agent_slug,
+       p.asin,
+       p.marketplace,
+       replacement.id as replacement_tracking_id
+     FROM agent_products ap
+     JOIN tracking_ids old_track ON old_track.id = ap.tracking_id
+     JOIN agents a ON a.id = ap.agent_id
+     JOIN products p ON p.id = ap.product_id
+     LEFT JOIN tracking_ids replacement
+       ON replacement.agent_id = ap.agent_id
+      AND replacement.marketplace = p.marketplace
+      AND replacement.tag = ?
+      AND replacement.is_active = 1
+     WHERE ${whereClauses.join(' AND ')}
+       AND ap.is_active = 1
+       AND p.is_active = 1`
+  )
+    .bind(data.new_tracking_tag, ...bindings)
+    .all<{
+      mapping_id: number;
+      product_id: number;
+      agent_id: number;
+      agent_slug: string;
+      asin: string;
+      marketplace: string;
+      replacement_tracking_id: number | null;
+    }>();
+
+  const matches = results ?? [];
+  const rowsToUpdate = matches.filter((row) => Boolean(row.replacement_tracking_id));
+  const skippedRows = matches.filter((row) => !row.replacement_tracking_id);
+
+  for (const row of rowsToUpdate) {
+    await c.env.DB.prepare(
+      `UPDATE agent_products
+       SET tracking_id = ?,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = ?`
+    )
+      .bind(row.replacement_tracking_id, row.mapping_id)
+      .run();
+  }
+
+  const cache = new CacheService(c.env.KV);
+  const invalidated = new Set<string>();
+
+  for (const row of rowsToUpdate) {
+    const key = `${row.agent_slug}|${row.asin}|${row.marketplace}`;
+    if (invalidated.has(key)) continue;
+
+    invalidated.add(key);
+    c.executionCtx.waitUntil(cache.deleteRedirectUrl(row.agent_slug, row.asin, row.marketplace));
+    c.executionCtx.waitUntil(cache.deletePageData(row.agent_slug, row.asin, row.marketplace));
+  }
+
+  return c.json({
+    message: `Updated ${rowsToUpdate.length} mappings from ${data.old_tracking_tag} to ${data.new_tracking_tag}.`,
+    summary: {
+      matched: matches.length,
+      updated: rowsToUpdate.length,
+      skippedMissingReplacement: skippedRows.length,
+      marketplace: data.marketplace,
+    },
+    skipped: skippedRows.slice(0, 50).map((row) => ({
+      mappingId: row.mapping_id,
+      asin: row.asin,
+      agentSlug: row.agent_slug,
+      marketplace: row.marketplace,
+      reason: 'Replacement tag was not found for this agent + marketplace.',
+    })),
+  });
+});
+
 mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid mapping ID' });
@@ -307,6 +404,7 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
     `SELECT ap.*,
        a.name as agent_name, a.slug as agent_slug,
        p.asin, p.title as product_title, p.image_url,
+       p.marketplace as product_marketplace,
        t.tag as tracking_tag,
        t.is_active as tracking_is_active,
        t.marketplace as tracking_marketplace
