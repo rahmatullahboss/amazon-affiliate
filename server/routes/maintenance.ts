@@ -5,6 +5,12 @@ import { CacheService } from '../services/cache';
 
 const maintenance = new Hono<AppEnv>();
 
+interface CacheTarget {
+  asin: string;
+  marketplace: string;
+  agent_slug?: string | null;
+}
+
 function parsePositiveIds(value: unknown): number[] {
   if (!Array.isArray(value)) return [];
 
@@ -18,12 +24,25 @@ function parsePositiveIds(value: unknown): number[] {
 async function invalidateProductCaches(
   env: AppEnv['Bindings'],
   ctx: ExecutionContext,
-  products: Array<{ asin: string; marketplace: string }>
+  products: CacheTarget[]
 ) {
   const cache = new CacheService(env.KV);
+  const seen = new Set<string>();
 
   for (const product of products) {
-    ctx.waitUntil(cache.invalidateForProduct(product.asin));
+    const productKey = `${product.asin}|${product.marketplace}`;
+    if (!seen.has(productKey)) {
+      seen.add(productKey);
+      ctx.waitUntil(cache.invalidateForProduct(product.asin));
+    }
+
+    if (product.agent_slug) {
+      const mappingKey = `${product.agent_slug}|${product.asin}|${product.marketplace}`;
+      if (seen.has(mappingKey)) continue;
+      seen.add(mappingKey);
+      ctx.waitUntil(cache.deletePageData(product.agent_slug, product.asin, product.marketplace));
+      ctx.waitUntil(cache.deleteRedirectUrl(product.agent_slug, product.asin, product.marketplace));
+    }
   }
 }
 
@@ -41,13 +60,14 @@ maintenance.post('/mappings/hard-delete', async (c) => {
 
   const placeholders = mappingIds.map(() => '?').join(',');
   const { results } = await c.env.DB.prepare(
-    `SELECT DISTINCT p.asin, p.marketplace
+    `SELECT DISTINCT p.asin, p.marketplace, a.slug as agent_slug
      FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
+     JOIN agents a ON a.id = ap.agent_id
      WHERE ap.id IN (${placeholders})`
   )
     .bind(...mappingIds)
-    .all<{ asin: string; marketplace: string }>();
+    .all<CacheTarget>();
 
   await c.env.DB.prepare(`DELETE FROM agent_products WHERE id IN (${placeholders})`)
     .bind(...mappingIds)
@@ -90,6 +110,16 @@ maintenance.post('/products/hard-delete', async (c) => {
   const existingIds = existingProducts.map((product) => product.id);
   const existingPlaceholders = existingIds.map(() => '?').join(',');
 
+  const { results: cacheTargets } = await c.env.DB.prepare(
+    `SELECT DISTINCT p.asin, p.marketplace, a.slug as agent_slug
+     FROM products p
+     LEFT JOIN agent_products ap ON ap.product_id = p.id
+     LEFT JOIN agents a ON a.id = ap.agent_id
+     WHERE p.id IN (${existingPlaceholders})`
+  )
+    .bind(...existingIds)
+    .all<CacheTarget>();
+
   await c.env.DB.prepare(`DELETE FROM agent_products WHERE product_id IN (${existingPlaceholders})`)
     .bind(...existingIds)
     .run();
@@ -104,7 +134,7 @@ maintenance.post('/products/hard-delete', async (c) => {
     .bind(...existingIds)
     .run();
 
-  await invalidateProductCaches(c.env, c.executionCtx, existingProducts);
+  await invalidateProductCaches(c.env, c.executionCtx, cacheTargets ?? existingProducts);
 
   return c.json({
     message: `Permanently deleted ${existingProducts.length} product${existingProducts.length === 1 ? '' : 's'} and their tracking mappings.`,
@@ -126,13 +156,14 @@ maintenance.post('/tracking/hard-delete', async (c) => {
 
   const placeholders = trackingIds.map(() => '?').join(',');
   const { results: affectedProducts } = await c.env.DB.prepare(
-    `SELECT DISTINCT p.asin, p.marketplace
+    `SELECT DISTINCT p.asin, p.marketplace, a.slug as agent_slug
      FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
+     JOIN agents a ON a.id = ap.agent_id
      WHERE ap.tracking_id IN (${placeholders})`
   )
     .bind(...trackingIds)
-    .all<{ asin: string; marketplace: string }>();
+    .all<CacheTarget>();
 
   await c.env.DB.prepare(`DELETE FROM agent_products WHERE tracking_id IN (${placeholders})`)
     .bind(...trackingIds)
@@ -155,22 +186,23 @@ maintenance.post('/tracking/hard-delete', async (c) => {
 
 maintenance.post('/cleanup-single-mapping', async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT ap.id, ap.product_id, p.asin, p.marketplace
+    `SELECT ap.id, ap.product_id, p.asin, p.marketplace, a.slug as agent_slug
      FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
+     JOIN agents a ON a.id = ap.agent_id
      WHERE ap.is_active = 1
      ORDER BY ap.product_id ASC, ap.updated_at DESC, ap.id DESC`
-  ).all<{ id: number; product_id: number; asin: string; marketplace: string }>();
+  ).all<{ id: number; product_id: number; asin: string; marketplace: string; agent_slug: string }>();
 
   const activeRows = results ?? [];
   const seenProductIds = new Set<number>();
   const duplicateIds: number[] = [];
-  const affectedProducts = new Map<number, { asin: string; marketplace: string }>();
+  const affectedProducts: CacheTarget[] = [];
 
   for (const row of activeRows) {
     if (seenProductIds.has(row.product_id)) {
       duplicateIds.push(row.id);
-      affectedProducts.set(row.product_id, { asin: row.asin, marketplace: row.marketplace });
+      affectedProducts.push({ asin: row.asin, marketplace: row.marketplace, agent_slug: row.agent_slug });
       continue;
     }
 
@@ -189,7 +221,7 @@ maintenance.post('/cleanup-single-mapping', async (c) => {
       .run();
   }
 
-  await invalidateProductCaches(c.env, c.executionCtx, Array.from(affectedProducts.values()));
+  await invalidateProductCaches(c.env, c.executionCtx, affectedProducts);
 
   return c.json({
     message: duplicateIds.length
