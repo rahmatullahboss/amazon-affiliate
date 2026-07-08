@@ -216,6 +216,7 @@ export default function AdminLayout() {
         { to: "/admin/sheet-control", label: "Sheet Control", icon: "🗂️" },
         { to: "/admin/product-submissions", label: "Reviews", icon: "🛂" },
         { to: "/admin/tracking", label: "Tracking", icon: "🏷️" },
+        { to: "/admin/tracking-maintenance", label: "Tag Maintenance", icon: "🧰" },
         { to: "/admin/mappings", label: "Mappings", icon: "🔗" },
         { to: "/admin/analytics", label: "Analytics", icon: "📈" },
         { to: "/admin/reports", label: "Reports", icon: "🧾" },
