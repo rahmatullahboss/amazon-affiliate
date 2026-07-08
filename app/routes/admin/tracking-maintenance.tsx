@@ -28,6 +28,7 @@ interface TrackingRow {
   label: string | null;
   marketplace: string;
   is_active: number;
+  linked_product_count?: number;
   agent_name: string;
   agent_slug: string;
 }
@@ -40,13 +41,6 @@ interface ReplaceResponse {
     skippedMissingReplacement: number;
     marketplace: string;
   };
-  skipped?: Array<{
-    mappingId: number;
-    asin: string;
-    agentSlug: string;
-    marketplace: string;
-    reason: string;
-  }>;
 }
 
 const MARKETPLACES: MarketplaceFilter[] = ["ALL", "US", "CA", "UK", "DE", "FR", "IT", "ES"];
@@ -58,6 +52,10 @@ function normalizeText(value: string | null | undefined) {
 
 function getMappingMarketplace(mapping: MappingRow) {
   return (mapping.product_marketplace || mapping.tracking_marketplace || "").toUpperCase();
+}
+
+function uniqueNumbers(values: number[]) {
+  return [...new Set(values.filter((value) => Number.isInteger(value) && value > 0))];
 }
 
 export default function TrackingMaintenancePage() {
@@ -111,15 +109,19 @@ export default function TrackingMaintenancePage() {
     }
   }
 
+  const activeTrackingIds = useMemo(
+    () => trackingIds.filter((tag) => tag.is_active === 1),
+    [trackingIds]
+  );
+
   const availableTrackingTags = useMemo(() => {
     const tags = new Set<string>();
-    trackingIds
-      .filter((tag) => tag.is_active === 1)
+    activeTrackingIds
       .filter((tag) => marketplaceFilter === "ALL" || tag.marketplace === marketplaceFilter)
       .forEach((tag) => tags.add(tag.tag));
 
     return Array.from(tags).sort((left, right) => left.localeCompare(right));
-  }, [trackingIds, marketplaceFilter]);
+  }, [activeTrackingIds, marketplaceFilter]);
 
   const filteredMappings = useMemo(() => {
     const search = normalizeText(query);
@@ -157,6 +159,16 @@ export default function TrackingMaintenancePage() {
   const selectedRows = useMemo(
     () => filteredMappings.filter((mapping) => selectedMappingIds.includes(mapping.id)),
     [filteredMappings, selectedMappingIds]
+  );
+
+  const selectedProductIds = useMemo(
+    () => uniqueNumbers(selectedRows.map((row) => row.product_id)),
+    [selectedRows]
+  );
+
+  const selectedTrackingIds = useMemo(
+    () => uniqueNumbers(selectedRows.map((row) => row.tracking_id)),
+    [selectedRows]
   );
 
   const allFilteredSelected =
@@ -242,19 +254,106 @@ export default function TrackingMaintenancePage() {
     }
   }
 
+  async function callMaintenanceAction(
+    path: string,
+    body: Record<string, unknown>,
+    confirmMessage: string,
+    fallbackMessage: string
+  ) {
+    if (!window.confirm(confirmMessage)) return;
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const response = await fetch(path, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify(body),
+      });
+
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, fallbackMessage));
+      }
+
+      setMessage(payload.message || fallbackMessage);
+      await loadData();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : fallbackMessage);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function deleteSelectedMappings() {
+    if (selectedMappingIds.length === 0) {
+      setError("Select mapping rows first.");
+      return;
+    }
+
+    await callMaintenanceAction(
+      "/api/maintenance/mappings/hard-delete",
+      { mappingIds: selectedMappingIds },
+      `Remove ${selectedMappingIds.length} selected product tracking mapping(s)? Products will remain, but their tracking link will be removed.`,
+      "Failed to delete selected mappings"
+    );
+  }
+
+  async function hardDeleteSelectedProducts() {
+    if (selectedProductIds.length === 0) {
+      setError("Select product rows first.");
+      return;
+    }
+
+    await callMaintenanceAction(
+      "/api/maintenance/products/hard-delete",
+      { productIds: selectedProductIds },
+      `Permanently delete ${selectedProductIds.length} selected product(s)? This removes product records and their tracking mappings. This cannot be undone.`,
+      "Failed to delete selected products"
+    );
+  }
+
+  async function hardDeleteSelectedTrackingTags() {
+    if (selectedTrackingIds.length === 0) {
+      setError("Select rows using the tracking tags you want to delete first.");
+      return;
+    }
+
+    await callMaintenanceAction(
+      "/api/maintenance/tracking/hard-delete",
+      { trackingIds: selectedTrackingIds },
+      `Permanently delete ${selectedTrackingIds.length} selected tracking tag(s)? Their product mappings will also be removed. This cannot be undone.`,
+      "Failed to delete selected tracking tags"
+    );
+  }
+
+  async function cleanupDuplicateMappings() {
+    await callMaintenanceAction(
+      "/api/maintenance/cleanup-single-mapping",
+      {},
+      "Turn off duplicate active tracking mappings and keep only the latest active mapping per product?",
+      "Failed to clean duplicate mappings"
+    );
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="m-0 text-xs font-bold uppercase tracking-[0.22em] text-[#ff9900]">
-            Bulk Maintenance
+            Single Tracking Mode
           </p>
           <h1 className="mt-2 text-2xl font-bold text-[#f0f0f5] sm:text-3xl">
-            Tracking Tag Maintenance
+            Tracking Maintenance
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[#a0a0b8]">
-            পুরনো uploaded product mapping খুঁজে বের করে একসাথে tracking tag replace করুন।
-            Replace করলে redirect/page cache clear হবে, তাই নতুন tag link-এ apply হবে।
+            Multi-tracking বন্ধ করা হয়েছে। এক product-এ একটাই active tracking mapping থাকবে।
+            এখানে selected অথবা filtered product tracking bulk replace/delete করা যাবে।
           </p>
         </div>
         <button
@@ -268,7 +367,7 @@ export default function TrackingMaintenancePage() {
 
       <div className="mb-6 grid grid-cols-1 gap-3 md:grid-cols-4">
         <div className="rounded-2xl border border-white/5 bg-[#1a1a28]/80 p-4">
-          <p className="m-0 text-xs uppercase tracking-[0.2em] text-[#8d8da6]">Total mappings</p>
+          <p className="m-0 text-xs uppercase tracking-[0.2em] text-[#8d8da6]">Active mappings</p>
           <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{mappings.length}</p>
         </div>
         <div className="rounded-2xl border border-white/5 bg-[#1a1a28]/80 p-4">
@@ -276,13 +375,18 @@ export default function TrackingMaintenancePage() {
           <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{filteredMappings.length}</p>
         </div>
         <div className="rounded-2xl border border-white/5 bg-[#1a1a28]/80 p-4">
-          <p className="m-0 text-xs uppercase tracking-[0.2em] text-[#8d8da6]">Selected</p>
-          <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{selectedRows.length}</p>
+          <p className="m-0 text-xs uppercase tracking-[0.2em] text-[#8d8da6]">Selected products</p>
+          <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{selectedProductIds.length}</p>
         </div>
         <div className="rounded-2xl border border-white/5 bg-[#1a1a28]/80 p-4">
           <p className="m-0 text-xs uppercase tracking-[0.2em] text-[#8d8da6]">Active tags</p>
-          <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{availableTrackingTags.length}</p>
+          <p className="mt-2 text-2xl font-bold text-[#f0f0f5]">{activeTrackingIds.length}</p>
         </div>
+      </div>
+
+      <div className="mb-6 rounded-2xl border border-emerald-500/15 bg-emerald-500/10 p-4 text-sm leading-6 text-emerald-100">
+        <strong>Rule:</strong> এখন থেকে কোনো product-এ নতুন tracking assign করলে আগের active tracking mapping off হয়ে যাবে।
+        Mark করে selected product গুলো অন্য tracking দিয়ে replace করা যাবে।
       </div>
 
       <div className="mb-6 rounded-2xl border border-white/5 bg-[#1a1a28]/90 p-5">
@@ -355,6 +459,14 @@ export default function TrackingMaintenancePage() {
           </button>
           <button
             type="button"
+            onClick={() => void cleanupDuplicateMappings()}
+            disabled={saving}
+            className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Cleanup Duplicate Tracking
+          </button>
+          <button
+            type="button"
             onClick={() => {
               setQuery("");
               setOldTrackingTag("");
@@ -368,6 +480,33 @@ export default function TrackingMaintenancePage() {
             className="rounded-lg border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold text-[#d4d4e4] transition-colors hover:bg-white/10"
           >
             Clear filters
+          </button>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-3 border-t border-white/5 pt-4">
+          <button
+            type="button"
+            onClick={() => void deleteSelectedMappings()}
+            disabled={saving || selectedMappingIds.length === 0}
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 transition-colors hover:bg-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Remove Selected Links ({selectedMappingIds.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => void hardDeleteSelectedProducts()}
+            disabled={saving || selectedProductIds.length === 0}
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Hard Delete Products ({selectedProductIds.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => void hardDeleteSelectedTrackingTags()}
+            disabled={saving || selectedTrackingIds.length === 0}
+            className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Hard Delete Tags ({selectedTrackingIds.length})
           </button>
         </div>
 
@@ -415,7 +554,7 @@ export default function TrackingMaintenancePage() {
                 </tr>
               ) : filteredMappings.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-[#a0a0b8]">No mappings found.</td>
+                  <td colSpan={7} className="px-4 py-8 text-center text-[#a0a0b8]">No active mappings found.</td>
                 </tr>
               ) : (
                 filteredMappings.slice(0, 500).map((mapping) => (
@@ -452,7 +591,7 @@ export default function TrackingMaintenancePage() {
         </div>
         {filteredMappings.length > 500 ? (
           <div className="border-t border-white/5 px-4 py-3 text-xs text-amber-200">
-            Showing first 500 rows. Use search/marketplace/old tag filters to narrow the result before bulk replacement.
+            Showing first 500 rows. Use search/marketplace/old tag filters to narrow the result before bulk replacement or deletion.
           </div>
         ) : null}
       </div>
