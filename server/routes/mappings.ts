@@ -18,6 +18,51 @@ import {
 
 const mappings = new Hono<AppEnv>();
 
+interface MappingCacheRow {
+  id: number;
+  agent_slug: string;
+  asin: string;
+  marketplace: string;
+}
+
+async function getProductMappingCacheRows(
+  db: D1Database,
+  productId: number
+): Promise<MappingCacheRow[]> {
+  const { results } = await db.prepare(
+    `SELECT ap.id,
+       a.slug as agent_slug,
+       p.asin,
+       p.marketplace
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     JOIN products p ON p.id = ap.product_id
+     WHERE ap.product_id = ?`
+  )
+    .bind(productId)
+    .all<MappingCacheRow>();
+
+  return results ?? [];
+}
+
+async function invalidateCacheRows(
+  env: AppEnv['Bindings'],
+  executionCtx: ExecutionContext,
+  rows: MappingCacheRow[]
+) {
+  const cache = new CacheService(env.KV);
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    const key = `${row.agent_slug}|${row.asin}|${row.marketplace}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    executionCtx.waitUntil(cache.deleteRedirectUrl(row.agent_slug, row.asin, row.marketplace));
+    executionCtx.waitUntil(cache.deletePageData(row.agent_slug, row.asin, row.marketplace));
+  }
+}
+
 async function invalidateMappingCaches(
   env: AppEnv['Bindings'],
   executionCtx: ExecutionContext,
@@ -32,8 +77,46 @@ async function invalidateMappingCaches(
   }
 }
 
+async function keepOnlyOneActiveMappingForProduct(
+  db: D1Database,
+  productId: number,
+  keepMappingId: number
+) {
+  await db.prepare(
+    `UPDATE agent_products
+     SET is_active = 0,
+         updated_at = CURRENT_TIMESTAMP
+     WHERE product_id = ? AND id != ? AND is_active = 1`
+  )
+    .bind(productId, keepMappingId)
+    .run();
+}
+
+async function fetchMappingByAgentProduct(
+  db: D1Database,
+  agentId: number,
+  productId: number
+) {
+  return db.prepare(
+    `SELECT ap.*,
+       a.name as agent_name, a.slug as agent_slug,
+       p.asin, p.title as product_title, p.image_url,
+       p.marketplace as product_marketplace,
+       t.tag as tracking_tag,
+       t.is_active as tracking_is_active,
+       t.marketplace as tracking_marketplace
+     FROM agent_products ap
+     JOIN agents a ON a.id = ap.agent_id
+     JOIN products p ON p.id = ap.product_id
+     JOIN tracking_ids t ON t.id = ap.tracking_id
+     WHERE ap.agent_id = ? AND ap.product_id = ?`
+  )
+    .bind(agentId, productId)
+    .first<{ id: number } & Record<string, unknown>>();
+}
+
 /**
- * GET /api/mappings — List all agent-product mappings
+ * GET /api/mappings — List active agent-product mappings
  */
 mappings.get('/', async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -48,14 +131,16 @@ mappings.get('/', async (c) => {
      JOIN agents a ON a.id = ap.agent_id
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
-     ORDER BY ap.created_at DESC`
+     WHERE ap.is_active = 1
+     ORDER BY ap.updated_at DESC, ap.created_at DESC`
   ).all();
 
   return c.json({ mappings: results });
 });
 
 /**
- * POST /api/mappings — Create agent-product mapping
+ * POST /api/mappings — Create/replace product mapping.
+ * Single-tracking mode: one active mapping per product.
  */
 mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
   const data = c.req.valid('json');
@@ -78,6 +163,8 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
     });
   }
 
+  const previousRows = await getProductMappingCacheRows(c.env.DB, product.id);
+
   try {
     await c.env.DB.prepare(
       `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
@@ -85,33 +172,27 @@ mappings.post('/', zValidator('json', createMappingSchema), async (c) => {
        ON CONFLICT(agent_id, product_id) DO UPDATE SET
          tracking_id = excluded.tracking_id,
          custom_title = excluded.custom_title,
-         is_active = 1`
+         is_active = 1,
+         updated_at = CURRENT_TIMESTAMP`
     )
       .bind(data.agent_id, data.product_id, data.tracking_id, data.custom_title || null)
       .run();
 
-    // Invalidate cache
-    const cache = new CacheService(c.env.KV);
-    c.executionCtx.waitUntil(cache.deleteRedirectUrl(agent.slug, product.asin, product.marketplace));
-    c.executionCtx.waitUntil(cache.deletePageData(agent.slug, product.asin, product.marketplace));
+    const mapping = await fetchMappingByAgentProduct(c.env.DB, data.agent_id, data.product_id);
+    if (!mapping) {
+      throw new HTTPException(500, { message: 'Mapping was not saved.' });
+    }
 
-    const mapping = await c.env.DB.prepare(
-      `SELECT ap.*,
-         a.name as agent_name, a.slug as agent_slug,
-         p.asin, p.title as product_title,
-         p.marketplace as product_marketplace,
-         t.tag as tracking_tag
-       FROM agent_products ap
-       JOIN agents a ON a.id = ap.agent_id
-       JOIN products p ON p.id = ap.product_id
-       JOIN tracking_ids t ON t.id = ap.tracking_id
-       WHERE ap.agent_id = ? AND ap.product_id = ?`
-    )
-      .bind(data.agent_id, data.product_id)
-      .first();
+    await keepOnlyOneActiveMappingForProduct(c.env.DB, product.id, Number(mapping.id));
+    await invalidateCacheRows(c.env, c.executionCtx, previousRows);
+    await invalidateMappingCaches(c.env, c.executionCtx, agent.slug, [product]);
 
-    return c.json({ mapping, message: 'Mapping created successfully' }, 201);
+    return c.json({
+      mapping,
+      message: 'Tracking mapping saved. Other active mappings for this product were turned off.',
+    }, 201);
   } catch (error: unknown) {
+    if (error instanceof HTTPException) throw error;
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new HTTPException(409, { message: 'This agent-product mapping already exists' });
     }
@@ -128,16 +209,29 @@ mappings.post('/bulk', zValidator('json', bulkMappingSchema), async (c) => {
 
   for (const item of items) {
     try {
+      const previousRows = await getProductMappingCacheRows(c.env.DB, item.product_id);
       await c.env.DB.prepare(
-        `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
+         VALUES (?, ?, ?, ?, 1)
          ON CONFLICT(agent_id, product_id) DO UPDATE SET
            tracking_id = excluded.tracking_id,
            custom_title = excluded.custom_title,
-           is_active = 1`
+           is_active = 1,
+           updated_at = CURRENT_TIMESTAMP`
       )
         .bind(item.agent_id, item.product_id, item.tracking_id, item.custom_title || null)
         .run();
+
+      const mapping = await c.env.DB.prepare(
+        `SELECT id FROM agent_products WHERE agent_id = ? AND product_id = ?`
+      )
+        .bind(item.agent_id, item.product_id)
+        .first<{ id: number }>();
+
+      if (mapping) {
+        await keepOnlyOneActiveMappingForProduct(c.env.DB, item.product_id, mapping.id);
+      }
+      await invalidateCacheRows(c.env, c.executionCtx, previousRows);
       results.push({ agentId: item.agent_id, productId: item.product_id, status: 'success' });
     } catch (error: unknown) {
       results.push({
@@ -212,22 +306,38 @@ mappings.post('/bulk-assign', zValidator('json', bulkAssignMappingsSchema), asyn
     });
   }
 
+  const invalidationRows: MappingCacheRow[] = [];
+
   for (const product of products) {
+    invalidationRows.push(...await getProductMappingCacheRows(c.env.DB, product.id));
+
     await c.env.DB.prepare(
       `INSERT INTO agent_products (agent_id, product_id, tracking_id, custom_title, is_active)
        VALUES (?, ?, ?, NULL, 1)
        ON CONFLICT(agent_id, product_id) DO UPDATE SET
          tracking_id = excluded.tracking_id,
-         is_active = 1`
+         is_active = 1,
+         updated_at = CURRENT_TIMESTAMP`
     )
       .bind(data.agent_id, product.id, data.tracking_id)
       .run();
+
+    const mapping = await c.env.DB.prepare(
+      `SELECT id FROM agent_products WHERE agent_id = ? AND product_id = ?`
+    )
+      .bind(data.agent_id, product.id)
+      .first<{ id: number }>();
+
+    if (mapping) {
+      await keepOnlyOneActiveMappingForProduct(c.env.DB, product.id, mapping.id);
+    }
   }
 
+  await invalidateCacheRows(c.env, c.executionCtx, invalidationRows);
   await invalidateMappingCaches(c.env, c.executionCtx, agent.slug, products);
 
   return c.json({
-    message: 'Tracking tag assigned to selected products',
+    message: 'Tracking replaced for selected products. Only one active tracking mapping is kept per product.',
     summary: {
       updated: products.length,
       marketplace: tracking.marketplace,
@@ -297,6 +407,8 @@ mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTracking
     )
       .bind(row.replacement_tracking_id, row.mapping_id)
       .run();
+
+    await keepOnlyOneActiveMappingForProduct(c.env.DB, row.product_id, row.mapping_id);
   }
 
   const cache = new CacheService(c.env.KV);
@@ -362,26 +474,33 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
   let nextTrackingId = current.tracking_id;
   if (data.tracking_id !== undefined) {
     const tracking = await c.env.DB.prepare(
-      `SELECT id
+      `SELECT id, marketplace
        FROM tracking_ids
        WHERE id = ? AND agent_id = ? AND is_active = 1`
     )
       .bind(data.tracking_id, current.agent_id)
-      .first<{ id: number }>();
+      .first<{ id: number; marketplace: string }>();
 
     if (!tracking) {
       throw new HTTPException(404, { message: 'Selected tracking tag not found or inactive' });
     }
 
+    if (tracking.marketplace !== current.marketplace) {
+      throw new HTTPException(400, { message: `Selected tag is for ${tracking.marketplace}. Choose a ${current.marketplace} tag.` });
+    }
+
     nextTrackingId = tracking.id;
   }
+
+  const previousRows = await getProductMappingCacheRows(c.env.DB, current.product_id);
 
   await c.env.DB.prepare(
     `UPDATE agent_products
      SET tracking_id = ?,
          custom_title = ?,
          show_on_homepage = ?,
-         is_active = 1
+         is_active = 1,
+         updated_at = CURRENT_TIMESTAMP
      WHERE id = ?`
   )
     .bind(
@@ -396,6 +515,8 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
     )
     .run();
 
+  await keepOnlyOneActiveMappingForProduct(c.env.DB, current.product_id, id);
+  await invalidateCacheRows(c.env, c.executionCtx, previousRows);
   await invalidateMappingCaches(c.env, c.executionCtx, current.agent_slug, [
     { asin: current.asin, marketplace: current.marketplace },
   ]);
@@ -417,7 +538,7 @@ mappings.put('/:id', zValidator('json', updateMappingSchema), async (c) => {
     .bind(id)
     .first();
 
-  return c.json({ mapping, message: 'Mapping updated successfully' });
+  return c.json({ mapping, message: 'Mapping updated. Only one active mapping is kept for this product.' });
 });
 
 /**
