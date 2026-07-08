@@ -1,5 +1,8 @@
 const SHEETS_SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 const TOKEN_AUDIENCE = "https://oauth2.googleapis.com/token";
+const DEFAULT_MAX_RETRY_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 500;
+const RETRY_MAX_DELAY_MS = 5_000;
 
 interface SheetProperties {
   sheetId: number;
@@ -13,6 +16,11 @@ interface SpreadsheetMetadata {
 interface GoogleServiceAccountCredentials {
   clientEmail: string;
   privateKey: string;
+}
+
+interface FetchRetryOptions {
+  label: string;
+  maxAttempts?: number;
 }
 
 export interface SpreadsheetTab {
@@ -35,13 +43,14 @@ export async function readSheetRows(input: {
   });
 
   const range = `${escapeSheetRange(sheetTitle)}!A:Z`;
-  const response = await fetch(
+  const response = await fetchWithRetry(
     `https://sheets.googleapis.com/v4/spreadsheets/${input.spreadsheetId}/values/${encodeURIComponent(range)}`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    }
+    },
+    { label: "Google Sheets read" }
   );
 
   if (!response.ok) {
@@ -70,7 +79,7 @@ export async function writeSheetRows(input: {
 
   const range = `${escapeSheetRange(sheetTitle)}!A:Z`;
 
-  const clearResponse = await fetch(
+  const clearResponse = await fetchWithRetry(
     `https://sheets.googleapis.com/v4/spreadsheets/${input.spreadsheetId}/values/${encodeURIComponent(range)}:clear`,
     {
       method: "POST",
@@ -79,7 +88,8 @@ export async function writeSheetRows(input: {
         "Content-Type": "application/json",
       },
       body: "{}",
-    }
+    },
+    { label: "Google Sheets clear" }
   );
 
   if (!clearResponse.ok) {
@@ -87,7 +97,7 @@ export async function writeSheetRows(input: {
     throw new Error(`Google Sheets clear failed with status ${clearResponse.status}: ${errorText}`);
   }
 
-  const updateResponse = await fetch(
+  const updateResponse = await fetchWithRetry(
     `https://sheets.googleapis.com/v4/spreadsheets/${input.spreadsheetId}/values/${encodeURIComponent(
       `${escapeSheetRange(sheetTitle)}!A1`
     )}?valueInputOption=RAW`,
@@ -102,7 +112,8 @@ export async function writeSheetRows(input: {
         majorDimension: "ROWS",
         values: input.rows,
       }),
-    }
+    },
+    { label: "Google Sheets write" }
   );
 
   if (!updateResponse.ok) {
@@ -178,13 +189,14 @@ async function fetchSpreadsheetMetadata(
   spreadsheetId: string,
   accessToken: string
 ): Promise<SpreadsheetMetadata> {
-  const metadataResponse = await fetch(
+  const metadataResponse = await fetchWithRetry(
     `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}?fields=sheets(properties(sheetId,title))`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
-    }
+    },
+    { label: "Google Sheets metadata lookup" }
   );
 
   if (!metadataResponse.ok) {
@@ -293,4 +305,73 @@ function encodeBase64Url(data: string | ArrayBuffer): string {
 
 function escapeSheetRange(sheetTitle: string): string {
   return `'${sheetTitle.replace(/'/g, "''")}'`;
+}
+
+// Retry helpers live below this point.
+
+async function fetchWithRetry(
+  input: string | URL | Request,
+  init: RequestInit | undefined,
+  options: FetchRetryOptions
+): Promise<Response> {
+  const maxAttempts = Math.max(1, options.maxAttempts ?? DEFAULT_MAX_RETRY_ATTEMPTS);
+  let lastNetworkError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      const response = await fetch(input, init);
+      if (!shouldRetryResponse(response) || attempt === maxAttempts) {
+        return response;
+      }
+
+      await sleep(getRetryDelayMs(response, attempt));
+    } catch (error) {
+      lastNetworkError = error instanceof Error ? error : new Error(String(error));
+      if (attempt === maxAttempts) {
+        throw new Error(`${options.label} failed after ${attempt} attempt(s): ${lastNetworkError.message}`);
+      }
+
+      await sleep(getRetryDelayMs(null, attempt));
+    }
+  }
+
+  throw new Error(`${options.label} failed unexpectedly.`);
+}
+
+function shouldRetryResponse(response: Response): boolean {
+  return response.status === 429 || response.status >= 500;
+}
+
+function parseRetryAfterMs(value: string | null | undefined): number | null {
+  if (!value) {
+    return null;
+  }
+
+  const numericSeconds = Number(value);
+  if (Number.isFinite(numericSeconds) && numericSeconds >= 0) {
+    return numericSeconds * 1_000;
+  }
+
+  const dateMs = Date.parse(value);
+  if (Number.isFinite(dateMs)) {
+    return Math.max(0, dateMs - Date.now());
+  }
+
+  return null;
+}
+
+function getRetryDelayMs(response: Response | null, attempt: number): number {
+  const retryAfter = response?.headers.get("Retry-After");
+  const retryAfterMs = parseRetryAfterMs(retryAfter);
+  if (retryAfterMs !== null) {
+    return Math.min(retryAfterMs, RETRY_MAX_DELAY_MS);
+  }
+
+  const exponentialDelay = RETRY_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1);
+  const jitter = Math.floor(Math.random() * 150);
+  return Math.min(exponentialDelay + jitter, RETRY_MAX_DELAY_MS);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

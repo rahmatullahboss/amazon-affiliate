@@ -153,6 +153,8 @@ const loadBridgeResolution = async () => {
         fallbackApiKeys: workerEnv.AMAZON_API_KEY_FALLBACK
           ? [workerEnv.AMAZON_API_KEY_FALLBACK]
           : [],
+        serpApiToken: (workerEnv as unknown as Record<string, string | undefined>).SERPAPI_TOKEN,
+        zyteApiKey: (workerEnv as unknown as Record<string, string | undefined>).ZYTE_API_KEY,
       });
     } catch (error) {
       if (error instanceof DynamicLinkResolutionError) {

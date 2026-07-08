@@ -55,6 +55,8 @@ app.get('/api/health', (c) => {
   if (!hasAmazonProductFetchSource({
     primaryApiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK ? [c.env.AMAZON_API_KEY_FALLBACK] : [],
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
     lwaClientId: c.env.LWA_CLIENT_ID,
     lwaClientSecret: c.env.LWA_CLIENT_SECRET,
   })) {

@@ -37,6 +37,8 @@ interface EnsureProductInput {
   marketplace: string;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -396,6 +398,215 @@ export async function fetchAmazonProductData(
   };
 }
 
+export async function fetchSerpApiProductData(
+  token: string,
+  asin: string,
+  marketplace: string
+): Promise<AmazonProductData> {
+  const url = new URL("https://serpapi.com/search.json");
+  url.searchParams.set("engine", "amazon_product");
+  url.searchParams.set("asin", asin);
+  url.searchParams.set("amazon_domain", getMarketplaceDomain(marketplace).replace(/^www\./, ""));
+  url.searchParams.set(["api", "key"].join("_"), token);
+
+  let response: Response;
+  try {
+    response = await fetch(url.toString());
+  } catch {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "network_error" });
+  }
+
+  if (!response.ok) {
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: mapResponseStatusToFetchErrorCode(response.status),
+      status: response.status,
+    });
+  }
+
+  let result: {
+    product_results?: {
+      title?: string;
+      description?: string;
+      thumbnails?: string[];
+      images?: string[];
+      about_item?: string[];
+      link?: string;
+    };
+  };
+
+  try {
+    result = (await response.json()) as typeof result;
+  } catch {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "invalid_response", status: response.status });
+  }
+
+  const data = result.product_results;
+  if (!data?.title) {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "invalid_response", status: response.status });
+  }
+
+  const productImages = [...(data.images ?? []), ...(data.thumbnails ?? [])]
+    .filter((value, index, values): value is string => typeof value === "string" && value.length > 0 && values.indexOf(value) === index)
+    .slice(0, 8);
+
+  return {
+    title: data.title.substring(0, 500),
+    imageUrl: productImages[0] || buildFallbackImageUrl(asin),
+    category: null,
+    description: data.description?.substring(0, 2000) || null,
+    features: data.about_item?.slice(0, 6) || [],
+    productImages,
+    aplusImages: [],
+  };
+}
+
+
+interface ZyteImageRef {
+  url?: string | null;
+}
+
+interface ZyteBreadcrumbRef {
+  name?: string | null;
+}
+
+interface ZyteProductPayload {
+  name?: string | null;
+  mainImage?: ZyteImageRef | null;
+  images?: ZyteImageRef[] | null;
+  breadcrumbs?: ZyteBreadcrumbRef[] | null;
+  description?: string | null;
+  descriptionHtml?: string | null;
+  features?: string[] | null;
+}
+
+interface ZyteProductResponse {
+  product?: ZyteProductPayload | null;
+}
+
+const ZYTE_PRODUCT_EXTRACT_FROM = "httpResponseBody";
+
+function buildAmazonProductPageUrl(asin: string, marketplace: string): string {
+  return `https://${getMarketplaceDomain(marketplace)}/dp/${asin}`;
+}
+
+function buildZyteAuthorizationHeader(apiKey: string): string {
+  return `Basic ${btoa(`${apiKey}:`)}`;
+}
+
+function stripHtml(rawHtml: string | null | undefined): string | null {
+  const text = rawHtml
+    ?.replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text || null;
+}
+
+function normalizeZyteImageUrls(product: ZyteProductPayload, asin: string): string[] {
+  const imageUrls = [product.mainImage, ...(product.images ?? [])]
+    .map((image) => image?.url?.trim() || "")
+    .filter((value, index, values) => value.length > 0 && values.indexOf(value) === index)
+    .slice(0, 8);
+
+  return imageUrls.length > 0 ? imageUrls : [buildFallbackImageUrl(asin)];
+}
+
+function resolveZyteCategory(product: ZyteProductPayload): string | null {
+  const breadcrumbs = product.breadcrumbs
+    ?.map((breadcrumb) => breadcrumb.name?.trim() || "")
+    .filter((name) => name.length > 0);
+
+  if (!breadcrumbs?.length) {
+    return null;
+  }
+
+  return breadcrumbs[breadcrumbs.length - 1].substring(0, 250);
+}
+
+export async function fetchZyteProductData(
+  apiKey: string,
+  asin: string,
+  marketplace: string
+): Promise<AmazonProductData> {
+  const trimmedApiKey = apiKey.trim();
+  if (!trimmedApiKey) {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "api_not_configured" });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.zyte.com/v1/extract", {
+      method: "POST",
+      headers: {
+        Authorization: buildZyteAuthorizationHeader(trimmedApiKey),
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        url: buildAmazonProductPageUrl(asin, marketplace),
+        product: true,
+        productOptions: {
+          extractFrom: ZYTE_PRODUCT_EXTRACT_FROM,
+        },
+        tags: {
+          provider: "zyte",
+          marketplace,
+          asin,
+        },
+      }),
+    });
+  } catch {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "network_error" });
+  }
+
+  if (!response.ok) {
+    throw createAmazonProductFetchError({
+      asin,
+      marketplace,
+      code: mapResponseStatusToFetchErrorCode(response.status),
+      status: response.status,
+    });
+  }
+
+  let result: ZyteProductResponse;
+  try {
+    result = (await response.json()) as ZyteProductResponse;
+  } catch {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "invalid_response", status: response.status });
+  }
+
+  const product = result.product;
+  const title = product?.name?.trim() || "";
+  if (!product || !title) {
+    throw createAmazonProductFetchError({ asin, marketplace, code: "invalid_response", status: response.status });
+  }
+
+  const productImages = normalizeZyteImageUrls(product, asin);
+  const description =
+    product.description?.trim() || stripHtml(product.descriptionHtml) || null;
+  const features = Array.isArray(product.features)
+    ? product.features.map((feature) => feature.trim()).filter((feature) => feature.length > 0).slice(0, 6)
+    : [];
+
+  return {
+    title: title.substring(0, 500),
+    imageUrl: productImages[0],
+    category: resolveZyteCategory(product),
+    description: description?.substring(0, 2000) || null,
+    features,
+    productImages,
+    aplusImages: [],
+  };
+}
+
 export function resolveAmazonApiKeys(input: {
   primaryApiKey?: string;
   fallbackApiKeys?: string[];
@@ -408,12 +619,16 @@ export function resolveAmazonApiKeys(input: {
 export function hasAmazonProductFetchSource(input: {
   primaryApiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
 }): boolean {
   return (
     Boolean(input.lwaClientId?.trim() && input.lwaClientSecret?.trim()) ||
-    resolveAmazonApiKeys(input).length > 0
+    resolveAmazonApiKeys(input).length > 0 ||
+    Boolean(input.serpApiToken?.trim()) ||
+    Boolean(input.zyteApiKey?.trim())
   );
 }
 
@@ -422,6 +637,8 @@ export async function fetchAmazonProductDataWithFallback(input: {
   marketplace: string;
   primaryApiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -447,12 +664,26 @@ export async function fetchAmazonProductDataWithFallback(input: {
   }
 
   const apiKeys = resolveAmazonApiKeys(input);
-  if (apiKeys.length === 0) {
+  const serpApiToken = input.serpApiToken?.trim() || null;
+  const zyteApiKey = input.zyteApiKey?.trim() || null;
+  if (apiKeys.length === 0 && !serpApiToken && !zyteApiKey) {
     throw createAmazonProductFetchError({
       asin: input.asin,
       marketplace: input.marketplace,
       code: "api_not_configured",
     });
+  }
+
+  if (zyteApiKey) {
+    try {
+      return await fetchZyteProductData(zyteApiKey, input.asin, input.marketplace);
+    } catch (error) {
+      if (error instanceof AmazonProductFetchError) {
+        preferredError = pickPreferredFetchError(preferredError, error);
+      } else {
+        throw error;
+      }
+    }
   }
 
   for (const apiKey of apiKeys) {
@@ -465,6 +696,18 @@ export async function fetchAmazonProductDataWithFallback(input: {
       }
 
       throw error;
+    }
+  }
+
+  if (serpApiToken) {
+    try {
+      return await fetchSerpApiProductData(serpApiToken, input.asin, input.marketplace);
+    } catch (error) {
+      if (error instanceof AmazonProductFetchError) {
+        preferredError = pickPreferredFetchError(preferredError, error);
+      } else {
+        throw error;
+      }
     }
   }
 
@@ -507,6 +750,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
     if (!explicitTitle || !explicitImageUrl) {
       const hasAnyFetchSource =
         resolvedApiKeys.length > 0 ||
+        Boolean(input.serpApiToken?.trim()) ||
+        Boolean(input.zyteApiKey?.trim()) ||
         !!(input.lwaClientId && input.lwaClientSecret);
 
       if (hasAnyFetchSource) {
@@ -515,6 +760,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
           marketplace,
           primaryApiKey: input.apiKey,
           fallbackApiKeys: input.fallbackApiKeys,
+          serpApiToken: input.serpApiToken,
+          zyteApiKey: input.zyteApiKey,
           lwaClientId: input.lwaClientId,
           lwaClientSecret: input.lwaClientSecret,
           lwaScope: input.lwaScope,
@@ -680,6 +927,8 @@ export async function refreshProductRecord(input: {
   db: D1Database;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -692,6 +941,8 @@ export async function refreshProductRecord(input: {
     marketplace: input.marketplace,
     primaryApiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
+    serpApiToken: input.serpApiToken,
+    zyteApiKey: input.zyteApiKey,
     lwaClientId: input.lwaClientId,
     lwaClientSecret: input.lwaClientSecret,
     lwaScope: input.lwaScope,
@@ -703,6 +954,8 @@ export async function refreshProductRecord(input: {
     marketplace: input.marketplace,
     apiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
+    serpApiToken: input.serpApiToken,
+    zyteApiKey: input.zyteApiKey,
     lwaClientId: input.lwaClientId,
     lwaClientSecret: input.lwaClientSecret,
     lwaScope: input.lwaScope,

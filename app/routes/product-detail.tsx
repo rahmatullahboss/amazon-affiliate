@@ -181,6 +181,14 @@ function parseJsonArray(raw: string | null): string[] {
   return [];
 }
 
+function ProductAffiliateDisclosureNote() {
+  return (
+    <p className="mt-4 text-xs leading-5 text-gray-500">
+      {INLINE_AFFILIATE_DISCLOSURE}
+    </p>
+  );
+}
+
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
   const { product, relatedProducts, availableMarketplaces, amazonUrlsByMarketplace } = loaderData as ProductDetailData;
   const galleryImages = parseJsonArray(product.product_images);
@@ -345,9 +353,6 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                     <p className="mt-3 text-sm leading-6 text-gray-600">
                       {AMAZON_DESTINATION_NOTE}
                     </p>
-                    <p className="mt-2 text-xs leading-5 text-gray-500">
-                      {INLINE_AFFILIATE_DISCLOSURE}
-                    </p>
                     <div className="mt-5">
                       <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
                         Share this product
@@ -359,6 +364,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                         />
                       </div>
                     </div>
+                    <ProductAffiliateDisclosureNote />
                   </div>
                 ) : selectedMarketplace ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">

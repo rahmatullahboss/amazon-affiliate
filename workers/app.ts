@@ -1,10 +1,7 @@
 import { createRequestHandler } from "react-router";
-import { ASIN_IMPORT_ENABLED } from "../server/utils/asin-import";
 import { apiApp } from "../server/api";
 import { createBlogImageResponse } from "../server/services/blog";
 import { generateScheduledBlogDraft, publishDueScheduledBlogPosts } from "../server/services/blog-generation";
-import { syncAgentSheetSources } from "../server/services/sheet-control";
-import { getSheetSyncConfig, syncProductsFromSheet } from "../server/services/sheet-sync";
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
 
 declare module "react-router" {
@@ -34,16 +31,6 @@ interface SitemapEntry {
   path: string;
   lastModified?: string | null;
 }
-
-type RuntimeSecretEnv = Env & {
-  AMAZON_API_KEY?: string;
-  AMAZON_API_KEY_FALLBACK?: string;
-  LWA_CLIENT_ID?: string;
-  LWA_CLIENT_SECRET?: string;
-  LWA_CREATORS_SCOPE?: string;
-  GOOGLE_SERVICE_ACCOUNT_EMAIL?: string;
-  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?: string;
-};
 
 function isCommonBotProbe(pathname: string): boolean {
   return (
@@ -260,57 +247,9 @@ export default {
         console.error(`[BLOG_SCHEDULE] Scheduled blog generation failed: ${message}`, error);
       }));
 
-      if (!ASIN_IMPORT_ENABLED) {
-        return;
-      }
-
-      const runtimeEnv = env as RuntimeSecretEnv;
-
-      if (!runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL || !runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
-        console.warn("[SHEET_SYNC] Skipping scheduled import because Google credentials are missing.");
-        return;
-      }
-
-      await syncAgentSheetSources({
-        db: env.DB,
-        kv: env.KV,
-        apiKey: runtimeEnv.AMAZON_API_KEY,
-        fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
-          ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
-          : [],
-        lwaClientId: runtimeEnv.LWA_CLIENT_ID,
-        lwaClientSecret: runtimeEnv.LWA_CLIENT_SECRET,
-        lwaScope: runtimeEnv.LWA_CREATORS_SCOPE,
-        credentials: {
-          clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          privateKey: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-        },
-      });
-
-      const config = await getSheetSyncConfig(env.DB);
-      if (!config.is_active || !config.sheet_url) {
-        return;
-      }
-
-      await syncProductsFromSheet({
-        db: env.DB,
-        kv: env.KV,
-        apiKey: runtimeEnv.AMAZON_API_KEY,
-        fallbackApiKeys: runtimeEnv.AMAZON_API_KEY_FALLBACK
-          ? [runtimeEnv.AMAZON_API_KEY_FALLBACK]
-          : [],
-        lwaClientId: runtimeEnv.LWA_CLIENT_ID,
-        lwaClientSecret: runtimeEnv.LWA_CLIENT_SECRET,
-        lwaScope: runtimeEnv.LWA_CREATORS_SCOPE,
-        config,
-        credentials: {
-          clientEmail: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-          privateKey: runtimeEnv.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
-        },
-      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown scheduled sheet sync error";
-      ctx.waitUntil(Promise.resolve(console.error(`[SHEET_SYNC] Scheduled import failed: ${message}`, error)));
+      const message = error instanceof Error ? error.message : "Unknown scheduled task error";
+      ctx.waitUntil(Promise.resolve(console.error(`[SCHEDULE] Task failed: ${message}`, error)));
     }
   },
 } satisfies ExportedHandler<Env>;

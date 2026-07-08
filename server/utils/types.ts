@@ -23,6 +23,8 @@ export type Bindings = {
   ADMIN_PASSWORD?: string;
   AMAZON_API_KEY?: string;
   AMAZON_API_KEY_FALLBACK?: string;
+  SERPAPI_TOKEN?: string;
+  ZYTE_API_KEY?: string;
   RESEND_API_KEY?: string;
   RESEND_FROM_EMAIL?: string;
   RESEND_REPLY_TO?: string;

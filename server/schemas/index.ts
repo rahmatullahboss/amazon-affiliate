@@ -116,6 +116,7 @@ export const updateTrackingIdSchema = z.object({
   tag: trackingTagSchema.optional(),
   label: z.string().max(100).optional().nullable(),
   is_default: z.boolean().optional(),
+  is_site_primary: z.boolean().optional(),
   is_active: z.boolean().optional(),
   is_portal_editable: z.boolean().optional(),
   alias_slug: slugAliasSchema,

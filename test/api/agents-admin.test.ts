@@ -157,6 +157,61 @@ describe("Admin agent management API", () => {
     expect(detachedUser).toEqual({ agent_id: null, is_active: 0 });
   });
 
+  it("deletes an inactive agent using an active default admin tag without choosing the deleted agent tag", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 914, "default-owner", "Default Owner");
+    await DbFactory.seedAgent(env.DB, 915, "inactive-self-primary", "Inactive Self Primary");
+    await env.DB.prepare(
+      `UPDATE agents
+       SET is_active = 0
+       WHERE id = 915`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (607, 'BDEFAULT01', 'Default Fallback Product', 'http://img.com/default.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
+       VALUES
+         (713, 914, 'admin-default-us-20', 'US', 1, 0, 1),
+         (714, 915, 'deleted-self-primary-us-20', 'US', 1, 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (807, 915, 607, 714, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+
+    const response = await apiApp.fetch(
+      new Request("http://localhost/api/agents/915", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Origin: "http://localhost",
+        },
+      }),
+      env as never,
+      { waitUntil: () => undefined } as never
+    );
+
+    expect(response.status).toBe(200);
+
+    const remappedRow = await env.DB.prepare(
+      `SELECT agent_id, tracking_id
+       FROM agent_products
+       WHERE id = 807`
+    ).first<{ agent_id: number; tracking_id: number }>();
+    const deletedAgent = await env.DB.prepare(
+      `SELECT id
+       FROM agents
+       WHERE id = 915`
+    ).first<{ id: number }>();
+
+    expect(deletedAgent).toBeNull();
+    expect(remappedRow).toEqual({ agent_id: 914, tracking_id: 713 });
+  });
+
   it("deletes all tracking for an inactive agent and remaps products to site-primary owners", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 907, "site-owner-three", "Site Owner Three");
@@ -258,7 +313,7 @@ describe("Admin agent management API", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Missing active site-primary tag for marketplace(s): DE",
+      error: "Missing active site-primary/default tag for marketplace(s): DE",
     });
   });
 

@@ -47,7 +47,7 @@ async function invalidateProductCaches(
 }
 
 maintenance.post('/mappings/hard-delete', async (c) => {
-  const body = await c.req.json<{ mappingIds?: number[] }>().catch(() => ({}));
+  const body = await c.req.json<{ mappingIds?: number[] }>().catch((): { mappingIds?: number[] } => ({}));
   const mappingIds = parsePositiveIds(body.mappingIds);
 
   if (!mappingIds.length) {
@@ -82,7 +82,7 @@ maintenance.post('/mappings/hard-delete', async (c) => {
 });
 
 maintenance.post('/products/hard-delete', async (c) => {
-  const body = await c.req.json<{ productIds?: number[] }>().catch(() => ({}));
+  const body = await c.req.json<{ productIds?: number[] }>().catch((): { productIds?: number[] } => ({}));
   const productIds = parsePositiveIds(body.productIds);
 
   if (!productIds.length) {
@@ -143,7 +143,7 @@ maintenance.post('/products/hard-delete', async (c) => {
 });
 
 maintenance.post('/tracking/hard-delete', async (c) => {
-  const body = await c.req.json<{ trackingIds?: number[] }>().catch(() => ({}));
+  const body = await c.req.json<{ trackingIds?: number[] }>().catch((): { trackingIds?: number[] } => ({}));
   const trackingIds = parsePositiveIds(body.trackingIds);
 
   if (!trackingIds.length) {

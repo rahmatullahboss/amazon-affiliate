@@ -63,6 +63,8 @@
   // - JWT_SECRET
   // - AMAZON_API_KEY (optional)
   // - AMAZON_API_KEY_FALLBACK (optional)
+  // - SERPAPI_TOKEN (optional SerpApi Amazon Product fallback)
+  // - ZYTE_API_KEY (optional Zyte API Amazon Product fallback)
   // - OLLAMA_CLOUD_BASE_URL (optional fallback)
   // - OLLAMA_CLOUD_API_KEY (optional fallback)
   // - OLLAMA_CLOUD_MODEL (optional fallback)

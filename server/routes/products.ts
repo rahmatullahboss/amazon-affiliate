@@ -247,6 +247,8 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
   const hasFetchSource = hasAmazonProductFetchSource({
     primaryApiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys,
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
     lwaClientId: c.env.LWA_CLIENT_ID,
     lwaClientSecret: c.env.LWA_CLIENT_SECRET,
   });
@@ -263,6 +265,8 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       marketplace,
       primaryApiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      serpApiToken: c.env.SERPAPI_TOKEN,
+      zyteApiKey: c.env.ZYTE_API_KEY,
       lwaClientId: c.env.LWA_CLIENT_ID,
       lwaClientSecret: c.env.LWA_CLIENT_SECRET,
       lwaScope: c.env.LWA_CREATORS_SCOPE,
@@ -273,6 +277,8 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       marketplace,
       apiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      serpApiToken: c.env.SERPAPI_TOKEN,
+      zyteApiKey: c.env.ZYTE_API_KEY,
       lwaClientId: c.env.LWA_CLIENT_ID,
       lwaClientSecret: c.env.LWA_CLIENT_SECRET,
       lwaScope: c.env.LWA_CREATORS_SCOPE,
@@ -408,6 +414,8 @@ products.post('/:id/refresh', async (c) => {
   if (!hasAmazonProductFetchSource({
     primaryApiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys,
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
     lwaClientId: c.env.LWA_CLIENT_ID,
     lwaClientSecret: c.env.LWA_CLIENT_SECRET,
   })) {
@@ -434,6 +442,8 @@ products.post('/:id/refresh', async (c) => {
       db: c.env.DB,
       apiKey: c.env.AMAZON_API_KEY,
       fallbackApiKeys,
+      serpApiToken: c.env.SERPAPI_TOKEN,
+      zyteApiKey: c.env.ZYTE_API_KEY,
       lwaClientId: c.env.LWA_CLIENT_ID,
       lwaClientSecret: c.env.LWA_CLIENT_SECRET,
       lwaScope: c.env.LWA_CREATORS_SCOPE,
@@ -767,6 +777,8 @@ products.post('/enrich', async (c) => {
   if (!hasAmazonProductFetchSource({
     primaryApiKey: c.env.AMAZON_API_KEY,
     fallbackApiKeys,
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
     lwaClientId: c.env.LWA_CLIENT_ID,
     lwaClientSecret: c.env.LWA_CLIENT_SECRET,
   })) {
@@ -820,6 +832,8 @@ products.post('/enrich', async (c) => {
           marketplace: product.marketplace,
           primaryApiKey: c.env.AMAZON_API_KEY,
           fallbackApiKeys,
+          serpApiToken: c.env.SERPAPI_TOKEN,
+          zyteApiKey: c.env.ZYTE_API_KEY,
           lwaClientId: c.env.LWA_CLIENT_ID,
           lwaClientSecret: c.env.LWA_CLIENT_SECRET,
           lwaScope: c.env.LWA_CREATORS_SCOPE,

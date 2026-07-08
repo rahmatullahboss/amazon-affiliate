@@ -965,7 +965,7 @@ describe("Portal Tracking API", () => {
 
     expect(response.status).toBe(409);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Missing active site-primary tag for marketplace: DE",
+      error: "Missing active site-primary/default tag for marketplace: DE",
     });
   });
 

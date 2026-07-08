@@ -256,7 +256,9 @@ agents.delete('/:id', async (c) => {
   const marketplaces = await collectAgentDeleteMarketplaces(c.env.DB, id);
 
   try {
-    const replacements = await ensureSitePrimaryCoverageForMarketplaces(c.env.DB, marketplaces);
+    const replacements = await ensureSitePrimaryCoverageForMarketplaces(c.env.DB, marketplaces, {
+      excludedAgentId: id,
+    });
 
     await remapAgentProductsForAgentToSitePrimary(c.env.DB, id, replacements);
     await remapAgentAnalyticsToSitePrimary(c.env.DB, id, replacements);
@@ -343,11 +345,10 @@ agents.delete('/:id/tracking', async (c) => {
   }
 
   try {
-    const replacements = await ensureSitePrimaryCoverageForMarketplaces(
-      c.env.DB,
-      marketplaces,
-      excludedTrackingIdsByMarketplace
-    );
+    const replacements = await ensureSitePrimaryCoverageForMarketplaces(c.env.DB, marketplaces, {
+      excludedTrackingIdsByMarketplace,
+      excludedAgentId: id,
+    });
 
     await remapAgentProductsForAgentToSitePrimary(c.env.DB, id, replacements);
   } catch (error) {

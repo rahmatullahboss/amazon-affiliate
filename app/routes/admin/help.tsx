@@ -1,7 +1,6 @@
-import type { Route } from "./+types/help";
 import { useState } from "react";
 
-export function meta({}: Route.MetaArgs) {
+export function meta() {
   return [
     { title: "Help Center | DealsRky Admin" },
     { name: "description", content: "Admin Help Center and Documentation" },

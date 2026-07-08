@@ -50,6 +50,8 @@ interface SyncProductsFromSheetInput {
   kv: KVNamespace;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -71,6 +73,13 @@ interface SyncSummary {
   createdCount: number;
   updatedCount: number;
   skippedCount: number;
+}
+
+interface RowFailureDetail {
+  rowNumber: number;
+  asin: string | null;
+  marketplace: string | null;
+  reason: string;
 }
 
 interface ParsedSheetSyncRow {
@@ -232,11 +241,18 @@ export async function syncProductsFromSheet(
     let createdCount = 0;
     let updatedCount = 0;
     let skippedCount = 0;
+    const rowFailures: RowFailureDetail[] = [];
 
-    for (const row of rowRecords) {
+    for (const [rowIndex, row] of rowRecords.entries()) {
       const parsedRow = parseSheetSyncRow(row, input.config.default_marketplace);
       if (!parsedRow) {
         skippedCount += 1;
+        rowFailures.push({
+          rowNumber: rowIndex + 2,
+          asin: row.asin || row.amazon_url || row.product_url || row.url || row.link || null,
+          marketplace: row.marketplace || null,
+          reason: "ASIN is missing or invalid.",
+        });
         continue;
       }
 
@@ -252,6 +268,8 @@ export async function syncProductsFromSheet(
           marketplace: parsedRow.marketplace,
           apiKey: input.apiKey,
           fallbackApiKeys: input.fallbackApiKeys,
+          serpApiToken: input.serpApiToken,
+          zyteApiKey: input.zyteApiKey,
           lwaClientId: input.lwaClientId,
           lwaClientSecret: input.lwaClientSecret,
           lwaScope: input.lwaScope,
@@ -295,6 +313,12 @@ export async function syncProductsFromSheet(
 
           if (mappingResult === "skipped") {
             skippedCount += 1;
+            rowFailures.push({
+              rowNumber: rowIndex + 2,
+              asin: parsedRow.asin,
+              marketplace: parsedRow.marketplace,
+              reason: "Agent or tracking ID was not found for this row.",
+            });
             continue;
           }
 
@@ -315,10 +339,24 @@ export async function syncProductsFromSheet(
         }
 
         await cache.invalidateForProduct(parsedRow.asin);
-      } catch {
+      } catch (error) {
         skippedCount += 1;
+        rowFailures.push({
+          rowNumber: rowIndex + 2,
+          asin: parsedRow.asin,
+          marketplace: parsedRow.marketplace,
+          reason: error instanceof Error ? error.message : "Row sync failed.",
+        });
         continue;
       }
+    }
+
+    if (rowFailures.length > 0) {
+      console.warn("Sheet import skipped rows", {
+        sheetUrl: input.config.sheet_url,
+        rowFailureCount: rowFailures.length,
+        rowFailures: rowFailures.slice(0, 50),
+      });
     }
 
     const summary = {

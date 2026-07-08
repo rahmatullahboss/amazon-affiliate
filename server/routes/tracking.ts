@@ -41,8 +41,7 @@ async function enforceSingleActiveTagForAgentMarketplace(
   await db.prepare(
     `UPDATE tracking_ids
      SET is_active = 0,
-         is_default = 0,
-         updated_at = CURRENT_TIMESTAMP
+         is_default = 0
      WHERE agent_id = ? AND marketplace = ? AND id != ?`
   )
     .bind(input.agentId, input.marketplace, input.keepTrackingId)
@@ -51,8 +50,7 @@ async function enforceSingleActiveTagForAgentMarketplace(
   await db.prepare(
     `UPDATE tracking_ids
      SET is_active = 1,
-         is_default = 1,
-         updated_at = CURRENT_TIMESTAMP
+         is_default = 1
      WHERE id = ?`
   )
     .bind(input.keepTrackingId)
@@ -90,14 +88,16 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active, is_portal_editable)
-       VALUES (?, ?, ?, ?, 1, 1, ?)`
+      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_site_primary, is_active, is_portal_editable)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`
     )
       .bind(
         data.agent_id,
         data.tag,
         data.label || null,
         data.marketplace,
+        data.is_default ? 1 : 0,
+        data.is_site_primary ? 1 : 0,
         data.is_portal_editable ? 1 : 0
       )
       .run();
@@ -176,12 +176,12 @@ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
   if (body.tag !== undefined) { updates.push('tag = ?'); values.push(body.tag); }
   if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
   if (body.is_default !== undefined) { updates.push('is_default = ?'); values.push(body.is_default ? 1 : 0); }
+  if (body.is_site_primary !== undefined) { updates.push('is_site_primary = ?'); values.push(body.is_site_primary ? 1 : 0); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
   if (body.is_portal_editable !== undefined) { updates.push('is_portal_editable = ?'); values.push(body.is_portal_editable ? 1 : 0); }
 
   try {
     if (updates.length > 0) {
-      updates.push('updated_at = CURRENT_TIMESTAMP');
       values.push(id);
       await c.env.DB.prepare(`UPDATE tracking_ids SET ${updates.join(', ')} WHERE id = ?`)
         .bind(...values)
@@ -247,8 +247,6 @@ tracking.delete('/:id', async (c) => {
   const id = parseInt(c.req.param('id'));
   if (isNaN(id)) throw new HTTPException(400, { message: 'Invalid tag ID' });
 
-  const hardDelete = c.req.query('hard') === '1' || c.req.query('force') === '1';
-
   const current = await c.env.DB.prepare(
     'SELECT id, agent_id, marketplace, tag FROM tracking_ids WHERE id = ?'
   )
@@ -266,17 +264,13 @@ tracking.delete('/:id', async (c) => {
     .first<{ count: number }>();
 
   if (usage && usage.count > 0) {
-    if (hardDelete) {
-      await c.env.DB.prepare('DELETE FROM agent_products WHERE tracking_id = ?').bind(id).run();
-    } else {
-      try {
-        const replacement = await requireSitePrimaryTrackingTarget(c.env.DB, current.marketplace, id);
-        await remapAgentTrackingToSitePrimary(c.env.DB, id, replacement);
-      } catch (error) {
-        throw new HTTPException(409, {
-          message: error instanceof Error ? error.message : 'Missing site-primary replacement tag.',
-        });
-      }
+    try {
+      const replacement = await requireSitePrimaryTrackingTarget(c.env.DB, current.marketplace, id);
+      await remapAgentTrackingToSitePrimary(c.env.DB, id, replacement);
+    } catch (error) {
+      throw new HTTPException(409, {
+        message: error instanceof Error ? error.message : 'Missing site-primary replacement tag.',
+      });
     }
   }
 
@@ -284,11 +278,9 @@ tracking.delete('/:id', async (c) => {
   await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
 
   return c.json({
-    message: hardDelete
-      ? `Deleted ${current.tag} and removed ${usage?.count ?? 0} linked product mapping${usage?.count === 1 ? '' : 's'}.`
-      : usage && usage.count > 0
-        ? `Moved ${usage.count} linked mapping${usage.count > 1 ? 's' : ''} to the site-primary tag and deleted ${current.tag}.`
-        : 'Tag deleted',
+    message: usage && usage.count > 0
+      ? `Moved ${usage.count} linked mapping${usage.count > 1 ? 's' : ''} to the site-primary tag and deleted ${current.tag}.`
+      : 'Tag deleted',
   });
 });
 

@@ -1,6 +1,10 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../utils/types";
+import {
+  syncAdminSheetRows,
+  type AdminSheetSyncRowInput,
+} from "../services/admin-sheet-row-sync";
 import { syncAgentSheetSources } from "../services/sheet-control";
 import { getSheetSyncConfig, syncProductsFromSheet } from "../services/sheet-sync";
 
@@ -17,16 +21,36 @@ type WebhookEnv = AppEnv & {
 
 const webhooks = new Hono<WebhookEnv>();
 
-webhooks.post("/sheet-sync", async (c) => {
-  const secret = c.env.SHEET_WEBHOOK_SECRET;
-  if (!secret) {
-    throw new HTTPException(503, { message: "Webhook secret not configured." });
-  }
+webhooks.post("/sheet-row-sync", async (c) => {
+  ensureSheetWebhookSecret(c.env.SHEET_WEBHOOK_SECRET, c.req.header("X-Webhook-Secret"));
 
-  const provided = c.req.header("X-Webhook-Secret");
-  if (provided !== secret) {
-    throw new HTTPException(401, { message: "Invalid webhook secret." });
-  }
+  const payload = await c.req.json<unknown>().catch(() => null);
+  const rows = parseAdminSheetRows(payload);
+  const result = await syncAdminSheetRows({
+    db: c.env.DB,
+    kv: c.env.KV,
+    publicAppUrl: c.env.PUBLIC_APP_URL,
+    rows,
+    apiKey: c.env.AMAZON_API_KEY,
+    fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK
+      ? [c.env.AMAZON_API_KEY_FALLBACK]
+      : [],
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
+    lwaClientId: c.env.LWA_CLIENT_ID,
+    lwaClientSecret: c.env.LWA_CLIENT_SECRET,
+    lwaScope: c.env.LWA_CREATORS_SCOPE,
+  });
+
+  const failedCount = result.results.filter((row) => row.status === "failed").length;
+  return c.json({
+    status: failedCount > 0 ? "partial" : "ok",
+    results: result.results,
+  });
+});
+
+webhooks.post("/sheet-sync", async (c) => {
+  ensureSheetWebhookSecret(c.env.SHEET_WEBHOOK_SECRET, c.req.header("X-Webhook-Secret"));
 
   if (!c.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || !c.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY) {
     throw new HTTPException(503, { message: "Google Sheets API credentials not configured." });
@@ -44,6 +68,8 @@ webhooks.post("/sheet-sync", async (c) => {
     fallbackApiKeys: c.env.AMAZON_API_KEY_FALLBACK
       ? [c.env.AMAZON_API_KEY_FALLBACK]
       : [],
+    serpApiToken: c.env.SERPAPI_TOKEN,
+    zyteApiKey: c.env.ZYTE_API_KEY,
     lwaClientId: c.env.LWA_CLIENT_ID,
     lwaClientSecret: c.env.LWA_CLIENT_SECRET,
     lwaScope: c.env.LWA_CREATORS_SCOPE,
@@ -77,5 +103,46 @@ webhooks.post("/sheet-sync", async (c) => {
 
   return c.json({ status: "ok", message: "Sheet sync triggered successfully." });
 });
+
+function ensureSheetWebhookSecret(secret: string | undefined, provided: string | undefined): void {
+  if (!secret) {
+    throw new HTTPException(503, { message: "Webhook secret not configured." });
+  }
+  if (provided !== secret) {
+    throw new HTTPException(401, { message: "Invalid webhook secret." });
+  }
+}
+
+function parseAdminSheetRows(payload: unknown): AdminSheetSyncRowInput[] {
+  if (!payload || typeof payload !== "object" || !("rows" in payload)) {
+    throw new HTTPException(400, { message: "Request body must contain rows." });
+  }
+
+  const rawRows = (payload as { rows?: unknown }).rows;
+  if (!Array.isArray(rawRows) || rawRows.length === 0) {
+    throw new HTTPException(400, { message: "At least one row is required." });
+  }
+  if (rawRows.length > 100) {
+    throw new HTTPException(400, { message: "A maximum of 100 rows can be synced per request." });
+  }
+
+  return rawRows.map((rawRow, index) => {
+    if (!rawRow || typeof rawRow !== "object") {
+      throw new HTTPException(400, { message: `Row ${index + 1} must be an object.` });
+    }
+
+    const row = rawRow as Record<string, unknown>;
+    return {
+      rowNumber:
+        typeof row.rowNumber === "number" && Number.isInteger(row.rowNumber)
+          ? row.rowNumber
+          : index + 2,
+      asin: typeof row.asin === "string" ? row.asin : "",
+      marketplace: typeof row.marketplace === "string" ? row.marketplace : "",
+      trackingTag: typeof row.trackingTag === "string" ? row.trackingTag : null,
+      customTitle: typeof row.customTitle === "string" ? row.customTitle : null,
+    };
+  });
+}
 
 export default webhooks;

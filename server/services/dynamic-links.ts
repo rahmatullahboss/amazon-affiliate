@@ -27,6 +27,8 @@ interface EnsureLegacyDynamicLinkInput {
   preferredMarketplace?: string | null;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -95,6 +97,8 @@ interface EnsureDynamicLinkInput {
   asin: string;
   apiKey?: string;
   fallbackApiKeys?: string[];
+  serpApiToken?: string;
+  zyteApiKey?: string;
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
@@ -451,6 +455,8 @@ export async function ensureDynamicLinkByTrackingTag(
     if (!hasAmazonProductFetchSource({
       primaryApiKey: input.apiKey,
       fallbackApiKeys: input.fallbackApiKeys,
+      serpApiToken: input.serpApiToken,
+      zyteApiKey: input.zyteApiKey,
       lwaClientId: input.lwaClientId,
       lwaClientSecret: input.lwaClientSecret,
     })) {
@@ -469,6 +475,8 @@ export async function ensureDynamicLinkByTrackingTag(
         fallbackApiKeys: input.fallbackApiKeys,
         lwaClientId: input.lwaClientId,
         lwaClientSecret: input.lwaClientSecret,
+        serpApiToken: input.serpApiToken,
+        zyteApiKey: input.zyteApiKey,
         lwaScope: input.lwaScope,
         status: "active",
         requireRealProductData: true,
@@ -652,6 +660,8 @@ export async function ensureDynamicLinkByAgentSlug(
   if (!hasAmazonProductFetchSource({
     primaryApiKey: input.apiKey,
     fallbackApiKeys: input.fallbackApiKeys,
+    serpApiToken: input.serpApiToken,
+    zyteApiKey: input.zyteApiKey,
     lwaClientId: input.lwaClientId,
     lwaClientSecret: input.lwaClientSecret,
   })) {
@@ -697,6 +707,8 @@ export async function ensureDynamicLinkByAgentSlug(
         fallbackApiKeys: input.fallbackApiKeys,
         lwaClientId: input.lwaClientId,
         lwaClientSecret: input.lwaClientSecret,
+        serpApiToken: input.serpApiToken,
+        zyteApiKey: input.zyteApiKey,
         lwaScope: input.lwaScope,
         status: "active",
         requireRealProductData: true,

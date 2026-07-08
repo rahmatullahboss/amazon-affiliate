@@ -513,6 +513,8 @@ export async function syncAgentSheetSources(input: {
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
+  serpApiToken?: string;
+  zyteApiKey?: string;
   triggeredByUserId?: number;
   sourceId?: number;
 }): Promise<AgentSheetSyncSummary> {
@@ -570,6 +572,8 @@ export async function approveSheetSubmissionRow(input: {
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
+  serpApiToken?: string;
+  zyteApiKey?: string;
   statusOverride?: "approved" | "auto_approved";
 }): Promise<SheetSubmissionRowListItem> {
   const row = await input.db
@@ -667,6 +671,8 @@ export async function approveSheetSubmissionRow(input: {
       marketplace: row.marketplace,
       apiKey: input.apiKey,
       fallbackApiKeys: input.fallbackApiKeys,
+      serpApiToken: input.serpApiToken,
+      zyteApiKey: input.zyteApiKey,
       lwaClientId: input.lwaClientId,
       lwaClientSecret: input.lwaClientSecret,
       lwaScope: input.lwaScope,
@@ -816,6 +822,8 @@ async function syncSingleAgentSheetSource(input: {
   lwaClientId?: string;
   lwaClientSecret?: string;
   lwaScope?: string;
+  serpApiToken?: string;
+  zyteApiKey?: string;
   triggeredByUserId?: number;
 }): Promise<{
   totalRows: number;
@@ -858,6 +866,8 @@ async function syncSingleAgentSheetSource(input: {
           hasAmazonProductFetchSource({
             primaryApiKey: input.apiKey,
             fallbackApiKeys: input.fallbackApiKeys,
+            serpApiToken: input.serpApiToken,
+            zyteApiKey: input.zyteApiKey,
             lwaClientId: input.lwaClientId,
             lwaClientSecret: input.lwaClientSecret,
           }),
@@ -921,6 +931,8 @@ async function syncSingleAgentSheetSource(input: {
             reviewedByUserId: input.triggeredByUserId,
             apiKey: input.apiKey,
             fallbackApiKeys: input.fallbackApiKeys,
+            serpApiToken: input.serpApiToken,
+            zyteApiKey: input.zyteApiKey,
             lwaClientId: input.lwaClientId,
             lwaClientSecret: input.lwaClientSecret,
             lwaScope: input.lwaScope,

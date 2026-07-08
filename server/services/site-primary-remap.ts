@@ -1,5 +1,3 @@
-import type { D1Database } from "@cloudflare/workers-types";
-
 export interface SitePrimaryTrackingTarget {
   agentId: number;
   trackingId: number;
@@ -7,22 +5,32 @@ export interface SitePrimaryTrackingTarget {
   tag: string;
 }
 
+interface SitePrimaryLookupOptions {
+  excludedTrackingId?: number;
+  excludedAgentId?: number;
+}
+
 async function loadSitePrimaryTrackingTarget(
   db: D1Database,
   marketplace: string,
-  excludedTrackingId?: number
+  options: SitePrimaryLookupOptions = {}
 ): Promise<SitePrimaryTrackingTarget | null> {
   const clauses = [
     "t.marketplace = ?",
     "t.is_active = 1",
-    "t.is_site_primary = 1",
+    "(t.is_site_primary = 1 OR t.is_default = 1)",
     "a.is_active = 1",
   ];
   const params: Array<string | number> = [marketplace];
 
-  if (excludedTrackingId) {
+  if (options.excludedTrackingId) {
     clauses.push("t.id != ?");
-    params.push(excludedTrackingId);
+    params.push(options.excludedTrackingId);
+  }
+
+  if (options.excludedAgentId) {
+    clauses.push("t.agent_id != ?");
+    params.push(options.excludedAgentId);
   }
 
   return db
@@ -35,7 +43,7 @@ async function loadSitePrimaryTrackingTarget(
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
        WHERE ${clauses.join(" AND ")}
-       ORDER BY t.created_at ASC
+       ORDER BY t.is_site_primary DESC, t.is_default DESC, t.created_at ASC
        LIMIT 1`
     )
     .bind(...params)
@@ -47,10 +55,10 @@ export async function requireSitePrimaryTrackingTarget(
   marketplace: string,
   excludedTrackingId?: number
 ): Promise<SitePrimaryTrackingTarget> {
-  const replacement = await loadSitePrimaryTrackingTarget(db, marketplace, excludedTrackingId);
+  const replacement = await loadSitePrimaryTrackingTarget(db, marketplace, { excludedTrackingId });
 
   if (!replacement) {
-    throw new Error(`Missing active site-primary tag for marketplace: ${marketplace}`);
+    throw new Error(`Missing active site-primary/default tag for marketplace: ${marketplace}`);
   }
 
   return replacement;
@@ -97,20 +105,24 @@ export async function collectAgentDeleteMarketplaces(
   ])];
 }
 
+interface SitePrimaryCoverageOptions {
+  excludedTrackingIdsByMarketplace?: Map<string, number>;
+  excludedAgentId?: number;
+}
+
 export async function ensureSitePrimaryCoverageForMarketplaces(
   db: D1Database,
   marketplaces: string[],
-  excludedTrackingIdsByMarketplace?: Map<string, number>
+  options: SitePrimaryCoverageOptions = {}
 ): Promise<Map<string, SitePrimaryTrackingTarget>> {
   const replacements = new Map<string, SitePrimaryTrackingTarget>();
   const missing: string[] = [];
 
   for (const marketplace of marketplaces) {
-    const replacement = await loadSitePrimaryTrackingTarget(
-      db,
-      marketplace,
-      excludedTrackingIdsByMarketplace?.get(marketplace)
-    );
+    const replacement = await loadSitePrimaryTrackingTarget(db, marketplace, {
+      excludedTrackingId: options.excludedTrackingIdsByMarketplace?.get(marketplace),
+      excludedAgentId: options.excludedAgentId,
+    });
 
     if (!replacement) {
       missing.push(marketplace);
@@ -121,7 +133,7 @@ export async function ensureSitePrimaryCoverageForMarketplaces(
   }
 
   if (missing.length > 0) {
-    throw new Error(`Missing active site-primary tag for marketplace(s): ${missing.join(", ")}`);
+    throw new Error(`Missing active site-primary/default tag for marketplace(s): ${missing.join(", ")}`);
   }
 
   return replacements;

@@ -43,3 +43,36 @@
 
 ---
 *Auto-synced | 2026-03-28*
+
+## 🚦 Mandatory Superpowers Skills
+
+Use the `Skill` tool to invoke these skills at the right moment. Skipping them is a protocol violation.
+
+- **`superpowers:using-superpowers`** — invoke FIRST, before responding to any user message. Establishes how to find and use skills.
+- **`superpowers:brainstorming`** — invoke BEFORE any planning, design, or non-trivial implementation. Brainstorm first, plan second, code third.
+- **`superpowers:writing-plans`** — invoke when a plan is needed before implementation. Plans contain approach and steps only — NO code blocks in plans.
+- **`superpowers:execute-plan`** — invoke when actually executing a written plan.
+- **`superpowers:test-driven-development`** — invoke when adding tests or test-driven features.
+- **`superpowers:systematic-debugging`** — invoke BEFORE attempting any bug fix. Always debug first, patch second.
+- **`superpowers:verification-before-completion`** — invoke before claiming a task is done. Verify, then state completion.
+- **`superpowers:requesting-code-review`** — invoke at major milestones or before merging significant work.
+- **`superpowers:receiving-code-review`** — invoke when receiving review feedback; do not silently ignore review input.
+
+> 1% rule: even a small chance a skill applies means invoke it. Skills override default behavior but user instructions are highest priority.
+
+## 🔄 Session Memory Files (Maintain Every Turn)
+
+These MD files are the project's persistent memory across ChatGPT sessions via CodexPro. Update them at the appropriate moment — do not let them go stale.
+
+| File | When to update |
+|---|---|
+| `active-context.md` (project root) | **Every turn** while work is in progress: current task, branch, files touched this session, pending decisions, blockers, next concrete step |
+| `.ai-bridge/current-plan.md` | **Before any non-trivial work.** Approach and steps only — never code blocks |
+| `.ai-bridge/project-map.md` | **Whenever you explore or map the codebase.** Persistent codebase map the next session reads to skip rediscovery |
+| `.ai-bridge/codex-status.md` | After each meaningful change: files touched, tests run, results, blockers, next GPT review focus |
+| `.ai-bridge/decisions.md` | When an architectural decision is made and should remain stable |
+| `.ai-bridge/open-questions.md` | When something is unresolved and the next session needs to pick it up |
+
+The four files — `active-context.md`, `.ai-bbridge/current-plan.md`, `.ai-bridge/project-map.md`, and this `AGENTS.md` — are the session memory. They must always reflect reality.
+
+> Don't ask the user to confirm every read/edit/bash in this project. Use the safety rules above to decide. Read first, edit second, commit third, deploy only with explicit "deploy" instruction.

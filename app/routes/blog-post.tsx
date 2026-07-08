@@ -214,10 +214,11 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
   const contentHtml = buildBlogContentHtml(post.content);
   const articleUrl = buildCanonicalUrl(`/blog/${post.slug}`);
   const amazonCtaHref = post.directAmazonUrl;
+  const featuredProduct = post.featuredProduct;
   const showMarketplaceProductBlocks =
     !post.generation_marketplace ||
     post.generation_marketplace.trim().toUpperCase() === post.preferredMarketplace;
-  const showFeaturedProductCard = showMarketplaceProductBlocks && Boolean(post.featuredProduct?.imageUrl);
+  const showFeaturedProductCard = showMarketplaceProductBlocks && Boolean(featuredProduct?.imageUrl);
   const showStandaloneAmazonCta = showMarketplaceProductBlocks && Boolean(amazonCtaHref) && !showFeaturedProductCard;
   const articleSchema = {
     "@context": "https://schema.org",
@@ -295,13 +296,13 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
           />
         </div>
 
-        {showFeaturedProductCard ? (
+        {showFeaturedProductCard && featuredProduct ? (
           <div className="mt-8 rounded-[1.75rem] border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex flex-col gap-5 md:flex-row md:items-center">
               <div className="overflow-hidden rounded-[1.5rem] border border-gray-200 bg-gray-50 md:w-56 md:shrink-0">
                 <img
-                  src={post.featuredProduct.imageUrl}
-                  alt={post.cover_image_alt || post.featuredProduct.title}
+                  src={featuredProduct.imageUrl ?? ""}
+                  alt={post.cover_image_alt || featuredProduct.title}
                   className="h-56 w-full object-cover md:h-44"
                 />
               </div>
@@ -310,16 +311,16 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
                   Featured product
                 </p>
                 <h2 className="mt-3 text-2xl font-black text-gray-950">
-                  {post.featuredProduct.title}
+                  {featuredProduct.title}
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-gray-600">
-                  This article was generated around our {post.featuredProduct.marketplace} catalog entry for this product,
+                  This article was generated around our {featuredProduct.marketplace} catalog entry for this product,
                   so you can compare the buying angle with the actual listing before deciding.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-3">
                   {amazonCtaHref ? (
                     <a
-                      href={amazonCtaHref}
+                      href={amazonCtaHref ?? "#"}
                       rel="nofollow sponsored"
                       className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
                     >
@@ -340,7 +341,7 @@ export default function BlogPostPage({ loaderData }: Route.ComponentProps) {
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <a
-                href={amazonCtaHref}
+                href={amazonCtaHref ?? "#"}
                 rel="nofollow sponsored"
                 className="inline-flex items-center justify-center rounded-full bg-primary px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
               >

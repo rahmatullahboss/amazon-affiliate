@@ -6,7 +6,7 @@ export const HOME_HERO_TITLE =
 export const DEALS_PAGE_TITLE = "Browse Curated Product Picks";
 
 export const INLINE_AFFILIATE_DISCLOSURE =
-  "Affiliate link. As an Amazon Associate, DealsRky earns from qualifying purchases.";
+  "Affiliate disclosure: As an Amazon Associate, we earn from qualifying purchases. DealsRky may earn a commission when you continue through eligible product links and make a purchase. Final pricing and availability are always shown on the retailer page.";
 
 export const AMAZON_DESTINATION_NOTE =
   "You will leave DealsRky and continue to Amazon for current pricing, delivery details, reviews, and checkout.";

@@ -19,9 +19,10 @@ describe("affiliate copy", () => {
     expect(BROWSE_PICKS_LABEL).toBe("Browse Picks");
   });
 
-  it("keeps the inline disclosure short and specific", () => {
-    expect(INLINE_AFFILIATE_DISCLOSURE).toContain("Amazon Associate");
-    expect(INLINE_AFFILIATE_DISCLOSURE).toContain("qualifying purchases");
+  it("keeps the inline disclosure complete for product page footers", () => {
+    expect(INLINE_AFFILIATE_DISCLOSURE).toBe(
+      "Affiliate disclosure: As an Amazon Associate, we earn from qualifying purchases. DealsRky may earn a commission when you continue through eligible product links and make a purchase. Final pricing and availability are always shown on the retailer page."
+    );
   });
 
   it("explains that the user is leaving DealsRky for Amazon", () => {

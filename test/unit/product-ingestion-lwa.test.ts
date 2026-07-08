@@ -48,6 +48,43 @@ function buildRapidApiResponse(title = "RapidAPI Sourced Product"): Response {
   );
 }
 
+function buildSerpApiResponse(title = "SerpApi Sourced Product"): Response {
+  return new Response(
+    JSON.stringify({
+      product_results: {
+        title,
+        description: "SerpApi description",
+        images: ["https://m.media-amazon.com/images/I/serpapi.jpg"],
+        thumbnails: ["https://m.media-amazon.com/images/I/serpapi-thumb.jpg"],
+        about_item: ["SerpApi feature"],
+        price: "$99.99",
+      },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } }
+  );
+}
+
+function buildZyteResponse(title = "Zyte Sourced Product"): Response {
+  return new Response(
+    JSON.stringify({
+      product: {
+        name: title,
+        mainImage: { url: "https://m.media-amazon.com/images/I/zyte.jpg" },
+        images: [
+          { url: "https://m.media-amazon.com/images/I/zyte.jpg" },
+          { url: "https://m.media-amazon.com/images/I/zyte-2.jpg" },
+        ],
+        breadcrumbs: [{ name: "Electronics" }, { name: "Headphones" }],
+        description: "Zyte description",
+        features: ["Zyte feature"],
+        price: "99.99",
+        currency: "USD",
+      },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } }
+  );
+}
+
 describe("fetchAmazonProductDataWithFallback LWA branching", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let originalFetch: typeof fetch;
@@ -100,6 +137,69 @@ describe("fetchAmazonProductDataWithFallback LWA branching", () => {
     expect(
       urls.some((u) => u.includes("real-time-amazon-data.p.rapidapi.com"))
     ).toBe(true);
+  });
+
+  it("falls back to SerpApi after RapidAPI keys fail and does not expose price", async () => {
+    fetchMock.mockResolvedValueOnce(buildLwaTokenResponse());
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    fetchMock.mockResolvedValueOnce(new Response("rate limited", { status: 429 }));
+    fetchMock.mockResolvedValueOnce(buildSerpApiResponse());
+
+    const result = await fetchAmazonProductDataWithFallback({
+      asin: TEST_ASIN,
+      marketplace: TEST_MARKET,
+      lwaClientId: "id",
+      lwaClientSecret: "secret",
+      primaryApiKey: "rapidapi-key",
+      serpApiToken: "serpapi-token",
+    });
+
+    expect(result.title).toBe("SerpApi Sourced Product");
+    expect(result.imageUrl).toBe("https://m.media-amazon.com/images/I/serpapi.jpg");
+    expect(result.features).toEqual(["SerpApi feature"]);
+    expect("price" in result).toBe(false);
+
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("real-time-amazon-data.p.rapidapi.com"))).toBe(true);
+    expect(urls.some((u) => u.includes("serpapi.com/search.json"))).toBe(true);
+    expect(urls.some((u) => u.includes("engine=amazon_product"))).toBe(true);
+  });
+
+  it("uses Zyte before RapidAPI when configured and does not expose price", async () => {
+    fetchMock.mockResolvedValueOnce(buildLwaTokenResponse());
+    fetchMock.mockResolvedValueOnce(new Response("not found", { status: 404 }));
+    fetchMock.mockResolvedValueOnce(buildZyteResponse());
+
+    const result = await fetchAmazonProductDataWithFallback({
+      asin: TEST_ASIN,
+      marketplace: TEST_MARKET,
+      lwaClientId: "id",
+      lwaClientSecret: "secret",
+      primaryApiKey: "rapid-key",
+      zyteApiKey: "zyte-key",
+    });
+
+    expect(result.title).toBe("Zyte Sourced Product");
+    expect(result.imageUrl).toBe("https://m.media-amazon.com/images/I/zyte.jpg");
+    expect(result.category).toBe("Headphones");
+    expect(result.description).toBe("Zyte description");
+    expect(result.features).toEqual(["Zyte feature"]);
+    expect("price" in result).toBe(false);
+
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]));
+    expect(urls.some((u) => u.includes("api.zyte.com/v1/extract"))).toBe(true);
+    expect(urls.filter((u) => u.includes("real-time-amazon-data.p.rapidapi.com"))).toHaveLength(0);
+
+    const zyteCall = fetchMock.mock.calls.find((call) => String(call[0]).includes("api.zyte.com/v1/extract"));
+    const zyteInit = zyteCall?.[1] as RequestInit | undefined;
+    const zyteBody = JSON.parse(String(zyteInit?.body)) as {
+      url: string;
+      product: boolean;
+      productOptions: { extractFrom: string };
+    };
+    expect(zyteBody.url).toBe(`https://www.amazon.com/dp/${TEST_ASIN}`);
+    expect(zyteBody.product).toBe(true);
+    expect(zyteBody.productOptions.extractFrom).toBe("httpResponseBody");
   });
 
   it("throws api_not_configured when LWA fails and no API keys configured", async () => {
