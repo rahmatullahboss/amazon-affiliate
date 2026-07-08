@@ -6,7 +6,7 @@ import {
   type ProductRecord,
 } from "./product-ingestion";
 
-const SUPPORTED_MARKETPLACES = new Set(["US", "CA", "UK", "DE", "FR", "IT"]);
+const SUPPORTED_MARKETPLACES = new Set(["US", "CA", "UK", "DE", "FR", "IT", "ES"]);
 const MAX_ROWS_PER_REQUEST = 100;
 const CONCURRENCY = 5;
 
@@ -104,7 +104,7 @@ async function syncAdminSheetRow(input: {
       input.row,
       asin,
       marketplace,
-      "Marketplace must be one of US, CA, UK, DE, FR, or IT.",
+      "Marketplace must be one of US, CA, UK, DE, FR, IT, or ES.",
       syncedAt
     );
   }

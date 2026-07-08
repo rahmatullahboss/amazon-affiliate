@@ -22,7 +22,8 @@ describe("admin sheet row sync", () => {
          id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
        ) VALUES
          (5001, 501, 'admin-us-20', 'US', 0, 1, 1),
-         (5002, 501, 'admin-ca-20', 'CA', 0, 1, 1)`
+         (5002, 501, 'admin-ca-20', 'CA', 0, 1, 1),
+         (5003, 501, 'admin-es-21', 'ES', 0, 1, 1)`
     ).run();
   });
 
@@ -179,6 +180,39 @@ describe("admin sheet row sync", () => {
       rowNumber: 52,
       status: "failed",
       errorMessage: "Provide a valid 10-character ASIN.",
+    });
+  });
+
+  it("accepts ES marketplace rows from the admin sheet", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6003, 'B0EXISTES1', 'Existing ES Product', 'https://img.test/es.jpg', 'ES', 'active', 1)`
+    ).run();
+
+    const ensureSpy = vi.spyOn(productIngestionService, "ensureProductRecord");
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 4,
+          asin: "B0EXISTES1",
+          marketplace: "es",
+          trackingTag: null,
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(ensureSpy).not.toHaveBeenCalled();
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 4,
+      marketplace: "ES",
+      status: "existing",
+      resolvedTrackingTag: "admin-es-21",
+      bridgePageUrl: "https://dealsrky.com/adminsheet/es/B0EXISTES1",
     });
   });
 

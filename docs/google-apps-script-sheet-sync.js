@@ -31,6 +31,7 @@ const COUNTRY_SHEET_MARKETPLACE = {
   "ASINs-DE": "DE",
   "ASINs-FR": "FR",
   "ASINs-IT": "IT",
+  "ASINs-ES": "ES",
 };
 
 const COLUMN = {
