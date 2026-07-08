@@ -139,6 +139,17 @@ export const bulkAssignMappingsSchema = z.object({
   tracking_id: z.number().int().positive(),
 });
 
+export const bulkReplaceMappingTrackingSchema = z
+  .object({
+    old_tracking_tag: trackingTagSchema,
+    new_tracking_tag: trackingTagSchema,
+    marketplace: z.enum([...MARKETPLACES, 'ALL']).default('ALL'),
+    mapping_ids: z.array(z.number().int().positive()).max(500).optional(),
+  })
+  .refine((value) => value.old_tracking_tag !== value.new_tracking_tag, {
+    message: 'Old and new tracking tags must be different',
+  });
+
 export const updateMappingSchema = z.object({
   tracking_id: z.number().int().positive().optional(),
   custom_title: z.string().max(500).optional().nullable(),
