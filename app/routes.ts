@@ -35,6 +35,7 @@ export default [
     route("sheet-control", "routes/admin/sheet-control.tsx"),
     route("product-submissions", "routes/admin/product-submissions.tsx"),
     route("tracking", "routes/admin/tracking.tsx"),
+    route("tracking-maintenance", "routes/admin/tracking-maintenance.tsx"),
     route("mappings", "routes/admin/mappings.tsx"),
     route("analytics", "routes/admin/analytics.tsx"),
     route("reports", "routes/admin/reports.tsx"),
