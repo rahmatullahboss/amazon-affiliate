@@ -142,14 +142,34 @@ export const bulkAssignMappingsSchema = z.object({
 
 export const bulkReplaceMappingTrackingSchema = z
   .object({
-    old_tracking_tag: trackingTagSchema,
-    new_tracking_tag: trackingTagSchema,
+    old_tracking_tag: trackingTagSchema.optional(),
+    old_tracking_tags: z.array(trackingTagSchema).max(25).optional(),
+    new_tracking_tag: trackingTagSchema.optional(),
+    source_tracking_id: z.number().int().positive().optional(),
+    target_tracking_id: z.number().int().positive().optional(),
     marketplace: z.enum([...MARKETPLACES, 'ALL']).default('ALL'),
     mapping_ids: z.array(z.number().int().positive()).max(500).optional(),
   })
-  .refine((value) => value.old_tracking_tag !== value.new_tracking_tag, {
-    message: 'Old and new tracking tags must be different',
-  });
+  .transform((value) => ({
+    ...value,
+    old_tracking_tags: value.old_tracking_tags?.length
+      ? value.old_tracking_tags
+      : value.old_tracking_tag
+        ? [value.old_tracking_tag]
+        : [],
+  }))
+  .refine(
+    (value) =>
+      Boolean(value.source_tracking_id && value.target_tracking_id) ||
+      Boolean(value.old_tracking_tags.length && value.new_tracking_tag),
+    { message: 'Provide source/target tracking IDs or old/new tracking tags' }
+  )
+  .refine(
+    (value) =>
+      !value.new_tracking_tag ||
+      !value.old_tracking_tags.includes(value.new_tracking_tag),
+    { message: 'Old and new tracking tags must be different' }
+  );
 
 export const updateMappingSchema = z.object({
   tracking_id: z.number().int().positive().optional(),

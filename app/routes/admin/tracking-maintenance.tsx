@@ -50,6 +50,17 @@ function normalizeText(value: string | null | undefined) {
   return String(value || "").trim().toLowerCase();
 }
 
+function parseTagFilterValues(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(/[\n,]+/)
+        .map((item) => item.trim())
+        .filter(Boolean)
+    )
+  );
+}
+
 function getMappingMarketplace(mapping: MappingRow) {
   return (mapping.product_marketplace || mapping.tracking_marketplace || "").toUpperCase();
 }
@@ -125,7 +136,7 @@ export default function TrackingMaintenancePage() {
 
   const filteredMappings = useMemo(() => {
     const search = normalizeText(query);
-    const oldTag = normalizeText(oldTrackingTag);
+    const oldTags = parseTagFilterValues(oldTrackingTag).map((tag) => normalizeText(tag));
 
     return mappings.filter((mapping) => {
       const marketplace = getMappingMarketplace(mapping);
@@ -133,7 +144,7 @@ export default function TrackingMaintenancePage() {
         return false;
       }
 
-      if (oldTag && normalizeText(mapping.tracking_tag) !== oldTag) {
+      if (oldTags.length > 0 && !oldTags.includes(normalizeText(mapping.tracking_tag))) {
         return false;
       }
 
@@ -185,16 +196,16 @@ export default function TrackingMaintenancePage() {
   }
 
   async function replaceTracking(scope: "selected" | "filtered") {
-    const oldTag = oldTrackingTag.trim();
+    const oldTags = parseTagFilterValues(oldTrackingTag);
     const newTag = newTrackingTag.trim();
 
-    if (!oldTag || !newTag) {
-      setError("Old tag এবং new tag দুটোই দিতে হবে।");
+    if (oldTags.length === 0 || !newTag) {
+      setError("Old tag list এবং new tag দুটোই দিতে হবে।");
       return;
     }
 
-    if (oldTag === newTag) {
-      setError("Old tag এবং new tag একই হতে পারবে না।");
+    if (oldTags.map((tag) => tag.toLowerCase()).includes(newTag.toLowerCase())) {
+      setError("New tag পুরনো tag list-এর মধ্যে থাকতে পারবে না।");
       return;
     }
 
@@ -215,7 +226,7 @@ export default function TrackingMaintenancePage() {
         ? `Replace tracking tag for ${targetIds.length} selected mappings?`
         : `Replace tracking tag for ${targetIds.length} filtered mappings?`;
 
-    if (!window.confirm(`${confirmMessage}\n\nOld: ${oldTag}\nNew: ${newTag}`)) {
+    if (!window.confirm(`${confirmMessage}\n\nOld tags: ${oldTags.join(", ")}\nNew: ${newTag}`)) {
       return;
     }
 
@@ -232,7 +243,8 @@ export default function TrackingMaintenancePage() {
           Authorization: `Bearer ${getAuthToken()}`,
         },
         body: JSON.stringify({
-          old_tracking_tag: oldTag,
+          old_tracking_tag: oldTags[0],
+          old_tracking_tags: oldTags,
           new_tracking_tag: newTag,
           marketplace: marketplaceFilter,
           mapping_ids: targetIds,
@@ -413,12 +425,12 @@ export default function TrackingMaintenancePage() {
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-[#a0a0b8]">Old tracking tag</label>
+            <label className="mb-1.5 block text-sm text-[#a0a0b8]">Old tracking tag(s)</label>
             <input
               value={oldTrackingTag}
               onChange={(event) => setOldTrackingTag(event.target.value)}
               list="tracking-maintenance-tags"
-              placeholder="oldtag-20"
+              placeholder="oldtag-20, oldtag2-20"
               className="w-full rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
             />
           </div>
@@ -439,6 +451,10 @@ export default function TrackingMaintenancePage() {
             <option key={tag} value={tag} />
           ))}
         </datalist>
+
+        <p className="mt-3 text-xs text-[#8d8da6]">
+          Multiple old tags দিতে comma বা new line ব্যবহার করুন; তখন ওই সব tag-এর product একসাথে দেখা যাবে এবং একই new tag-এ replace করা যাবে।
+        </p>
 
         <div className="mt-4 flex flex-wrap gap-3">
           <button

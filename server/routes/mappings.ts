@@ -10,6 +10,7 @@ import {
   updateMappingSchema,
 } from '../schemas';
 import { CacheService } from '../services/cache';
+import { writeAuditLog } from '../services/audit-log';
 import {
   buildCanonicalBridgeUrl,
   buildCanonicalRedirectUrl,
@@ -348,8 +349,104 @@ mappings.post('/bulk-assign', zValidator('json', bulkAssignMappingsSchema), asyn
 mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTrackingSchema), async (c) => {
   const data = c.req.valid('json');
 
-  const whereClauses = ['old_track.tag = ?'];
-  const bindings: Array<string | number> = [data.old_tracking_tag];
+  if (data.source_tracking_id && data.target_tracking_id) {
+    if (data.source_tracking_id === data.target_tracking_id) {
+      throw new HTTPException(400, { message: 'Source and target tags must be different' });
+    }
+
+    const [source, target] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT id, agent_id, tag, marketplace
+         FROM tracking_ids
+         WHERE id = ? AND is_active = 1`
+      )
+        .bind(data.source_tracking_id)
+        .first<{ id: number; agent_id: number; tag: string; marketplace: string }>(),
+      c.env.DB.prepare(
+        `SELECT id, agent_id, tag, marketplace
+         FROM tracking_ids
+         WHERE id = ? AND is_active = 1`
+      )
+        .bind(data.target_tracking_id)
+        .first<{ id: number; agent_id: number; tag: string; marketplace: string }>(),
+    ]);
+
+    if (!source) throw new HTTPException(404, { message: 'Source tag not found or inactive' });
+    if (!target) throw new HTTPException(404, { message: 'Target tag not found or inactive' });
+    if (source.agent_id !== target.agent_id) {
+      throw new HTTPException(400, { message: 'Source and target tags must belong to the same agent' });
+    }
+    if (source.marketplace !== target.marketplace) {
+      throw new HTTPException(400, {
+        message: `Source and target tags are in different marketplaces: ${source.marketplace} vs ${target.marketplace}`,
+      });
+    }
+
+    const whereClauses = ['ap.tracking_id = ?'];
+    const bindings: Array<string | number> = [source.id];
+    if (data.mapping_ids?.length) {
+      whereClauses.push(`ap.id IN (${data.mapping_ids.map(() => '?').join(', ')})`);
+      bindings.push(...data.mapping_ids);
+    }
+
+    const { results: rows } = await c.env.DB.prepare(
+      `SELECT ap.id as mapping_id,
+              ap.product_id,
+              a.slug as agent_slug,
+              p.asin,
+              p.marketplace
+       FROM agent_products ap
+       JOIN agents a ON a.id = ap.agent_id
+       JOIN products p ON p.id = ap.product_id
+       WHERE ${whereClauses.join(' AND ')}`
+    )
+      .bind(...bindings)
+      .all<MappingCacheRow & { mapping_id: number; product_id: number }>();
+
+    const matchedRows = rows ?? [];
+    for (const row of matchedRows) {
+      await c.env.DB.prepare(
+        `UPDATE agent_products
+         SET tracking_id = ?,
+             is_active = 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+      )
+        .bind(target.id, row.mapping_id)
+        .run();
+
+      await keepOnlyOneActiveMappingForProduct(c.env.DB, row.product_id, row.mapping_id);
+    }
+
+    await invalidateCacheRows(c.env, c.executionCtx, matchedRows);
+    c.executionCtx.waitUntil(
+      writeAuditLog(c.env.DB, {
+        userId: c.get('userId'),
+        action: 'mapping.bulk_replaced_tag',
+        entityType: 'tracking_id',
+        entityId: source.id,
+        details: {
+          sourceTrackingId: source.id,
+          targetTrackingId: target.id,
+          updated: matchedRows.length,
+        },
+      })
+    );
+
+    return c.json({
+      message: `Replaced source tag on ${matchedRows.length} mappings`,
+      summary: {
+        matched: matchedRows.length,
+        updated: matchedRows.length,
+        skippedMissingReplacement: 0,
+        marketplace: source.marketplace,
+      },
+    });
+  }
+
+  const oldTrackingTags = [...new Set(data.old_tracking_tags)];
+  const whereClauses = [`old_track.tag IN (${oldTrackingTags.map(() => '?').join(', ')})`];
+  const bindings: Array<string | number> = [...oldTrackingTags];
 
   if (data.marketplace !== 'ALL') {
     whereClauses.push('p.marketplace = ?');
@@ -424,7 +521,7 @@ mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTracking
   }
 
   return c.json({
-    message: `Updated ${rowsToUpdate.length} mappings from ${data.old_tracking_tag} to ${data.new_tracking_tag}.`,
+    message: `Updated ${rowsToUpdate.length} mappings from ${oldTrackingTags.join(', ')} to ${data.new_tracking_tag}.`,
     summary: {
       matched: matches.length,
       updated: rowsToUpdate.length,

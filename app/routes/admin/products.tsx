@@ -187,6 +187,7 @@ export default function ProductsPage() {
   const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<number[]>([]);
   const [bulkRegenerating, setBulkRegenerating] = useState(false);
+  const [bulkDeletingProducts, setBulkDeletingProducts] = useState(false);
   const [marketplaceFilter, setMarketplaceFilter] = useState<ProductMarketplaceFilter>("ALL");
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [editorForm, setEditorForm] = useState<ProductEditorForm>({
@@ -463,34 +464,81 @@ export default function ProductsPage() {
   }
 
   async function handleProductDelete(productId: number) {
-    if (!window.confirm("Remove this product from active use? Existing pages will stop working for it.")) {
+    if (!window.confirm("Permanently delete this product? All tracking mappings for this product will also be deleted. This cannot be undone.")) {
       return;
     }
 
     setDeletingProductId(productId);
     setError("");
+    setSheetMessage("");
 
     try {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${getToken()}` },
+      const response = await fetch("/api/maintenance/products/hard-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ productIds: [productId] }),
       });
 
       const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
 
       if (!response.ok) {
-        throw new Error(extractApiErrorMessage(payload, "Failed to remove product"));
+        throw new Error(extractApiErrorMessage(payload, "Failed to delete product"));
       }
 
+      setSheetMessage(payload.message || "Product and its mappings deleted.");
+      await fetchMappingAdminData();
       await fetchProducts(productPagination.page);
     } catch (requestError) {
       setError(
         requestError instanceof Error
           ? requestError.message
-          : "Failed to remove product"
+          : "Failed to delete product"
       );
     } finally {
       setDeletingProductId(null);
+    }
+  }
+
+  async function handleBulkProductDelete() {
+    if (selectedProductIds.length === 0) {
+      setError("Select products first.");
+      return;
+    }
+
+    if (!window.confirm(`Permanently delete ${selectedProductIds.length} selected product(s)? All mappings for these products will also be deleted. This cannot be undone.`)) {
+      return;
+    }
+
+    setBulkDeletingProducts(true);
+    setError("");
+    setSheetMessage("");
+
+    try {
+      const response = await fetch("/api/maintenance/products/hard-delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ productIds: selectedProductIds }),
+      });
+
+      const payload = (await response.json()) as { message?: string } & Record<string, unknown>;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to delete selected products"));
+      }
+
+      setSheetMessage(payload.message || "Selected products and their mappings deleted.");
+      setSelectedProductIds([]);
+      await fetchMappingAdminData();
+      await fetchProducts(productPagination.page);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to delete selected products");
+    } finally {
+      setBulkDeletingProducts(false);
     }
   }
 
@@ -1170,6 +1218,17 @@ export default function ProductsPage() {
               </button>
               <button onClick={() => void handleExport()} className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-[#a0a0b8] font-medium cursor-pointer text-sm hover:bg-white/10 transition-colors">
                 📥 Export CSV
+              </button>
+              <button
+                onClick={() => void handleBulkProductDelete()}
+                disabled={bulkDeletingProducts || selectedProductIds.length === 0}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  bulkDeletingProducts || selectedProductIds.length === 0
+                    ? "bg-white/5 border border-white/10 text-[#6b6b85] cursor-not-allowed"
+                    : "bg-red-500/10 border border-red-500/30 text-red-200 hover:bg-red-500/20"
+                }`}
+              >
+                {bulkDeletingProducts ? "Deleting..." : `Delete Selected (${selectedProductIds.length})`}
               </button>
               <button
                 onClick={() => {
@@ -2250,7 +2309,7 @@ export default function ProductsPage() {
                             : "border-red-500/30 bg-red-500/10 text-red-300 cursor-pointer hover:bg-red-500/20"
                         }`}
                       >
-                        {deletingProductId === product.id ? "Removing..." : "Remove Product"}
+                        {deletingProductId === product.id ? "Deleting..." : "Delete Product + Mappings"}
                       </button>
                     </>
                   ) : null}
