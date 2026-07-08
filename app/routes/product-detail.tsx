@@ -143,7 +143,8 @@ export async function loader({ params, context }: Route.LoaderArgs) {
             SELECT id, asin, title, image_url, category, marketplace
             FROM products
             WHERE category = ? AND asin != ? AND is_active = 1 AND status = 'active'
-            LIMIT 4
+            ORDER BY created_at DESC
+            LIMIT 12
           `
         ).bind(product.category, asin)
       : env.DB.prepare(
@@ -152,7 +153,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
             FROM products
             WHERE asin != ? AND is_active = 1 AND status = 'active'
             ORDER BY created_at DESC
-            LIMIT 4
+            LIMIT 12
           `
         ).bind(asin);
 
