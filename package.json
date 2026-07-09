@@ -11,7 +11,8 @@
     "preview": "npm run build && vite preview",
     "typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:coverage": "vitest run --coverage --coverage.provider=istanbul"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",
@@ -38,6 +39,7 @@
     "@types/node": "^22",
     "@types/react": "^19.1.13",
     "@types/react-dom": "^19.1.9",
+    "@vitest/coverage-istanbul": "^4.1.10",
     "dotenv": "^17.4.2",
     "typescript": "^5.9.2",
     "vite": "^7.1.7",

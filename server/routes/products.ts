@@ -44,8 +44,20 @@ products.get('/', async (c) => {
   const pageSize = Number.isNaN(requestedPageSize)
     ? 12
     : Math.min(48, Math.max(8, requestedPageSize));
-  const whereClause = hasMarketplaceFilter ? 'WHERE marketplace = ?' : '';
-  const whereParams = hasMarketplaceFilter ? [marketplaceFilter] : [];
+  const includeInactive = c.req.query('includeInactive') === 'true';
+  const whereConditions: string[] = [];
+  const whereParams: string[] = [];
+
+  if (hasMarketplaceFilter) {
+    whereConditions.push('marketplace = ?');
+    whereParams.push(marketplaceFilter);
+  }
+
+  if (!includeInactive) {
+    whereConditions.push('is_active = 1');
+  }
+
+  const whereClause = whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
   const totalResult = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM products ${whereClause}`)
     .bind(...whereParams)
@@ -65,7 +77,7 @@ products.get('/', async (c) => {
          (SELECT COUNT(*) FROM agent_products WHERE product_id = p.id AND is_active = 1) as agent_count,
          (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
        FROM products p
-       ${hasMarketplaceFilter ? 'WHERE p.marketplace = ?' : ''}
+       ${whereClause}
        ORDER BY p.created_at DESC
        LIMIT ? OFFSET ?`
     )
