@@ -43,7 +43,7 @@ products.get('/', async (c) => {
   const page = Number.isNaN(requestedPage) ? 1 : Math.max(1, requestedPage);
   const pageSize = Number.isNaN(requestedPageSize)
     ? 12
-    : Math.min(48, Math.max(8, requestedPageSize));
+    : Math.min(50, Math.max(8, requestedPageSize));
   const includeInactive = c.req.query('includeInactive') === 'true';
   const whereConditions: string[] = [];
   const whereParams: string[] = [];

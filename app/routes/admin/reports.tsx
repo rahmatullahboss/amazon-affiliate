@@ -25,7 +25,7 @@ interface ImportFormState {
 const getToken = () => getAuthToken();
 
 export default function AdminReportsPage() {
-  const REPORTS_PER_PAGE = 10;
+  const REPORTS_PER_PAGE = 50;
   const [reports, setReports] = useState<AmazonReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

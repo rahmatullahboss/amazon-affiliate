@@ -14,7 +14,7 @@ interface Product { id: number; asin: string; title: string; }
 interface TrackId { id: number; tag: string; agent_id: number; label: string | null; }
 
 export default function MappingsPage() {
-  const MAPPINGS_PER_PAGE = 12;
+  const MAPPINGS_PER_PAGE = 50;
   const [mappings, setMappings] = useState<Mapping[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [products, setProducts] = useState<Product[]>([]);

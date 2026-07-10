@@ -71,7 +71,7 @@ export default function AdminBlogsPage() {
   const [marketFilter, setMarketFilter] = useState<"all" | "global" | (typeof PUBLIC_MARKETPLACES)[number]>("all");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const POSTS_PER_PAGE = 10;
+  const POSTS_PER_PAGE = 50;
 
   useEffect(() => {
     void fetchPosts();

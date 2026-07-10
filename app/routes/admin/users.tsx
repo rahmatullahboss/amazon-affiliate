@@ -21,7 +21,7 @@ interface Agent {
 const getToken = () => getAuthToken();
 
 export default function AdminUsersPage() {
-  const USERS_PER_PAGE = 12;
+  const USERS_PER_PAGE = 50;
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);

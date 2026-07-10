@@ -129,7 +129,7 @@ const EMPTY_USER_FORM: UserFormState = {
   password: "",
   is_active: true,
 };
-const AGENTS_PER_PAGE = 8;
+const AGENTS_PER_PAGE = 50;
 
 const getToken = () => getAuthToken();
 

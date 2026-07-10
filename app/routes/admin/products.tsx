@@ -123,7 +123,7 @@ const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
 const PRODUCT_MARKETPLACE_FILTERS = ["ALL", ...MARKETPLACES] as const;
 type ProductMarketplaceFilter = (typeof PRODUCT_MARKETPLACE_FILTERS)[number];
 const getToken = () => getAuthToken();
-const PRODUCT_PAGE_SIZE = 12;
+const PRODUCT_PAGE_SIZE = 50;
 
 interface ProductEditorForm {
   title: string;

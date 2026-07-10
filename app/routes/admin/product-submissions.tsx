@@ -21,7 +21,7 @@ interface ProductSubmission {
 const getToken = () => getAuthToken();
 
 export default function ProductSubmissionsPage() {
-  const SUBMISSIONS_PER_PAGE = 10;
+  const SUBMISSIONS_PER_PAGE = 50;
   const [submissions, setSubmissions] = useState<ProductSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

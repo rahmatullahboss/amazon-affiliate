@@ -12,7 +12,7 @@ interface AuditLog {
 }
 
 export default function AuditLogsPage() {
-  const LOGS_PER_PAGE = 12;
+  const LOGS_PER_PAGE = 50;
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

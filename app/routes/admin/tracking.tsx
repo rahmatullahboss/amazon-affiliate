@@ -17,7 +17,7 @@ interface TrackingId {
 interface Agent { id: number; name: string; slug: string; }
 
 export default function TrackingPage() {
-  const TAG_GROUPS_PER_PAGE = 8;
+  const TAG_GROUPS_PER_PAGE = 50;
   const [trackingIds, setTrackingIds] = useState<TrackingId[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
