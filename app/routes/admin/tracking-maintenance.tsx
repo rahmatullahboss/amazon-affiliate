@@ -80,6 +80,8 @@ export default function TrackingMaintenancePage() {
   const [marketplaceFilter, setMarketplaceFilter] = useState<MarketplaceFilter>("ALL");
   const [oldTrackingTag, setOldTrackingTag] = useState("");
   const [newTrackingTag, setNewTrackingTag] = useState("");
+  const [sourceTrackingId, setSourceTrackingId] = useState(0);
+  const [targetTrackingId, setTargetTrackingId] = useState(0);
   const [selectedMappingIds, setSelectedMappingIds] = useState<number[]>([]);
   const [lastResult, setLastResult] = useState<ReplaceResponse | null>(null);
 
@@ -123,6 +125,20 @@ export default function TrackingMaintenancePage() {
   const activeTrackingIds = useMemo(
     () => trackingIds.filter((tag) => tag.is_active === 1),
     [trackingIds]
+  );
+
+  const selectedSourceTracking = useMemo(
+    () => trackingIds.find((tag) => tag.id === sourceTrackingId) || null,
+    [sourceTrackingId, trackingIds]
+  );
+
+  const exactTargetTrackingOptions = useMemo(
+    () => activeTrackingIds.filter(
+      (tag) =>
+        tag.id !== sourceTrackingId &&
+        (!selectedSourceTracking || tag.marketplace === selectedSourceTracking.marketplace)
+    ),
+    [activeTrackingIds, selectedSourceTracking, sourceTrackingId]
   );
 
   const availableTrackingTags = useMemo(() => {
@@ -209,22 +225,28 @@ export default function TrackingMaintenancePage() {
       return;
     }
 
-    const targetIds = scope === "selected" ? selectedRows.map((row) => row.id) : filteredMappings.map((row) => row.id);
+    const useServerFilter = scope === "filtered" && query.trim().length === 0;
+    const targetIds = scope === "selected"
+      ? selectedRows.map((row) => row.id)
+      : useServerFilter
+        ? []
+        : filteredMappings.map((row) => row.id);
 
-    if (targetIds.length === 0) {
+    if ((scope === "selected" || !useServerFilter) && targetIds.length === 0) {
       setError(scope === "selected" ? "Select at least one mapping first." : "No filtered mapping found.");
       return;
     }
 
     if (targetIds.length > MAX_REPLACE_ROWS) {
-      setError(`একবারে সর্বোচ্চ ${MAX_REPLACE_ROWS} mapping replace করা যাবে। Filter আরো narrow করুন।`);
+      setError(`Search-based replace-এ একবারে সর্বোচ্চ ${MAX_REPLACE_ROWS} mapping নেওয়া যাবে। Exact old tag + marketplace filter ব্যবহার করলে সব matching product একসাথে replace হবে।`);
       return;
     }
 
+    const affectedCount = scope === "selected" ? selectedRows.length : filteredMappings.length;
     const confirmMessage =
       scope === "selected"
-        ? `Replace tracking tag for ${targetIds.length} selected mappings?`
-        : `Replace tracking tag for ${targetIds.length} filtered mappings?`;
+        ? `Replace tracking tag for ${affectedCount} selected mappings?`
+        : `Replace tracking tag for all ${affectedCount} filtered mappings?`;
 
     if (!window.confirm(`${confirmMessage}\n\nOld tags: ${oldTags.join(", ")}\nNew: ${newTag}`)) {
       return;
@@ -247,7 +269,7 @@ export default function TrackingMaintenancePage() {
           old_tracking_tags: oldTags,
           new_tracking_tag: newTag,
           marketplace: marketplaceFilter,
-          mapping_ids: targetIds,
+          ...(targetIds.length > 0 ? { mapping_ids: targetIds } : {}),
         }),
       });
 
@@ -261,6 +283,59 @@ export default function TrackingMaintenancePage() {
       await loadData();
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to replace tracking tags");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function moveExactTracking() {
+    const source = trackingIds.find((tag) => tag.id === sourceTrackingId);
+    const target = trackingIds.find((tag) => tag.id === targetTrackingId);
+
+    if (!source || !target) {
+      setError("Source এবং target tag দুটোই select করুন।");
+      return;
+    }
+
+    if (source.marketplace !== target.marketplace) {
+      setError("Source এবং target tag একই marketplace-এর হতে হবে।");
+      return;
+    }
+
+    const affectedCount = Number(source.linked_product_count || 0);
+    const confirmed = window.confirm(
+      `Move all ${affectedCount} linked product(s)?\n\nFrom: ${source.tag} — ${source.agent_name}\nTo: ${target.tag} — ${target.agent_name}\nMarketplace: ${source.marketplace}`
+    );
+    if (!confirmed) return;
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+    setLastResult(null);
+
+    try {
+      const response = await fetch("/api/mappings/bulk-replace-tag", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({
+          source_tracking_id: source.id,
+          target_tracking_id: target.id,
+        }),
+      });
+
+      const payload = (await response.json()) as ReplaceResponse & Record<string, unknown>;
+      if (!response.ok) {
+        throw new Error(extractApiErrorMessage(payload, "Failed to move tracking products"));
+      }
+
+      setLastResult(payload);
+      setMessage(payload.message || "Tracking products moved.");
+      await loadData();
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Failed to move tracking products");
     } finally {
       setSaving(false);
     }
@@ -487,6 +562,8 @@ export default function TrackingMaintenancePage() {
               setQuery("");
               setOldTrackingTag("");
               setNewTrackingTag("");
+              setSourceTrackingId(0);
+              setTargetTrackingId(0);
               setMarketplaceFilter("ALL");
               setSelectedMappingIds([]);
               setError("");
@@ -497,6 +574,59 @@ export default function TrackingMaintenancePage() {
           >
             Clear filters
           </button>
+        </div>
+
+        <div className="mt-5 rounded-xl border border-sky-500/20 bg-sky-500/10 p-4">
+          <div className="mb-3">
+            <p className="m-0 text-sm font-bold text-sky-100">Move all products to another agent/tag</p>
+            <p className="mt-1 text-xs leading-5 text-sky-100/70">
+              কোনো agent বা tag অকার্যকর হলে exact source tag-এর সব linked product একই marketplace-এর অন্য active tag-এ একবারে move করুন।
+            </p>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-sky-100/70">Source tag</label>
+              <select
+                value={sourceTrackingId}
+                onChange={(event) => {
+                  setSourceTrackingId(Number(event.target.value));
+                  setTargetTrackingId(0);
+                }}
+                className="w-full rounded-lg border border-sky-200/15 bg-[#12121a] px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-sky-400"
+              >
+                <option value={0}>Select source tag...</option>
+                {trackingIds.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.tag} — {tag.agent_name} — {tag.marketplace} ({Number(tag.linked_product_count || 0)} products)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.14em] text-sky-100/70">Target active tag</label>
+              <select
+                value={targetTrackingId}
+                onChange={(event) => setTargetTrackingId(Number(event.target.value))}
+                disabled={!selectedSourceTracking}
+                className="w-full rounded-lg border border-sky-200/15 bg-[#12121a] px-3.5 py-2.5 text-sm text-[#f0f0f5] focus:outline-none focus:ring-2 focus:ring-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value={0}>Select target tag...</option>
+                {exactTargetTrackingOptions.map((tag) => (
+                  <option key={tag.id} value={tag.id}>
+                    {tag.tag} — {tag.agent_name} — {tag.marketplace}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={() => void moveExactTracking()}
+              disabled={saving || !sourceTrackingId || !targetTrackingId}
+              className="rounded-lg bg-sky-400 px-4 py-2.5 text-sm font-bold text-slate-950 transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? "Moving..." : `Move All (${Number(selectedSourceTracking?.linked_product_count || 0)})`}
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap gap-3 border-t border-white/5 pt-4">

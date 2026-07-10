@@ -144,12 +144,12 @@ describe("Mappings bulk-replace-tag API", () => {
     ]);
   });
 
-  it("reactivates a soft-deleted mapping when its tag is bulk-replaced", async () => {
+  it("does not reactivate an inactive historical mapping during bulk replacement", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 503, "reactivate-agent", "Reactivate Agent");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
-       VALUES (721, 'B0BR000021', 'Reactivated Product', 'https://example.com/r.webp', 'US', 'active', 1)`
+       VALUES (721, 'B0BR000021', 'Historical Product', 'https://example.com/r.webp', 'US', 'active', 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
@@ -173,6 +173,8 @@ describe("Mappings bulk-replace-tag API", () => {
     );
 
     expect(response.status).toBe(200);
+    const payload = (await response.json()) as { summary?: { updated?: number } };
+    expect(payload.summary?.updated).toBe(0);
 
     const mapping = await env.DB.prepare(
       `SELECT tracking_id, is_active
@@ -180,7 +182,7 @@ describe("Mappings bulk-replace-tag API", () => {
        WHERE id = 421`
     ).first<{ tracking_id: number; is_active: number }>();
 
-    expect(mapping).toEqual({ tracking_id: 622, is_active: 1 });
+    expect(mapping).toEqual({ tracking_id: 621, is_active: 0 });
   });
 
   it("rejects when source and target tags are the same", async () => {
@@ -207,15 +209,23 @@ describe("Mappings bulk-replace-tag API", () => {
     );
   });
 
-  it("rejects when source and target tags belong to different agents", async () => {
+  it("moves source-tag products to a target tag owned by another agent", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 505, "agent-a", "Agent A");
     await DbFactory.seedAgent(env.DB, 506, "agent-b", "Agent B");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (714, 'B0BR000014', 'Cross Agent Product', 'https://example.com/cross.webp', 'US', 'active', 1)`
+    ).run();
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (641, 505, 'agent-a-20', 'US', 1, 1),
          (642, 506, 'agent-b-20', 'US', 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES (414, 505, 714, 641, NULL, 1)`
     ).run();
 
     const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
@@ -228,10 +238,58 @@ describe("Mappings bulk-replace-tag API", () => {
       token
     );
 
-    expect(response.status).toBe(400);
-    expect(await readErrorMessage(response)).toBe(
-      "Source and target tags must belong to the same agent"
+    expect(response.status).toBe(200);
+    const mapping = await env.DB.prepare(
+      `SELECT agent_id, tracking_id, is_active
+       FROM agent_products
+       WHERE product_id = 714 AND is_active = 1`
+    ).first<{ agent_id: number; tracking_id: number; is_active: number }>();
+
+    expect(mapping).toEqual({ agent_id: 506, tracking_id: 642, is_active: 1 });
+  });
+
+  it("reuses an existing target-agent mapping without creating a duplicate", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 515, "collision-agent-a", "Collision Agent A");
+    await DbFactory.seedAgent(env.DB, 516, "collision-agent-b", "Collision Agent B");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (715, 'B0BR000015', 'Collision Product', 'https://example.com/collision.webp', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES
+         (645, 515, 'collision-old-20', 'US', 1, 1),
+         (646, 516, 'collision-new-20', 'US', 1, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES
+         (415, 515, 715, 645, NULL, 1),
+         (416, 516, 715, 646, NULL, 0)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const response = await fetchBulkReplaceTag(
+      {
+        source_tracking_id: 645,
+        target_tracking_id: 646,
+      },
+      token
     );
+
+    expect(response.status).toBe(200);
+    const { results } = await env.DB.prepare(
+      `SELECT id, agent_id, tracking_id, is_active
+       FROM agent_products
+       WHERE product_id = 715
+       ORDER BY id ASC`
+    ).all<{ id: number; agent_id: number; tracking_id: number; is_active: number }>();
+
+    expect(results).toEqual([
+      { id: 415, agent_id: 515, tracking_id: 645, is_active: 0 },
+      { id: 416, agent_id: 516, tracking_id: 646, is_active: 1 },
+    ]);
   });
 
   it("rejects when source and target tags are in different marketplaces", async () => {
@@ -280,7 +338,7 @@ describe("Mappings bulk-replace-tag API", () => {
 
     expect(response.status).toBe(404);
     expect(await readErrorMessage(response)).toBe(
-      "Source tag not found or inactive"
+      "Source tag not found"
     );
   });
 
@@ -363,5 +421,56 @@ describe("Mappings bulk-replace-tag API", () => {
       targetTrackingId: 682,
       updated: 1,
     });
+  });
+
+  it("replaces every matching mapping by tag name when mapping_ids are omitted", async () => {
+    await DbFactory.seedAdmin(env.DB);
+    await DbFactory.seedAgent(env.DB, 511, "name-filter-agent", "Name Filter Agent");
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES
+         (741, 'B0BR000041', 'Name Filter Product 1', 'https://example.com/n1.webp', 'US', 'active', 1),
+         (742, 'B0BR000042', 'Name Filter Product 2', 'https://example.com/n2.webp', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
+       VALUES
+         (691, 511, 'name-old-20', 'US', 1, 1),
+         (692, 511, 'name-new-20', 'US', 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
+       VALUES
+         (441, 511, 741, 691, NULL, 1),
+         (442, 511, 742, 691, NULL, 1)`
+    ).run();
+
+    const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
+    const response = await fetchBulkReplaceTag(
+      {
+        old_tracking_tags: ["name-old-20"],
+        new_tracking_tag: "name-new-20",
+        marketplace: "US",
+      },
+      token
+    );
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      summary?: { matched?: number; updated?: number };
+    };
+    expect(payload.summary).toMatchObject({ matched: 2, updated: 2 });
+
+    const { results } = await env.DB.prepare(
+      `SELECT id, tracking_id
+       FROM agent_products
+       WHERE agent_id = 511
+       ORDER BY id ASC`
+    ).all<{ id: number; tracking_id: number }>();
+
+    expect(results).toEqual([
+      { id: 441, tracking_id: 692 },
+      { id: 442, tracking_id: 692 },
+    ]);
   });
 });

@@ -358,7 +358,7 @@ mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTracking
       c.env.DB.prepare(
         `SELECT id, agent_id, tag, marketplace
          FROM tracking_ids
-         WHERE id = ? AND is_active = 1`
+         WHERE id = ?`
       )
         .bind(data.source_tracking_id)
         .first<{ id: number; agent_id: number; tag: string; marketplace: string }>(),
@@ -371,18 +371,27 @@ mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTracking
         .first<{ id: number; agent_id: number; tag: string; marketplace: string }>(),
     ]);
 
-    if (!source) throw new HTTPException(404, { message: 'Source tag not found or inactive' });
+    if (!source) throw new HTTPException(404, { message: 'Source tag not found' });
     if (!target) throw new HTTPException(404, { message: 'Target tag not found or inactive' });
-    if (source.agent_id !== target.agent_id) {
-      throw new HTTPException(400, { message: 'Source and target tags must belong to the same agent' });
-    }
     if (source.marketplace !== target.marketplace) {
       throw new HTTPException(400, {
         message: `Source and target tags are in different marketplaces: ${source.marketplace} vs ${target.marketplace}`,
       });
     }
 
-    const whereClauses = ['ap.tracking_id = ?'];
+    const targetAgent = await c.env.DB.prepare(
+      `SELECT id, slug
+       FROM agents
+       WHERE id = ? AND is_active = 1`
+    )
+      .bind(target.agent_id)
+      .first<{ id: number; slug: string }>();
+
+    if (!targetAgent) {
+      throw new HTTPException(404, { message: 'Target tag owner is inactive or missing' });
+    }
+
+    const whereClauses = ['ap.tracking_id = ?', 'ap.is_active = 1', 'p.is_active = 1'];
     const bindings: Array<string | number> = [source.id];
     if (data.mapping_ids?.length) {
       whereClauses.push(`ap.id IN (${data.mapping_ids.map(() => '?').join(', ')})`);
@@ -404,21 +413,65 @@ mappings.post('/bulk-replace-tag', zValidator('json', bulkReplaceMappingTracking
       .all<MappingCacheRow & { mapping_id: number; product_id: number }>();
 
     const matchedRows = rows ?? [];
-    for (const row of matchedRows) {
-      await c.env.DB.prepare(
-        `UPDATE agent_products
-         SET tracking_id = ?,
-             is_active = 1,
-             updated_at = CURRENT_TIMESTAMP
-         WHERE id = ?`
-      )
-        .bind(target.id, row.mapping_id)
-        .run();
+    const targetCacheRows: MappingCacheRow[] = [];
 
-      await keepOnlyOneActiveMappingForProduct(c.env.DB, row.product_id, row.mapping_id);
+    for (const row of matchedRows) {
+      let keepMappingId = row.mapping_id;
+
+      if (source.agent_id === target.agent_id) {
+        await c.env.DB.prepare(
+          `UPDATE agent_products
+           SET tracking_id = ?,
+               is_active = 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+          .bind(target.id, row.mapping_id)
+          .run();
+      } else {
+        const existingTargetMapping = await c.env.DB.prepare(
+          `SELECT id
+           FROM agent_products
+           WHERE agent_id = ? AND product_id = ?`
+        )
+          .bind(target.agent_id, row.product_id)
+          .first<{ id: number }>();
+
+        if (existingTargetMapping) {
+          keepMappingId = existingTargetMapping.id;
+          await c.env.DB.prepare(
+            `UPDATE agent_products
+             SET tracking_id = ?,
+                 is_active = 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`
+          )
+            .bind(target.id, existingTargetMapping.id)
+            .run();
+        } else {
+          await c.env.DB.prepare(
+            `UPDATE agent_products
+             SET agent_id = ?,
+                 tracking_id = ?,
+                 is_active = 1,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE id = ?`
+          )
+            .bind(target.agent_id, target.id, row.mapping_id)
+            .run();
+        }
+      }
+
+      await keepOnlyOneActiveMappingForProduct(c.env.DB, row.product_id, keepMappingId);
+      targetCacheRows.push({
+        id: keepMappingId,
+        agent_slug: targetAgent.slug,
+        asin: row.asin,
+        marketplace: row.marketplace,
+      });
     }
 
-    await invalidateCacheRows(c.env, c.executionCtx, matchedRows);
+    await invalidateCacheRows(c.env, c.executionCtx, [...matchedRows, ...targetCacheRows]);
     c.executionCtx.waitUntil(
       writeAuditLog(c.env.DB, {
         userId: c.get('userId'),

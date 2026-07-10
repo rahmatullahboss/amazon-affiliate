@@ -118,6 +118,10 @@ export default function TrackingPage() {
     return {
       totalAgents: groupedTrackingIds.length,
       totalTags: filteredTrackingIds.length,
+      totalLinkedProducts: filteredTrackingIds.reduce(
+        (total, item) => total + Number(item.linked_product_count || 0),
+        0
+      ),
       adminOnly,
       portalEditable,
     };
@@ -236,10 +240,11 @@ export default function TrackingPage() {
         }} className="px-4 py-2 bg-gradient-to-br from-[#ff9900] to-[#ffad33] border-none rounded-lg text-black font-semibold text-sm cursor-pointer hover:opacity-90 transition-opacity whitespace-nowrap">{showForm ? "Cancel" : "+ Add Tag"}</button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
         {[
           { label: "Agents", value: summary.totalAgents },
           { label: "Visible Tags", value: summary.totalTags },
+          { label: "Linked Products", value: summary.totalLinkedProducts },
           { label: "Portal Editable", value: summary.portalEditable },
           { label: "Admin Only", value: summary.adminOnly },
         ].map((item) => (
@@ -394,6 +399,9 @@ export default function TrackingPage() {
                         <code className="text-sm text-[#ff9900] font-semibold bg-[#ff9900]/10 px-2.5 py-1 rounded-md">{t.tag}</code>
                         {t.is_default ? <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 font-medium">DEFAULT</span> : null}
                         <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-[#ff9900]/15 text-[#ffad33] font-medium">{t.marketplace}</span>
+                        <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 font-medium">
+                          {Number(t.linked_product_count || 0)} product{Number(t.linked_product_count || 0) === 1 ? "" : "s"}
+                        </span>
                         {t.is_portal_editable ? (
                           <span className="text-[0.65rem] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-medium">PORTAL</span>
                         ) : (

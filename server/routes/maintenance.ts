@@ -120,19 +120,16 @@ maintenance.post('/products/hard-delete', async (c) => {
     .bind(...existingIds)
     .all<CacheTarget>();
 
-  await c.env.DB.prepare(`DELETE FROM agent_products WHERE product_id IN (${existingPlaceholders})`)
-    .bind(...existingIds)
-    .run();
-
-  // Click rows can block hard deletion when foreign keys are enabled.
-  await c.env.DB.prepare(`DELETE FROM clicks WHERE product_id IN (${existingPlaceholders})`)
-    .bind(...existingIds)
-    .run()
-    .catch(() => undefined);
-
-  await c.env.DB.prepare(`DELETE FROM products WHERE id IN (${existingPlaceholders})`)
-    .bind(...existingIds)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(`DELETE FROM agent_products WHERE product_id IN (${existingPlaceholders})`)
+      .bind(...existingIds),
+    c.env.DB.prepare(`DELETE FROM clicks WHERE product_id IN (${existingPlaceholders})`)
+      .bind(...existingIds),
+    c.env.DB.prepare(`DELETE FROM page_views WHERE product_id IN (${existingPlaceholders})`)
+      .bind(...existingIds),
+    c.env.DB.prepare(`DELETE FROM products WHERE id IN (${existingPlaceholders})`)
+      .bind(...existingIds),
+  ]);
 
   await invalidateProductCaches(c.env, c.executionCtx, cacheTargets ?? existingProducts);
 
