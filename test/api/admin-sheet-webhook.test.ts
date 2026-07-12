@@ -90,6 +90,47 @@ describe("admin sheet row webhook", () => {
     });
   });
 
+  it("passes the previous resolved tag so sheet edits can update the website tag", async () => {
+    const response = await webhooks.fetch(
+      new Request("http://localhost/sheet-row-sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Secret": "correct",
+        },
+        body: JSON.stringify({
+          rows: [
+            {
+              rowNumber: 2,
+              asin: "B0WEBHK001",
+              marketplace: "US",
+              trackingTag: "admin-us-new-20",
+              previousResolvedTrackingTag: "admin-us-20",
+              customTitle: "",
+            },
+          ],
+        }),
+      }),
+      testEnv() as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: "ok",
+      results: [
+        {
+          rowNumber: 2,
+          resolvedTrackingTag: "admin-us-new-20",
+        },
+      ],
+    });
+
+    const tracking = await env.DB.prepare(
+      "SELECT tag FROM tracking_ids WHERE id = 7001"
+    ).first<{ tag: string }>();
+    expect(tracking?.tag).toBe("admin-us-new-20");
+  });
+
   it("returns partial when one row fails without blocking valid rows", async () => {
     const response = await webhooks.fetch(
       new Request("http://localhost/sheet-row-sync", {

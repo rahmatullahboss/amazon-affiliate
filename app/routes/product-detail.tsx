@@ -309,6 +309,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
               <p className="mt-2 text-sm leading-6 text-gray-600">
                 {publicProductCallout.body}
               </p>
+              <ProductAffiliateDisclosureNote />
             </div>
 
             {availableMarketplaces.length > 0 ? (
@@ -364,7 +365,6 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                         />
                       </div>
                     </div>
-                    <ProductAffiliateDisclosureNote />
                   </div>
                 ) : selectedMarketplace ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">

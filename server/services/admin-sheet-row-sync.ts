@@ -16,6 +16,7 @@ export interface AdminSheetSyncRowInput {
   asin: string;
   marketplace: string;
   trackingTag?: string | null;
+  previousResolvedTrackingTag?: string | null;
   customTitle?: string | null;
   forceUpdateExisting?: boolean;
 }
@@ -112,20 +113,6 @@ async function syncAdminSheetRow(input: {
   }
 
   try {
-    const tracking = await resolveTrackingOwner({
-      db: input.db,
-      marketplace,
-      trackingTag: input.row.trackingTag,
-    });
-
-    if (!tracking) {
-      throw new Error(
-        input.row.trackingTag?.trim()
-          ? "The supplied tracking tag is not active for this marketplace."
-          : "No active site-primary admin tracking tag exists for this marketplace."
-      );
-    }
-
     let product = await input.db
       .prepare(
         `SELECT id, asin, title, image_url, marketplace, category, status,
@@ -137,6 +124,22 @@ async function syncAdminSheetRow(input: {
       .bind(asin, marketplace)
       .first<ExistingProductRow>();
     const existed = Boolean(product);
+
+    const tracking = await resolveTrackingOwner({
+      db: input.db,
+      marketplace,
+      trackingTag: input.row.trackingTag,
+      previousResolvedTrackingTag: input.row.previousResolvedTrackingTag,
+      productId: product?.id ?? null,
+    });
+
+    if (!tracking) {
+      throw new Error(
+        input.row.trackingTag?.trim()
+          ? "The supplied tracking tag could not be matched or synchronized for this marketplace."
+          : "No active site-primary admin tracking tag exists for this marketplace."
+      );
+    }
     const shouldRefreshExisting = existed && Boolean(input.row.forceUpdateExisting);
 
     if (!product || shouldRefreshExisting) {
@@ -226,16 +229,85 @@ async function resolveTrackingOwner(input: {
   db: D1Database;
   marketplace: string;
   trackingTag?: string | null;
+  previousResolvedTrackingTag?: string | null;
+  productId: number | null;
 }): Promise<TrackingOwnerRow | null> {
-  const explicitTag = input.trackingTag?.trim() || null;
-  const whereClause = explicitTag
-    ? "t.tag = ? AND t.marketplace = ?"
-    : "t.marketplace = ? AND t.is_site_primary = 1";
-  const bindings = explicitTag
-    ? [explicitTag, input.marketplace]
-    : [input.marketplace];
+  const requestedTag = input.trackingTag?.trim() || null;
+  const previousResolvedTag = input.previousResolvedTrackingTag?.trim() || null;
+  const productTracking = input.productId
+    ? await findProductTrackingOwner(input.db, input.productId, input.marketplace)
+    : null;
+  const sheetChangedTag = previousResolvedTag !== null && requestedTag !== previousResolvedTag;
 
-  return input.db
+  if (sheetChangedTag) {
+    if (!requestedTag) {
+      return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+    }
+
+    const existingRequestedTag = await findActiveTrackingOwnerByTag(
+      input.db,
+      input.marketplace,
+      requestedTag
+    );
+    if (existingRequestedTag) {
+      return existingRequestedTag;
+    }
+
+    const previousTracking = await findActiveTrackingOwnerByTag(
+      input.db,
+      input.marketplace,
+      previousResolvedTag
+    ) ?? productTracking;
+    if (!previousTracking) {
+      return null;
+    }
+
+    try {
+      await input.db
+        .prepare("UPDATE tracking_ids SET tag = ? WHERE id = ?")
+        .bind(requestedTag, previousTracking.tracking_id)
+        .run();
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("UNIQUE")) {
+        throw new Error("The requested tracking tag already belongs to another tracking record.");
+      }
+      throw error;
+    }
+
+    return {
+      ...previousTracking,
+      tracking_tag: requestedTag,
+    };
+  }
+
+  if (requestedTag) {
+    if (
+      previousResolvedTag === requestedTag &&
+      productTracking &&
+      productTracking.tracking_tag !== requestedTag
+    ) {
+      return productTracking;
+    }
+
+    if (previousResolvedTag === requestedTag && !productTracking) {
+      const sitePrimary = await findSitePrimaryTrackingOwner(input.db, input.marketplace);
+      if (sitePrimary && sitePrimary.tracking_tag !== requestedTag) {
+        return sitePrimary;
+      }
+    }
+
+    return findActiveTrackingOwnerByTag(input.db, input.marketplace, requestedTag);
+  }
+
+  return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+}
+
+async function findActiveTrackingOwnerByTag(
+  db: D1Database,
+  marketplace: string,
+  trackingTag: string
+): Promise<TrackingOwnerRow | null> {
+  return db
     .prepare(
       `SELECT
          t.id AS tracking_id,
@@ -244,13 +316,64 @@ async function resolveTrackingOwner(input: {
          a.slug AS agent_slug
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
-       WHERE ${whereClause}
+       WHERE t.tag = ?
+         AND t.marketplace = ?
+         AND t.is_active = 1
+         AND a.is_active = 1
+       LIMIT 1`
+    )
+    .bind(trackingTag, marketplace)
+    .first<TrackingOwnerRow>();
+}
+
+async function findSitePrimaryTrackingOwner(
+  db: D1Database,
+  marketplace: string
+): Promise<TrackingOwnerRow | null> {
+  return db
+    .prepare(
+      `SELECT
+         t.id AS tracking_id,
+         t.tag AS tracking_tag,
+         a.id AS agent_id,
+         a.slug AS agent_slug
+       FROM tracking_ids t
+       JOIN agents a ON a.id = t.agent_id
+       WHERE t.marketplace = ?
+         AND t.is_site_primary = 1
          AND t.is_active = 1
          AND a.is_active = 1
        ORDER BY t.created_at ASC
        LIMIT 1`
     )
-    .bind(...bindings)
+    .bind(marketplace)
+    .first<TrackingOwnerRow>();
+}
+
+async function findProductTrackingOwner(
+  db: D1Database,
+  productId: number,
+  marketplace: string
+): Promise<TrackingOwnerRow | null> {
+  return db
+    .prepare(
+      `SELECT
+         t.id AS tracking_id,
+         t.tag AS tracking_tag,
+         a.id AS agent_id,
+         a.slug AS agent_slug
+       FROM agent_products ap
+       JOIN tracking_ids t ON t.id = ap.tracking_id
+       JOIN agents a ON a.id = ap.agent_id
+       WHERE ap.product_id = ?
+         AND t.marketplace = ?
+         AND ap.is_active = 1
+         AND t.is_active = 1
+         AND a.is_active = 1
+       ORDER BY t.is_site_primary DESC, ap.updated_at DESC, ap.id DESC
+       LIMIT 1`
+    )
+    .bind(productId, marketplace)
     .first<TrackingOwnerRow>();
 }
 

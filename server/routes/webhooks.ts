@@ -140,6 +140,10 @@ function parseAdminSheetRows(payload: unknown): AdminSheetSyncRowInput[] {
       asin: typeof row.asin === "string" ? row.asin : "",
       marketplace: typeof row.marketplace === "string" ? row.marketplace : "",
       trackingTag: typeof row.trackingTag === "string" ? row.trackingTag : null,
+      previousResolvedTrackingTag:
+        typeof row.previousResolvedTrackingTag === "string"
+          ? row.previousResolvedTrackingTag
+          : null,
       customTitle: typeof row.customTitle === "string" ? row.customTitle : null,
       forceUpdateExisting: row.forceUpdateExisting === true,
     };

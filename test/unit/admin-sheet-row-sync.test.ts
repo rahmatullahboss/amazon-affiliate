@@ -78,6 +78,89 @@ describe("admin sheet row sync", () => {
     });
   });
 
+  it("updates the website tag when the sheet changes a previously resolved tag", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6005, 'B0TAGSYNC1', 'Tag Sync Product', 'https://img.test/tag-sync.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (501, 6005, 5001, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 6,
+          asin: "B0TAGSYNC1",
+          marketplace: "US",
+          trackingTag: "admin-us-new-20",
+          previousResolvedTrackingTag: "admin-us-20",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 6,
+      status: "existing",
+      resolvedTrackingTag: "admin-us-new-20",
+    });
+
+    const tracking = await env.DB.prepare(
+      "SELECT tag FROM tracking_ids WHERE id = 5001"
+    ).first<{ tag: string }>();
+    expect(tracking?.tag).toBe("admin-us-new-20");
+  });
+
+  it("writes the current website tag back when the sheet still has a stale tag", async () => {
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (5004, 501, 'admin-us-live-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6006, 'B0TAGLIVE1', 'Live Tag Product', 'https://img.test/tag-live.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (501, 6006, 5004, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 7,
+          asin: "B0TAGLIVE1",
+          marketplace: "US",
+          trackingTag: "admin-us-20",
+          previousResolvedTrackingTag: "admin-us-20",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 7,
+      status: "existing",
+      resolvedTrackingTag: "admin-us-live-20",
+    });
+
+    const mapping = await env.DB.prepare(
+      `SELECT tracking_id
+       FROM agent_products
+       WHERE agent_id = 501 AND product_id = 6006`
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(5004);
+  });
+
   it("fetches a missing product once and returns generated links", async () => {
     const ensureSpy = vi
       .spyOn(productIngestionService, "ensureProductRecord")
