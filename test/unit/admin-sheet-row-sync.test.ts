@@ -126,10 +126,10 @@ describe("admin sheet row sync", () => {
     expect(mapping?.tracking_id).toBe(5004);
   });
 
-  it("does not rename a global tag when a sheet row contains an unknown tag", async () => {
+  it("creates a new tag for the existing agent without renaming the previous global tag", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
-       VALUES (6007, 'B0TAGTYPO1', 'Typo Product', 'https://img.test/typo.jpg', 'US', 'active', 1)`
+       VALUES (6007, 'B0TAGNEW01', 'New Tag Product', 'https://img.test/new-tag.jpg', 'US', 'active', 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
@@ -143,9 +143,9 @@ describe("admin sheet row sync", () => {
       rows: [
         {
           rowNumber: 8,
-          asin: "B0TAGTYPO1",
+          asin: "B0TAGNEW01",
           marketplace: "US",
-          trackingTag: "unknown-tag-20",
+          trackingTag: "new-agent-tag-20",
           previousResolvedTrackingTag: "admin-us-20",
           customTitle: null,
         },
@@ -154,13 +154,86 @@ describe("admin sheet row sync", () => {
 
     expect(result.results[0]).toMatchObject({
       rowNumber: 8,
-      status: "failed",
+      status: "existing",
+      resolvedTrackingTag: "new-agent-tag-20",
+    });
+
+    const previousTracking = await env.DB.prepare(
+      "SELECT tag FROM tracking_ids WHERE id = 5001"
+    ).first<{ tag: string }>();
+    expect(previousTracking?.tag).toBe("admin-us-20");
+
+    const createdTracking = await env.DB.prepare(
+      `SELECT id, agent_id, tag, marketplace, is_active
+       FROM tracking_ids
+       WHERE tag = 'new-agent-tag-20'`
+    ).first<{
+      id: number;
+      agent_id: number;
+      tag: string;
+      marketplace: string;
+      is_active: number;
+    }>();
+    expect(createdTracking).toMatchObject({
+      agent_id: 501,
+      tag: "new-agent-tag-20",
+      marketplace: "US",
+      is_active: 1,
+    });
+
+    const mapping = await env.DB.prepare(
+      "SELECT tracking_id FROM agent_products WHERE agent_id = 501 AND product_id = 6007"
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(createdTracking?.id);
+  });
+
+  it("auto-creates an agent and tag for a brand-new explicit sheet tag", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6009, 'B0NEWAUTO1', 'Auto Agent Product', 'https://img.test/auto-agent.jpg', 'US', 'active', 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 10,
+          asin: "B0NEWAUTO1",
+          marketplace: "US",
+          trackingTag: "freshagent-20",
+          previousResolvedTrackingTag: null,
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 10,
+      status: "existing",
+      resolvedTrackingTag: "freshagent-20",
+      bridgePageUrl: "https://dealsrky.com/freshagent-20/us/B0NEWAUTO1",
+    });
+
+    const agent = await env.DB.prepare(
+      "SELECT id, name, slug, is_active FROM agents WHERE slug = 'freshagent-20'"
+    ).first<{ id: number; name: string; slug: string; is_active: number }>();
+    expect(agent).toMatchObject({
+      name: "freshagent-20",
+      slug: "freshagent-20",
+      is_active: 1,
     });
 
     const tracking = await env.DB.prepare(
-      "SELECT tag FROM tracking_ids WHERE id = 5001"
-    ).first<{ tag: string }>();
-    expect(tracking?.tag).toBe("admin-us-20");
+      "SELECT agent_id, tag, marketplace, is_active FROM tracking_ids WHERE tag = 'freshagent-20'"
+    ).first<{ agent_id: number; tag: string; marketplace: string; is_active: number }>();
+    expect(tracking).toMatchObject({
+      agent_id: agent?.id,
+      tag: "freshagent-20",
+      marketplace: "US",
+      is_active: 1,
+    });
   });
 
   it("removes accidental wrapping quotes from a tracking tag", async () => {
@@ -192,11 +265,17 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("writes the current website tag back when the sheet still has a stale tag", async () => {
+  it("writes the current website tag back for the same agent without choosing another agent mapping", async () => {
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (502, 'other-agent', 'Other Agent', 1)`
+    ).run();
     await env.DB.prepare(
       `INSERT INTO tracking_ids (
          id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
-       ) VALUES (5004, 501, 'admin-us-live-20', 'US', 1, 0, 1)`
+       ) VALUES
+         (5004, 501, 'admin-us-live-20', 'US', 1, 0, 1),
+         (5005, 502, 'other-agent-20', 'US', 1, 0, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
@@ -204,7 +283,9 @@ describe("admin sheet row sync", () => {
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
-       VALUES (501, 6006, 5004, 1)`
+       VALUES
+         (501, 6006, 5004, 1),
+         (502, 6006, 5005, 1)`
     ).run();
 
     const result = await syncAdminSheetRows({

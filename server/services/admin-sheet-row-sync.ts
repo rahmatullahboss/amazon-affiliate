@@ -1,4 +1,5 @@
 import { CacheService } from "./cache";
+import { writeAuditLog } from "./audit-log";
 import {
   ensureProductRecord,
   refreshProductRecord,
@@ -17,6 +18,7 @@ export interface AdminSheetSyncRowInput {
   marketplace: string;
   trackingTag?: string | null;
   previousResolvedTrackingTag?: string | null;
+  previousAgentSlug?: string | null;
   customTitle?: string | null;
   forceUpdateExisting?: boolean;
 }
@@ -45,6 +47,13 @@ interface TrackingOwnerRow {
   tracking_tag: string;
   agent_id: number;
   agent_slug: string;
+}
+
+interface AgentRow {
+  id: number;
+  name: string;
+  slug: string;
+  is_active: number;
 }
 
 interface ExistingProductRow extends ProductRecord {
@@ -130,13 +139,14 @@ async function syncAdminSheetRow(input: {
       marketplace,
       trackingTag: input.row.trackingTag,
       previousResolvedTrackingTag: input.row.previousResolvedTrackingTag,
+      previousAgentSlug: input.row.previousAgentSlug,
       productId: product?.id ?? null,
     });
 
     if (!tracking) {
       throw new Error(
         input.row.trackingTag?.trim()
-          ? "The supplied tracking tag could not be matched or synchronized for this marketplace."
+          ? "The supplied tracking tag could not be matched, reactivated, or created for this marketplace."
           : "No active site-primary admin tracking tag exists for this marketplace."
       );
     }
@@ -230,12 +240,29 @@ async function resolveTrackingOwner(input: {
   marketplace: string;
   trackingTag?: string | null;
   previousResolvedTrackingTag?: string | null;
+  previousAgentSlug?: string | null;
   productId: number | null;
 }): Promise<TrackingOwnerRow | null> {
   const requestedTag = normalizeTrackingTag(input.trackingTag);
   const previousResolvedTag = normalizeTrackingTag(input.previousResolvedTrackingTag);
+  const previousAgentSlug = normalizeAgentSlug(input.previousAgentSlug);
+  const previousOwner = previousResolvedTag
+    ? await findTrackingOwnerByTag(input.db, input.marketplace, previousResolvedTag)
+    : null;
+  const previousAgent =
+    previousOwner === null && previousAgentSlug
+      ? await findAgentBySlug(input.db, previousAgentSlug)
+      : null;
+  const previousAgentId = previousOwner?.agent_id ?? previousAgent?.id ?? null;
   const productTracking = input.productId
-    ? await findProductTrackingOwner(input.db, input.productId, input.marketplace)
+    ? previousAgentId
+      ? await findProductTrackingOwnerForAgent(
+          input.db,
+          input.productId,
+          input.marketplace,
+          previousAgentId
+        )
+      : await findProductTrackingOwner(input.db, input.productId, input.marketplace)
     : null;
   const sheetChangedTag = previousResolvedTag !== null && requestedTag !== previousResolvedTag;
 
@@ -244,13 +271,19 @@ async function resolveTrackingOwner(input: {
       return findSitePrimaryTrackingOwner(input.db, input.marketplace);
     }
 
-    // Sheet rows may switch a product to an existing active tag, but they must
-    // never rename the global tracking record. A typo in one row would affect
-    // every linked product otherwise.
-    return findActiveTrackingOwnerByTag(input.db, input.marketplace, requestedTag);
+    // A sheet edit may switch the row to another tag or create a new one, but
+    // it never renames the previous global tracking record.
+    return resolveOrCreateTrackingOwner({
+      db: input.db,
+      marketplace: input.marketplace,
+      trackingTag: requestedTag,
+      preferredAgentId: previousAgentId,
+    });
   }
 
   if (requestedTag) {
+    // When the sheet still contains the last confirmed value but the website
+    // mapping has changed, the website is authoritative and is written back.
     if (
       previousResolvedTag === requestedTag &&
       productTracking &&
@@ -266,7 +299,12 @@ async function resolveTrackingOwner(input: {
       }
     }
 
-    return findActiveTrackingOwnerByTag(input.db, input.marketplace, requestedTag);
+    return resolveOrCreateTrackingOwner({
+      db: input.db,
+      marketplace: input.marketplace,
+      trackingTag: requestedTag,
+      preferredAgentId: previousAgentId,
+    });
   }
 
   return findSitePrimaryTrackingOwner(input.db, input.marketplace);
@@ -285,6 +323,249 @@ function normalizeTrackingTag(value: string | null | undefined): string | null {
   }
 
   return normalized;
+}
+
+function normalizeAgentSlug(value: string | null | undefined): string | null {
+  const normalized = (value ?? "").trim().toLowerCase();
+  return normalized && /^[a-z0-9-]+$/.test(normalized) ? normalized : null;
+}
+
+async function resolveOrCreateTrackingOwner(input: {
+  db: D1Database;
+  marketplace: string;
+  trackingTag: string;
+  preferredAgentId: number | null;
+}): Promise<TrackingOwnerRow | null> {
+  const activeOwner = await findActiveTrackingOwnerByTag(
+    input.db,
+    input.marketplace,
+    input.trackingTag
+  );
+  if (activeOwner) return activeOwner;
+
+  const existingOwner = await findTrackingOwnerByTag(
+    input.db,
+    input.marketplace,
+    input.trackingTag
+  );
+  if (existingOwner) {
+    await Promise.all([
+      input.db
+        .prepare(
+          `UPDATE agents
+           SET is_active = 1,
+               updated_at = CURRENT_TIMESTAMP
+           WHERE id = ?`
+        )
+        .bind(existingOwner.agent_id)
+        .run(),
+      input.db
+        .prepare("UPDATE tracking_ids SET is_active = 1 WHERE id = ?")
+        .bind(existingOwner.tracking_id)
+        .run(),
+    ]);
+
+    return findActiveTrackingOwnerByTag(input.db, input.marketplace, input.trackingTag);
+  }
+
+  const conflictingMarketplace = await input.db
+    .prepare(
+      `SELECT marketplace
+       FROM tracking_ids
+       WHERE tag = ?
+       LIMIT 1`
+    )
+    .bind(input.trackingTag)
+    .first<{ marketplace: string }>();
+  if (conflictingMarketplace) {
+    throw new Error(
+      `This tracking tag already belongs to the ${conflictingMarketplace.marketplace} marketplace.`
+    );
+  }
+
+  const agent = input.preferredAgentId
+    ? await getOrReactivateAgentById(input.db, input.preferredAgentId)
+    : await findOrCreateSheetAgent(input.db, input.trackingTag);
+  if (!agent) {
+    throw new Error("Could not create or resolve an agent for this tracking tag.");
+  }
+
+  const activeTagCount = await input.db
+    .prepare(
+      `SELECT COUNT(*) AS count
+       FROM tracking_ids
+       WHERE agent_id = ?
+         AND marketplace = ?
+         AND is_active = 1`
+    )
+    .bind(agent.id, input.marketplace)
+    .first<{ count: number }>();
+  const isDefault = Number(activeTagCount?.count ?? 0) === 0 ? 1 : 0;
+
+  await input.db
+    .prepare(
+      `INSERT OR IGNORE INTO tracking_ids (
+         agent_id, tag, label, marketplace, is_default,
+         is_site_primary, is_active, is_portal_editable
+       ) VALUES (?, ?, ?, ?, ?, 0, 1, 1)`
+    )
+    .bind(
+      agent.id,
+      input.trackingTag,
+      "Auto-created from Admin Sheet",
+      input.marketplace,
+      isDefault
+    )
+    .run();
+
+  const createdOwner = await findActiveTrackingOwnerByTag(
+    input.db,
+    input.marketplace,
+    input.trackingTag
+  );
+  if (!createdOwner) {
+    throw new Error("The tracking tag could not be created for this marketplace.");
+  }
+
+  await writeSheetAuditLogSafe(input.db, {
+    action: "sheet.tracking_tag.auto_created",
+    entityType: "tracking_id",
+    entityId: createdOwner.tracking_id,
+    details: {
+      tag: input.trackingTag,
+      marketplace: input.marketplace,
+      agentId: createdOwner.agent_id,
+      agentSlug: createdOwner.agent_slug,
+    },
+  });
+
+  return createdOwner;
+}
+
+async function findOrCreateSheetAgent(
+  db: D1Database,
+  trackingTag: string
+): Promise<AgentRow | null> {
+  const slug = trackingTag.toLowerCase().slice(0, 50);
+  let agent = await db
+    .prepare("SELECT id, name, slug, is_active FROM agents WHERE slug = ? LIMIT 1")
+    .bind(slug)
+    .first<AgentRow>();
+  const wasCreated = !agent;
+
+  if (!agent) {
+    await db
+      .prepare(
+        `INSERT OR IGNORE INTO agents (name, slug, is_active)
+         VALUES (?, ?, 1)`
+      )
+      .bind(trackingTag, slug)
+      .run();
+
+    agent = await db
+      .prepare("SELECT id, name, slug, is_active FROM agents WHERE slug = ? LIMIT 1")
+      .bind(slug)
+      .first<AgentRow>();
+  }
+
+  if (!agent) return null;
+
+  if (agent.is_active !== 1) {
+    await db
+      .prepare(
+        `UPDATE agents
+         SET is_active = 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+      )
+      .bind(agent.id)
+      .run();
+    agent = { ...agent, is_active: 1 };
+  }
+
+  if (wasCreated) {
+    await writeSheetAuditLogSafe(db, {
+      action: "sheet.agent.auto_created",
+      entityType: "agent",
+      entityId: agent.id,
+      details: {
+        name: agent.name,
+        slug: agent.slug,
+        sourceTrackingTag: trackingTag,
+      },
+    });
+  }
+
+  return agent;
+}
+
+async function findAgentBySlug(
+  db: D1Database,
+  slug: string
+): Promise<AgentRow | null> {
+  return db
+    .prepare("SELECT id, name, slug, is_active FROM agents WHERE slug = ? LIMIT 1")
+    .bind(slug)
+    .first<AgentRow>();
+}
+
+async function getOrReactivateAgentById(
+  db: D1Database,
+  agentId: number
+): Promise<AgentRow | null> {
+  let agent = await db
+    .prepare("SELECT id, name, slug, is_active FROM agents WHERE id = ? LIMIT 1")
+    .bind(agentId)
+    .first<AgentRow>();
+  if (!agent) return null;
+
+  if (agent.is_active !== 1) {
+    await db
+      .prepare(
+        `UPDATE agents
+         SET is_active = 1,
+             updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`
+      )
+      .bind(agent.id)
+      .run();
+    agent = { ...agent, is_active: 1 };
+  }
+
+  return agent;
+}
+
+async function writeSheetAuditLogSafe(
+  db: D1Database,
+  input: Parameters<typeof writeAuditLog>[1]
+): Promise<void> {
+  try {
+    await writeAuditLog(db, input);
+  } catch (error) {
+    console.warn("[Admin Sheet Sync] Could not write audit log", error);
+  }
+}
+
+async function findTrackingOwnerByTag(
+  db: D1Database,
+  marketplace: string,
+  trackingTag: string
+): Promise<TrackingOwnerRow | null> {
+  return db
+    .prepare(
+      `SELECT
+         t.id AS tracking_id,
+         t.tag AS tracking_tag,
+         a.id AS agent_id,
+         a.slug AS agent_slug
+       FROM tracking_ids t
+       JOIN agents a ON a.id = t.agent_id
+       WHERE t.tag = ?
+         AND t.marketplace = ?
+       LIMIT 1`
+    )
+    .bind(trackingTag, marketplace)
+    .first<TrackingOwnerRow>();
 }
 
 async function findActiveTrackingOwnerByTag(
@@ -359,6 +640,35 @@ async function findProductTrackingOwner(
        LIMIT 1`
     )
     .bind(productId, marketplace)
+    .first<TrackingOwnerRow>();
+}
+
+async function findProductTrackingOwnerForAgent(
+  db: D1Database,
+  productId: number,
+  marketplace: string,
+  agentId: number
+): Promise<TrackingOwnerRow | null> {
+  return db
+    .prepare(
+      `SELECT
+         t.id AS tracking_id,
+         t.tag AS tracking_tag,
+         a.id AS agent_id,
+         a.slug AS agent_slug
+       FROM agent_products ap
+       JOIN tracking_ids t ON t.id = ap.tracking_id
+       JOIN agents a ON a.id = ap.agent_id
+       WHERE ap.product_id = ?
+         AND ap.agent_id = ?
+         AND t.marketplace = ?
+         AND ap.is_active = 1
+         AND t.is_active = 1
+         AND a.is_active = 1
+       ORDER BY ap.updated_at DESC, ap.id DESC
+       LIMIT 1`
+    )
+    .bind(productId, agentId, marketplace)
     .first<TrackingOwnerRow>();
 }
 

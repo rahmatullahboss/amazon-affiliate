@@ -50,11 +50,11 @@ Apps Script writes the response into the output columns for the matching rows.
 `tracking_tag` is the editable desired value, while `resolved_tracking_tag` stores the last tag confirmed by the website.
 
 - After a successful sync, Apps Script writes the website-confirmed tag into both columns.
-- When `tracking_tag` differs from the previous `resolved_tracking_tag`, the row may switch its product mapping only to an already-existing active tag for that marketplace.
-- Sheet edits never rename a global `tracking_ids` record, because one typo would otherwise affect every product linked to that tag.
-- Wrapping quotes, smart quotes, zero-width characters, and outer whitespace are removed before a tag is matched; other punctuation is rejected.
-- When both values still match but the live product mapping now points to a different website tag, the website value wins and is written back to the sheet.
-- A brand-new explicit tag must first be created in the website tracking management UI.
+- When `tracking_tag` differs from the previous `resolved_tracking_tag`, the row may switch to an existing tag or create a new tag without renaming the previous global `tracking_ids` record.
+- If a row already has a resolved tag, a new unknown tag is created for that same agent. If the row has no previous resolved tag, the website creates an active agent automatically using the normalized tag as its name and slug, then creates the tag for that agent.
+- Existing inactive agents or tags are reactivated when the exact marketplace tag is submitted again.
+- Wrapping quotes, smart quotes, zero-width characters, and outer whitespace are removed before a tag is matched; other invalid formats are rejected.
+- When both values still match but that agent's live product mapping now points to a different website tag, the website value wins and is written back to the sheet. The sheet does not revert the website unless an admin intentionally edits `tracking_tag` so it differs from `resolved_tracking_tag`.
 - Clearing a previously resolved tag resets the row to the marketplace site-primary tag.
 
 ## Reconciliation
