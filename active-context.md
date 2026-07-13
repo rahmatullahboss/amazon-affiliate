@@ -1,44 +1,57 @@
 # Active Context — Amazon Affiliate
 
-> Updated: 2026-07-08 (GitHub/local sync after Zyte + tracking maintenance work)
+> Updated: 2026-07-13
 > CodexPro reads this on every `workspace_summary` call. Keep current.
 
 ## Current task
 
-Synced local `master` with GitHub `origin/master`, pulled 12 GitHub-only commits, reapplied local uncommitted work, resolved one merge conflict in `server/routes/tracking.ts`, verified, committed, and pushed local work back to GitHub.
+All current Admin Sheet tracking-sync changes were verified, committed, and pushed to the repository default branch.
 
 ## Branch / worktree
 
-`main` / `master` workspace naming is mixed in local git output. Current active branch is `master`; do not deploy unless explicitly requested.
+- Active branch: `master`.
+- `origin/HEAD` points to `origin/master`; this repository has no `main` branch, so the user's request to merge into main was applied to the actual default branch, `master`.
+- No deployment was performed; deploy only with explicit user instruction.
 
 ## Files touched this session
 
-- Pulled GitHub tracking-maintenance commits, including maintenance routes, admin UI route, mapping cleanup, and single active tag behavior.
-- Resolved conflict between GitHub single-tag enforcement and local site-primary tracking fields in `server/routes/tracking.ts`.
-- Kept regular `/api/tracking/:id` delete behavior as remap-to-site-primary; hard deletion remains in the maintenance API.
-- Fixed `server/routes/maintenance.ts` body typing so `npm run typecheck` passes.
-- Kept prior local Zyte API fallback, admin sheet row sync, docs, tests, and generated admin sheet template assets staged for sync.
-- Restored generated Playwright/test-result deletions and did not push those artifact deletions.
+- `server/services/admin-sheet-row-sync.ts`
+  - Supports switching to existing tags, creating new tags, and reactivating inactive agents/tags from Admin Sheet input.
+  - Preserves the previous global tracking tag instead of renaming it.
+  - Keeps the website mapping authoritative when the sheet value has not intentionally changed.
+  - Writes safe audit-log entries for auto-created agents and tracking tags.
+- `test/unit/admin-sheet-row-sync.test.ts`
+  - Added coverage for auto-created agents/tags, existing-agent tag creation, and same-agent mapping reconciliation.
+  - Fixed a test fixture that incorrectly created a second active site-primary US tag, violating the unique marketplace constraint.
+- `docs/superpowers/specs/2026-06-25-admin-sheet-row-sync-design.md`
+  - Updated the synchronization behavior documentation.
+- `active-context.md`
+  - Updated session state and verification evidence.
 
-## Pending decisions
+## Product-page disclosure request
 
-- Need a real Zyte API key before live verification against Amazon can be run.
-- Current product-data fallback order is: manual/existing fields → Creators API → Zyte → RapidAPI → SerpApi → typed error.
-- Retry one ASIN row from the sheet and verify product data saves to D1.
-
-## Blockers
-
-- No live Zyte request was executed in this sync because no real Zyte key was verified locally.
+- `app/routes/product-detail.tsx` already renders the Amazon affiliate disclosure inside the shared highlighted destination/pricing callout and does not render a second disclosure below the `View on Amazon` CTA.
+- Because the shared `/deals/:asin` route is used for dynamic product pages, the existing source already applies this placement to all product pages.
 
 ## Verification
 
-- `npm run typecheck` passed after sync conflict fixes.
-- `npm test -- product-ingestion-lwa admin-sheet-row-sync admin-sheet-webhook portal-tracking agents-admin affiliate-copy` passed: 6 files, 58 tests.
-- Vitest/Wrangler emitted non-blocking stderr warnings during shutdown, but the test command exited 0 with all targeted tests passed.
+- Initial full test run exposed one invalid test fixture: a second active `is_site_primary = 1` US tag violated `idx_tracking_ids_site_primary_marketplace`.
+- Targeted test: `test/unit/admin-sheet-row-sync.test.ts` — 11/11 passed.
+- Full test suite: 44 files, 245 tests passed.
+- `npm run typecheck` passed.
+- `npm run build` passed.
+- `git diff --check` passed.
 
-## Next concrete step
+## Git result
 
-After the sync commit is pushed, retry one ASIN row from the sheet and verify product data saves to D1 using the configured live fallback keys.
+- Feature commit: `2687ac1` — `feat: sync and create tracking tags from admin sheet`.
+- Pushed successfully to `origin/master`.
+
+## Pending decisions / next concrete step
+
+- Retry one real ASIN row from the Admin Sheet and verify the new tag/agent behavior against the live D1 database.
+- A real Zyte API key is still needed for live Zyte fallback verification.
+- Deploy only when the user explicitly requests deployment.
 
 ## Operational reminders
 
@@ -47,4 +60,4 @@ After the sync commit is pushed, retry one ASIN row from the sheet and verify pr
 - Local MCP: `http://127.0.0.1:8790/mcp`.
 - Daily use: `cd "/Users/rahmatullahzisan/Desktop/Dev/Amazon affiliate" && codexpro start`.
 
-> This file is updated by the agent at the END of every turn (or START of the next) so the next session has fresh state.
+> This file is updated by the agent at the end of every turn so the next session has fresh state.
