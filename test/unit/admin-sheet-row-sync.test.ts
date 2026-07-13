@@ -78,7 +78,12 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("updates the website tag when the sheet changes a previously resolved tag", async () => {
+  it("switches a product to an existing active tag without renaming global tags", async () => {
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (5004, 501, 'admin-us-new-20', 'US', 0, 0, 1)`
+    ).run();
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (6005, 'B0TAGSYNC1', 'Tag Sync Product', 'https://img.test/tag-sync.jpg', 'US', 'active', 1)`
@@ -113,7 +118,78 @@ describe("admin sheet row sync", () => {
     const tracking = await env.DB.prepare(
       "SELECT tag FROM tracking_ids WHERE id = 5001"
     ).first<{ tag: string }>();
-    expect(tracking?.tag).toBe("admin-us-new-20");
+    expect(tracking?.tag).toBe("admin-us-20");
+
+    const mapping = await env.DB.prepare(
+      "SELECT tracking_id FROM agent_products WHERE agent_id = 501 AND product_id = 6005"
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(5004);
+  });
+
+  it("does not rename a global tag when a sheet row contains an unknown tag", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6007, 'B0TAGTYPO1', 'Typo Product', 'https://img.test/typo.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (501, 6007, 5001, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 8,
+          asin: "B0TAGTYPO1",
+          marketplace: "US",
+          trackingTag: "unknown-tag-20",
+          previousResolvedTrackingTag: "admin-us-20",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 8,
+      status: "failed",
+    });
+
+    const tracking = await env.DB.prepare(
+      "SELECT tag FROM tracking_ids WHERE id = 5001"
+    ).first<{ tag: string }>();
+    expect(tracking?.tag).toBe("admin-us-20");
+  });
+
+  it("removes accidental wrapping quotes from a tracking tag", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6008, 'B0TAGQUOTE', 'Quoted Tag Product', 'https://img.test/quote.jpg', 'US', 'active', 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 9,
+          asin: "B0TAGQUOTE",
+          marketplace: "US",
+          trackingTag: 'admin-us-20"',
+          previousResolvedTrackingTag: "admin-us-20",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      rowNumber: 9,
+      status: "existing",
+      resolvedTrackingTag: "admin-us-20",
+    });
   });
 
   it("writes the current website tag back when the sheet still has a stale tag", async () => {

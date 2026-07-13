@@ -50,14 +50,16 @@ Apps Script writes the response into the output columns for the matching rows.
 `tracking_tag` is the editable desired value, while `resolved_tracking_tag` stores the last tag confirmed by the website.
 
 - After a successful sync, Apps Script writes the website-confirmed tag into both columns.
-- When `tracking_tag` differs from the previous `resolved_tracking_tag`, the sheet edit is treated as intentional and the matching website tracking record is updated.
+- When `tracking_tag` differs from the previous `resolved_tracking_tag`, the row may switch its product mapping only to an already-existing active tag for that marketplace.
+- Sheet edits never rename a global `tracking_ids` record, because one typo would otherwise affect every product linked to that tag.
+- Wrapping quotes, smart quotes, zero-width characters, and outer whitespace are removed before a tag is matched; other punctuation is rejected.
 - When both values still match but the live product mapping now points to a different website tag, the website value wins and is written back to the sheet.
-- A brand-new explicit tag without a previous resolved baseline must already exist as an active website tag; this prevents an unsynced row from renaming a global tag accidentally.
+- A brand-new explicit tag must first be created in the website tracking management UI.
 - Clearing a previously resolved tag resets the row to the marketplace site-primary tag.
 
 ## Reconciliation
 
-The hourly scheduled reconciliation reads submitted rows and repairs missing product mappings, statuses, generated links, and website-to-sheet tracking-tag changes. Existing products are never refreshed from Amazon during reconciliation. A provider call occurs only if a submitted ASIN is absent from the database.
+The hourly scheduled reconciliation checks a rotating batch of up to 100 submitted rows and repairs missing product mappings, statuses, generated links, and website-to-sheet tracking-tag changes. The rotating cap prevents a large workbook from holding the Apps Script lock long enough to delay immediate ASIN edits. Existing products are never refreshed from Amazon during reconciliation. A provider call occurs only if a submitted ASIN is absent from the database.
 
 ## Failure Handling
 

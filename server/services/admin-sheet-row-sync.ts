@@ -210,7 +210,7 @@ async function syncAdminSheetRow(input: {
       storefrontUrl: `${baseUrl}/${tracking.agent_slug}`,
       redirectUrl: `${baseUrl}/go/${tracking.agent_slug}/${marketplacePath}/${asin}`,
       orderLink: `${baseUrl}/deals/${asin}`,
-      resolvedTrackingTag: tracking.tracking_tag,
+      resolvedTrackingTag: normalizeTrackingTag(tracking.tracking_tag),
       errorMessage: null,
       syncedAt,
     };
@@ -232,8 +232,8 @@ async function resolveTrackingOwner(input: {
   previousResolvedTrackingTag?: string | null;
   productId: number | null;
 }): Promise<TrackingOwnerRow | null> {
-  const requestedTag = input.trackingTag?.trim() || null;
-  const previousResolvedTag = input.previousResolvedTrackingTag?.trim() || null;
+  const requestedTag = normalizeTrackingTag(input.trackingTag);
+  const previousResolvedTag = normalizeTrackingTag(input.previousResolvedTrackingTag);
   const productTracking = input.productId
     ? await findProductTrackingOwner(input.db, input.productId, input.marketplace)
     : null;
@@ -244,54 +244,24 @@ async function resolveTrackingOwner(input: {
       return findSitePrimaryTrackingOwner(input.db, input.marketplace);
     }
 
-    const existingRequestedTag = await findActiveTrackingOwnerByTag(
-      input.db,
-      input.marketplace,
-      requestedTag
-    );
-    if (existingRequestedTag) {
-      return existingRequestedTag;
-    }
-
-    const previousTracking = await findActiveTrackingOwnerByTag(
-      input.db,
-      input.marketplace,
-      previousResolvedTag
-    ) ?? productTracking;
-    if (!previousTracking) {
-      return null;
-    }
-
-    try {
-      await input.db
-        .prepare("UPDATE tracking_ids SET tag = ? WHERE id = ?")
-        .bind(requestedTag, previousTracking.tracking_id)
-        .run();
-    } catch (error) {
-      if (error instanceof Error && error.message.includes("UNIQUE")) {
-        throw new Error("The requested tracking tag already belongs to another tracking record.");
-      }
-      throw error;
-    }
-
-    return {
-      ...previousTracking,
-      tracking_tag: requestedTag,
-    };
+    // Sheet rows may switch a product to an existing active tag, but they must
+    // never rename the global tracking record. A typo in one row would affect
+    // every linked product otherwise.
+    return findActiveTrackingOwnerByTag(input.db, input.marketplace, requestedTag);
   }
 
   if (requestedTag) {
     if (
       previousResolvedTag === requestedTag &&
       productTracking &&
-      productTracking.tracking_tag !== requestedTag
+      normalizeTrackingTag(productTracking.tracking_tag) !== requestedTag
     ) {
       return productTracking;
     }
 
     if (previousResolvedTag === requestedTag && !productTracking) {
       const sitePrimary = await findSitePrimaryTrackingOwner(input.db, input.marketplace);
-      if (sitePrimary && sitePrimary.tracking_tag !== requestedTag) {
+      if (sitePrimary && normalizeTrackingTag(sitePrimary.tracking_tag) !== requestedTag) {
         return sitePrimary;
       }
     }
@@ -300,6 +270,21 @@ async function resolveTrackingOwner(input: {
   }
 
   return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+}
+
+function normalizeTrackingTag(value: string | null | undefined): string | null {
+  const normalized = (value ?? "")
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .trim()
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
+    .trim();
+
+  if (!normalized) return null;
+  if (!/^[A-Za-z0-9][A-Za-z0-9-]*-[A-Za-z0-9]+$/.test(normalized)) {
+    throw new Error("Tracking tag format is invalid. Use the full tag, such as ivan101-20.");
+  }
+
+  return normalized;
 }
 
 async function findActiveTrackingOwnerByTag(

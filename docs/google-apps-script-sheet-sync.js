@@ -23,6 +23,8 @@ const INPUT_SHEET_NAME = "New ASINs";
 const SEARCH_RESULTS_SHEET_NAME = "Search Results";
 const MAX_ROWS_PER_REQUEST = 25;
 const CHUNK_SLEEP_MS = 800;
+const HOURLY_RECONCILE_LIMIT = 100;
+const HOURLY_RECONCILE_CURSOR_KEY = "HOURLY_RECONCILE_CURSOR";
 
 const COUNTRY_SHEET_MARKETPLACE = {
   "ASINs-US": "US",
@@ -380,12 +382,43 @@ function manualReconcile() {
 }
 
 function hourlyReconcile() {
+  const candidates = [];
+
   getAllSearchableSheets_().forEach((sheet) => {
-    const rowNumbers = getRowsWithAsin_(sheet);
-    if (rowNumbers.length) {
-      syncSelectedRows_(sheet, rowNumbers, { forceUpdateExisting: false });
-    }
+    getSubmittedRows_(sheet).forEach((rowNumber) => {
+      candidates.push({ sheet, rowNumber });
+    });
   });
+
+  if (!candidates.length) return;
+
+  const properties = PropertiesService.getScriptProperties();
+  const storedCursor = Number(properties.getProperty(HOURLY_RECONCILE_CURSOR_KEY) || "0");
+  const cursor = Number.isFinite(storedCursor) ? storedCursor % candidates.length : 0;
+  const batchSize = Math.min(HOURLY_RECONCILE_LIMIT, candidates.length);
+  const selected = [];
+
+  for (let index = 0; index < batchSize; index += 1) {
+    selected.push(candidates[(cursor + index) % candidates.length]);
+  }
+
+  const groupedRows = new Map();
+  selected.forEach((item) => {
+    const key = item.sheet.getSheetId();
+    if (!groupedRows.has(key)) {
+      groupedRows.set(key, { sheet: item.sheet, rows: [] });
+    }
+    groupedRows.get(key).rows.push(item.rowNumber);
+  });
+
+  groupedRows.forEach((group) => {
+    syncSelectedRows_(group.sheet, group.rows, { forceUpdateExisting: false });
+  });
+
+  properties.setProperty(
+    HOURLY_RECONCILE_CURSOR_KEY,
+    String((cursor + batchSize) % candidates.length)
+  );
 }
 
 function forceResyncSelectedRows() {
@@ -573,7 +606,7 @@ function unhideNewAsins() {
 function syncSelectedRows_(sheet, rowNumbers, options) {
   const lock = LockService.getDocumentLock();
 
-  if (!lock.tryLock(5000)) {
+  if (!lock.tryLock(30000)) {
     console.log("[Sync SKIP] Another sheet sync is already running.");
     return;
   }
@@ -621,8 +654,8 @@ function readSubmittableRows_(sheet, rowNumbers, options) {
       rowNumber,
       asin,
       marketplace: sheetMarketplace || normalizeText_(values[COLUMN.MARKETPLACE - 1]).toUpperCase(),
-      trackingTag: normalizeText_(values[COLUMN.TRACKING_TAG - 1]),
-      previousResolvedTrackingTag: normalizeText_(
+      trackingTag: normalizeTrackingTag_(values[COLUMN.TRACKING_TAG - 1]),
+      previousResolvedTrackingTag: normalizeTrackingTag_(
         values[COLUMN.RESOLVED_TRACKING_TAG - 1]
       ),
       customTitle: normalizeText_(values[COLUMN.CUSTOM_TITLE - 1]),
@@ -686,16 +719,16 @@ function writeResults_(sheet, results) {
             ? "Updated"
             : "Failed";
 
-    const existingResolvedTrackingTag = normalizeText_(
+    const existingResolvedTrackingTag = normalizeTrackingTag_(
       sheet.getRange(result.rowNumber, COLUMN.RESOLVED_TRACKING_TAG).getDisplayValue()
     );
-    const confirmedTrackingTag =
-      result.resolvedTrackingTag || existingResolvedTrackingTag;
+    const resolvedTrackingTag = normalizeTrackingTag_(result.resolvedTrackingTag);
+    const confirmedTrackingTag = resolvedTrackingTag || existingResolvedTrackingTag;
 
-    if (result.resolvedTrackingTag) {
+    if (resolvedTrackingTag) {
       sheet
         .getRange(result.rowNumber, COLUMN.TRACKING_TAG)
-        .setValue(result.resolvedTrackingTag);
+        .setValue(resolvedTrackingTag);
     }
 
     sheet
@@ -724,16 +757,19 @@ function writeChunkFailure_(sheet, rows, message) {
 
 function replaceTagInRows_(sheet, rowNumbers, oldTag, newTag, selectedMode) {
   const changedRows = [];
-  const oldTagText = normalizeText_(oldTag);
+  const oldTagText = normalizeTrackingTag_(oldTag);
+  const newTagText = normalizeTrackingTag_(newTag);
 
   rowNumbers.forEach((row) => {
     const asin = normalizeText_(sheet.getRange(row, COLUMN.ASIN).getDisplayValue());
     if (!asin) return;
 
-    const currentTag = normalizeText_(sheet.getRange(row, COLUMN.TRACKING_TAG).getDisplayValue());
+    const currentTag = normalizeTrackingTag_(
+      sheet.getRange(row, COLUMN.TRACKING_TAG).getDisplayValue()
+    );
     if (!selectedMode && currentTag !== oldTagText) return;
 
-    sheet.getRange(row, COLUMN.TRACKING_TAG).setValue(newTag);
+    sheet.getRange(row, COLUMN.TRACKING_TAG).setValue(newTagText);
     sheet.getRange(row, COLUMN.SUBMIT).setValue("YES");
     sheet.getRange(row, COLUMN.SYNC_STATUS).setValue("Pending Update");
     sheet.getRange(row, COLUMN.ERROR_MESSAGE).clearContent();
@@ -818,6 +854,26 @@ function getRowsWithAsin_(sheet) {
   values.forEach((item, index) => {
     const asin = normalizeText_(item[0]);
     if (asin && asin !== "#REF!") rows.push(index + 2);
+  });
+
+  return rows;
+}
+
+function getSubmittedRows_(sheet) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+
+  const values = sheet
+    .getRange(2, COLUMN.ASIN, lastRow - 1, COLUMN.SUBMIT)
+    .getDisplayValues();
+  const rows = [];
+
+  values.forEach((row, index) => {
+    const asin = normalizeText_(row[COLUMN.ASIN - 1]);
+    const submit = normalizeText_(row[COLUMN.SUBMIT - 1]).toUpperCase();
+    if (asin && asin !== "#REF!" && submit === "YES") {
+      rows.push(index + 2);
+    }
   });
 
   return rows;
@@ -946,6 +1002,13 @@ function promptRequired_(title, message) {
 
 function normalizeText_(value) {
   return String(value || "").trim();
+}
+
+function normalizeTrackingTag_(value) {
+  return normalizeText_(value)
+    .replace(/[\u200B-\u200D\uFEFF]/g, "")
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
+    .trim();
 }
 
 function extractAsin_(text) {

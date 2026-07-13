@@ -90,7 +90,7 @@ describe("admin sheet row webhook", () => {
     });
   });
 
-  it("passes the previous resolved tag so sheet edits can update the website tag", async () => {
+  it("normalizes accidental wrapping quotes without renaming the website tag", async () => {
     const response = await webhooks.fetch(
       new Request("http://localhost/sheet-row-sync", {
         method: "POST",
@@ -104,7 +104,7 @@ describe("admin sheet row webhook", () => {
               rowNumber: 2,
               asin: "B0WEBHK001",
               marketplace: "US",
-              trackingTag: "admin-us-new-20",
+              trackingTag: 'admin-us-20"',
               previousResolvedTrackingTag: "admin-us-20",
               customTitle: "",
             },
@@ -120,7 +120,7 @@ describe("admin sheet row webhook", () => {
       results: [
         {
           rowNumber: 2,
-          resolvedTrackingTag: "admin-us-new-20",
+          resolvedTrackingTag: "admin-us-20",
         },
       ],
     });
@@ -128,7 +128,7 @@ describe("admin sheet row webhook", () => {
     const tracking = await env.DB.prepare(
       "SELECT tag FROM tracking_ids WHERE id = 7001"
     ).first<{ tag: string }>();
-    expect(tracking?.tag).toBe("admin-us-new-20");
+    expect(tracking?.tag).toBe("admin-us-20");
   });
 
   it("returns partial when one row fails without blocking valid rows", async () => {
