@@ -144,6 +144,8 @@ function parseAdminSheetRows(payload: unknown): AdminSheetSyncRowInput[] {
         typeof row.previousResolvedTrackingTag === "string"
           ? row.previousResolvedTrackingTag
           : null,
+      previousAgentSlug:
+        typeof row.previousAgentSlug === "string" ? row.previousAgentSlug : null,
       customTitle: typeof row.customTitle === "string" ? row.customTitle : null,
       forceUpdateExisting: row.forceUpdateExisting === true,
     };

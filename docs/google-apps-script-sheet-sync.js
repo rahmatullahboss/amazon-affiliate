@@ -658,6 +658,9 @@ function readSubmittableRows_(sheet, rowNumbers, options) {
       previousResolvedTrackingTag: normalizeTrackingTag_(
         values[COLUMN.RESOLVED_TRACKING_TAG - 1]
       ),
+      previousAgentSlug: extractAgentSlug_(
+        values[COLUMN.BRIDGE_PAGE_URL - 1] || values[COLUMN.STOREFRONT_URL - 1]
+      ),
       customTitle: normalizeText_(values[COLUMN.CUSTOM_TITLE - 1]),
       forceUpdateExisting: forceUpdateExisting,
     });
@@ -1009,6 +1012,14 @@ function normalizeTrackingTag_(value) {
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
     .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
     .trim();
+}
+
+function extractAgentSlug_(value) {
+  const text = normalizeText_(value);
+  if (!text) return "";
+
+  const match = text.match(/^https?:\/\/[^/]+\/([^/?#]+)/i);
+  return match ? normalizeText_(match[1]).toLowerCase() : "";
 }
 
 function extractAsin_(text) {

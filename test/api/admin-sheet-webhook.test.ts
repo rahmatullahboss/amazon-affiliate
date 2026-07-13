@@ -131,6 +131,62 @@ describe("admin sheet row webhook", () => {
     expect(tracking?.tag).toBe("admin-us-20");
   });
 
+  it("uses the previous agent slug to write a website-renamed tag back to the sheet", async () => {
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (702, 'other-agent', 'Other Agent', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (7003, 702, 'other-agent-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES
+         (701, 7002, 7001, 1),
+         (702, 7002, 7003, 1)`
+    ).run();
+    await env.DB.prepare(
+      "UPDATE tracking_ids SET tag = 'admin-us-live-20' WHERE id = 7001"
+    ).run();
+
+    const response = await webhooks.fetch(
+      new Request("http://localhost/sheet-row-sync", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Secret": "correct",
+        },
+        body: JSON.stringify({
+          rows: [
+            {
+              rowNumber: 2,
+              asin: "B0WEBHK001",
+              marketplace: "US",
+              trackingTag: "admin-us-20",
+              previousResolvedTrackingTag: "admin-us-20",
+              previousAgentSlug: "adminsheet",
+            },
+          ],
+        }),
+      }),
+      testEnv() as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: "ok",
+      results: [
+        {
+          rowNumber: 2,
+          resolvedTrackingTag: "admin-us-live-20",
+          bridgePageUrl: "https://dealsrky.com/adminsheet/us/B0WEBHK001",
+        },
+      ],
+    });
+  });
+
   it("returns partial when one row fails without blocking valid rows", async () => {
     const response = await webhooks.fetch(
       new Request("http://localhost/sheet-row-sync", {

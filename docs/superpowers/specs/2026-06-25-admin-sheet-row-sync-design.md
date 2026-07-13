@@ -54,6 +54,7 @@ Apps Script writes the response into the output columns for the matching rows.
 - If a row already has a resolved tag, a new unknown tag is created for that same agent. If the row has no previous resolved tag, the website creates an active agent automatically using the normalized tag as its name and slug, then creates the tag for that agent.
 - Existing inactive agents or tags are reactivated when the exact marketplace tag is submitted again.
 - Wrapping quotes, smart quotes, zero-width characters, and outer whitespace are removed before a tag is matched; other invalid formats are rejected.
+- Apps Script also sends the previous agent slug parsed from the generated bridge/storefront URL. This keeps the row tied to the correct agent even when the website renames the old tracking-tag record.
 - When both values still match but that agent's live product mapping now points to a different website tag, the website value wins and is written back to the sheet. The sheet does not revert the website unless an admin intentionally edits `tracking_tag` so it differs from `resolved_tracking_tag`.
 - Clearing a previously resolved tag resets the row to the marketplace site-primary tag.
 

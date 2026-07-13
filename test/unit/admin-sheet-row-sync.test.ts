@@ -265,7 +265,7 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("writes the current website tag back for the same agent without choosing another agent mapping", async () => {
+  it("writes a website-renamed tag back for the same agent without choosing another agent mapping", async () => {
     await env.DB.prepare(
       `INSERT INTO agents (id, slug, name, is_active)
        VALUES (502, 'other-agent', 'Other Agent', 1)`
@@ -273,9 +273,7 @@ describe("admin sheet row sync", () => {
     await env.DB.prepare(
       `INSERT INTO tracking_ids (
          id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
-       ) VALUES
-         (5004, 501, 'admin-us-live-20', 'US', 1, 0, 1),
-         (5005, 502, 'other-agent-20', 'US', 1, 0, 1)`
+       ) VALUES (5005, 502, 'other-agent-20', 'US', 1, 0, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
@@ -284,8 +282,11 @@ describe("admin sheet row sync", () => {
     await env.DB.prepare(
       `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
        VALUES
-         (501, 6006, 5004, 1),
+         (501, 6006, 5001, 1),
          (502, 6006, 5005, 1)`
+    ).run();
+    await env.DB.prepare(
+      "UPDATE tracking_ids SET tag = 'admin-us-live-20' WHERE id = 5001"
     ).run();
 
     const result = await syncAdminSheetRows({
@@ -299,6 +300,7 @@ describe("admin sheet row sync", () => {
           marketplace: "US",
           trackingTag: "admin-us-20",
           previousResolvedTrackingTag: "admin-us-20",
+          previousAgentSlug: "adminsheet",
           customTitle: null,
         },
       ],
@@ -308,6 +310,7 @@ describe("admin sheet row sync", () => {
       rowNumber: 7,
       status: "existing",
       resolvedTrackingTag: "admin-us-live-20",
+      bridgePageUrl: "https://dealsrky.com/adminsheet/us/B0TAGLIVE1",
     });
 
     const mapping = await env.DB.prepare(
@@ -315,7 +318,7 @@ describe("admin sheet row sync", () => {
        FROM agent_products
        WHERE agent_id = 501 AND product_id = 6006`
     ).first<{ tracking_id: number }>();
-    expect(mapping?.tracking_id).toBe(5004);
+    expect(mapping?.tracking_id).toBe(5001);
   });
 
   it("fetches a missing product once and returns generated links", async () => {
