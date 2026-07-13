@@ -1,3 +1,4 @@
+import { derivePublicSlugFromTrackingTag } from "../../shared/tracking-slug";
 import { ensurePublicSlugAlias } from "./public-slugs";
 
 interface ExistingTrackingRow {
@@ -118,13 +119,15 @@ export async function replaceSingleTrackingForAgentMarketplace(input: {
 
   const savedTrackingId = keepId;
 
+  const defaultPublicSlug = derivePublicSlugFromTrackingTag(input.tag);
+
   await ensurePublicSlugAlias({
     db: input.db,
     agentId: input.agentId,
     trackingId: savedTrackingId,
     marketplace: input.marketplace,
-    fallbackSlug: input.tag,
-    preferredAlias: input.aliasSlug?.trim() || input.tag,
+    fallbackSlug: defaultPublicSlug,
+    preferredAlias: input.aliasSlug?.trim() || defaultPublicSlug,
   });
 
   const saved = await input.db

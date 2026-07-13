@@ -12,6 +12,7 @@ import {
   type AgentActivityFilter,
 } from "../../utils/agents";
 import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
+import { derivePublicSlugFromTrackingTag } from "../../../shared/tracking-slug";
 
 const MARKETPLACES = ["US", "CA", "UK", "DE", "IT", "FR", "ES"] as const;
 
@@ -1147,10 +1148,7 @@ export default function AgentsPage() {
                               onChange={(event) =>
                                 setTagForm((current) => {
                                   const nextTag = event.target.value;
-                                  const previousDefaultSlug = current.tag
-                                    .trim()
-                                    .toLowerCase()
-                                    .replace(/[^a-z0-9-]/g, "");
+                                  const previousDefaultSlug = derivePublicSlugFromTrackingTag(current.tag);
                                   const shouldFollowTag =
                                     !current.alias_slug || current.alias_slug === previousDefaultSlug;
 
@@ -1158,7 +1156,7 @@ export default function AgentsPage() {
                                     ...current,
                                     tag: nextTag,
                                     alias_slug: shouldFollowTag
-                                      ? nextTag.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+                                      ? derivePublicSlugFromTrackingTag(nextTag)
                                       : current.alias_slug,
                                   };
                                 })
@@ -1207,7 +1205,7 @@ export default function AgentsPage() {
                                   alias_slug: event.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""),
                                 }))
                               }
-                              placeholder="agent-us"
+                              placeholder="agent-name"
                             />
                           </div>
                         </div>

@@ -208,7 +208,7 @@ describe("Portal Tracking API", () => {
         tag: "alias-agent-uk-new-21",
         is_default: 1,
         is_portal_editable: 0,
-        slug: "alias-agent-uk-new-21",
+        slug: "alias-agent-uk-new",
       },
     ]);
 

@@ -3,6 +3,7 @@ import { getAuthToken } from "../../utils/auth-session";
 import { copyTextToClipboard } from "../../utils/clipboard";
 import { buildMarketplaceReadyLinkTemplate } from "../../utils/public-links";
 import { extractApiErrorMessage } from "../../utils/api-errors";
+import { derivePublicSlugFromTrackingTag } from "../../../shared/tracking-slug";
 
 const getToken = () => getAuthToken();
 
@@ -334,10 +335,7 @@ export default function TrackingPage() {
                 value={form.tag}
                 onChange={(event) => {
                   const nextTag = event.target.value;
-                  const previousDefaultSlug = form.tag
-                    .trim()
-                    .toLowerCase()
-                    .replace(/[^a-z0-9-]/g, "");
+                  const previousDefaultSlug = derivePublicSlugFromTrackingTag(form.tag);
                   const shouldFollowTag =
                     !form.alias_slug || form.alias_slug === previousDefaultSlug;
 
@@ -345,7 +343,7 @@ export default function TrackingPage() {
                     ...form,
                     tag: nextTag,
                     alias_slug: shouldFollowTag
-                      ? nextTag.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+                      ? derivePublicSlugFromTrackingTag(nextTag)
                       : form.alias_slug,
                   });
                 }}
@@ -368,10 +366,10 @@ export default function TrackingPage() {
                 className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
                 value={form.alias_slug}
                 onChange={e => setForm({...form, alias_slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "")})}
-                placeholder="agent-it or agent-us"
+                placeholder="agent-name"
               />
               <p className="mt-2 text-xs text-[#8b8ba7] leading-relaxed m-0">
-                By default this stays identical to the tracking tag. Only an admin can change it.
+                By default this uses the tag name before the Amazon -20/-21 suffix. Only an admin can change it.
               </p>
             </div>
             <div className="flex items-end h-full mb-[0.125rem]">

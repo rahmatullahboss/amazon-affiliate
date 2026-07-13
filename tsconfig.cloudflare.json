@@ -6,6 +6,7 @@
     "app/**/.server/**/*",
     "app/**/.client/**/*",
     "server/**/*",
+    "shared/**/*",
     "workers/**/*",
     "worker-configuration.d.ts"
   ],

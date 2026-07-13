@@ -7,6 +7,7 @@ import {
   requireSitePrimaryTrackingTarget,
   remapAgentTrackingToSitePrimary,
 } from '../services/site-primary-remap';
+import { derivePublicSlugFromTrackingTag } from '../../shared/tracking-slug';
 import { replaceSingleTrackingForAgentMarketplace } from '../services/single-tracking';
 
 const tracking = new Hono<AppEnv>();
@@ -53,7 +54,7 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
       marketplace: data.marketplace,
       tag: data.tag,
       label: data.label || null,
-      aliasSlug: data.alias_slug || data.tag,
+      aliasSlug: data.alias_slug || null,
       isSitePrimary: data.is_site_primary,
     });
 
@@ -61,7 +62,7 @@ tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
       trackingId,
       message: existing
         ? 'Tracking switched to the latest tag. Duplicate rows were removed and linked products now use this tag.'
-        : 'Tracking tag created. Public slug matches the tracking tag by default.',
+        : 'Tracking tag created. Public slug uses the readable part before the Amazon -20/-21 suffix.',
     }, existing ? 200 : 201);
   } catch (error: unknown) {
     if (error instanceof HTTPException) throw error;
@@ -107,11 +108,13 @@ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
 
   const nextTag = body.tag ?? current.tag;
   const nextLabel = body.label !== undefined ? body.label : current.label;
-  const aliasWasFollowingTag = !current.alias_slug || current.alias_slug === current.tag.toLowerCase();
+  const currentDefaultAlias = derivePublicSlugFromTrackingTag(current.tag);
+  const nextDefaultAlias = derivePublicSlugFromTrackingTag(nextTag);
+  const aliasWasFollowingTag = !current.alias_slug || current.alias_slug === currentDefaultAlias;
   const nextAlias = body.alias_slug !== undefined
-    ? body.alias_slug || nextTag
+    ? body.alias_slug || nextDefaultAlias
     : aliasWasFollowingTag
-      ? nextTag
+      ? nextDefaultAlias
       : current.alias_slug;
 
   try {
@@ -146,7 +149,7 @@ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
   ).bind(current.agent_id, current.marketplace).first();
   return c.json({
     trackingId: updated,
-    message: 'Tracking updated. Public slug follows the tracking tag unless admin sets a custom slug.',
+    message: 'Tracking updated. Public slug follows the tag name before the Amazon -20/-21 suffix unless admin sets a custom slug.',
   });
 });
 

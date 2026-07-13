@@ -151,7 +151,7 @@ describe("admin sheet row sync", () => {
       rowNumber: 8,
       status: "existing",
       resolvedTrackingTag: "new-agent-tag-20",
-      bridgePageUrl: "https://dealsrky.com/new-agent-tag-20/us/B0TAGNEW01",
+      bridgePageUrl: "https://dealsrky.com/new-agent-tag/us/B0TAGNEW01",
     });
 
     const switchedTracking = await env.DB.prepare(
@@ -190,7 +190,7 @@ describe("admin sheet row sync", () => {
     const alias = await env.DB.prepare(
       "SELECT slug FROM agent_slug_aliases WHERE tracking_id = 5001 AND marketplace = 'US'"
     ).first<{ slug: string }>();
-    expect(alias?.slug).toBe("new-agent-tag-20");
+    expect(alias?.slug).toBe("new-agent-tag");
   });
 
   it("auto-creates an agent and tag for a brand-new explicit sheet tag", async () => {
@@ -219,15 +219,15 @@ describe("admin sheet row sync", () => {
       rowNumber: 10,
       status: "existing",
       resolvedTrackingTag: "freshagent-20",
-      bridgePageUrl: "https://dealsrky.com/freshagent-20/us/B0NEWAUTO1",
+      bridgePageUrl: "https://dealsrky.com/freshagent/us/B0NEWAUTO1",
     });
 
     const agent = await env.DB.prepare(
-      "SELECT id, name, slug, is_active FROM agents WHERE slug = 'freshagent-20'"
+      "SELECT id, name, slug, is_active FROM agents WHERE slug = 'freshagent'"
     ).first<{ id: number; name: string; slug: string; is_active: number }>();
     expect(agent).toMatchObject({
       name: "freshagent-20",
-      slug: "freshagent-20",
+      slug: "freshagent",
       is_active: 1,
     });
 

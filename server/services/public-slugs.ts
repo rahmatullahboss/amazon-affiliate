@@ -27,7 +27,7 @@ export async function resolvePublicSlug(
   db: D1Database,
   slug: string
 ): Promise<ResolvedPublicSlug | null> {
-  const normalizedSlug = slug.trim();
+  const normalizedSlug = slug.trim().toLowerCase();
   if (!normalizedSlug) {
     return null;
   }
@@ -78,16 +78,44 @@ export async function resolvePublicSlug(
     .bind(normalizedSlug)
     .first<PublicSlugRow>();
 
-  if (!agentRow) {
+  if (agentRow) {
+    return {
+      agentId: agentRow.agent_id,
+      canonicalAgentSlug: agentRow.canonical_agent_slug,
+      publicSlug: agentRow.public_slug,
+      trackingId: null,
+      marketplace: null,
+    };
+  }
+
+  const legacyTrackingRow = await db
+    .prepare(
+      `SELECT
+         t.agent_id as agent_id,
+         a.slug as canonical_agent_slug,
+         lower(t.tag) as public_slug,
+         t.id as tracking_id,
+         t.marketplace as marketplace
+       FROM tracking_ids t
+       JOIN agents a ON a.id = t.agent_id
+       WHERE lower(t.tag) = ?
+         AND t.is_active = 1
+         AND a.is_active = 1
+       LIMIT 1`
+    )
+    .bind(normalizedSlug)
+    .first<PublicSlugRow>();
+
+  if (!legacyTrackingRow) {
     return null;
   }
 
   return {
-    agentId: agentRow.agent_id,
-    canonicalAgentSlug: agentRow.canonical_agent_slug,
-    publicSlug: agentRow.public_slug,
-    trackingId: null,
-    marketplace: null,
+    agentId: legacyTrackingRow.agent_id,
+    canonicalAgentSlug: legacyTrackingRow.canonical_agent_slug,
+    publicSlug: legacyTrackingRow.public_slug,
+    trackingId: legacyTrackingRow.tracking_id,
+    marketplace: legacyTrackingRow.marketplace,
   };
 }
 

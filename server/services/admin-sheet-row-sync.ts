@@ -1,3 +1,4 @@
+import { derivePublicSlugFromTrackingTag } from "../../shared/tracking-slug";
 import { CacheService } from "./cache";
 import { writeAuditLog } from "./audit-log";
 import { replaceSingleTrackingForAgentMarketplace } from "./single-tracking";
@@ -410,7 +411,7 @@ async function resolveOrCreateTrackingOwner(input: {
     marketplace: input.marketplace,
     tag: input.trackingTag,
     label: "Auto-created from Admin Sheet",
-    aliasSlug: input.trackingTag,
+    aliasSlug: derivePublicSlugFromTrackingTag(input.trackingTag),
   });
 
   const createdOwner = await findActiveTrackingOwnerByTag(
@@ -442,7 +443,7 @@ async function findOrCreateSheetAgent(
   db: D1Database,
   trackingTag: string
 ): Promise<AgentRow | null> {
-  const slug = trackingTag.toLowerCase().slice(0, 50);
+  const slug = derivePublicSlugFromTrackingTag(trackingTag).slice(0, 50);
   let agent = await db
     .prepare("SELECT id, name, slug, is_active FROM agents WHERE slug = ? LIMIT 1")
     .bind(slug)
