@@ -100,21 +100,21 @@ describe("Portal Tracking API", () => {
     }
   });
 
-  it("allows multiple portal-managed tags per marketplace", async () => {
-    await DbFactory.seedAgent(env.DB, 22, "multi-tag-agent", "Multi Tag Agent");
-    const token = await generateAgentToken(22, "multi-tag-agent", env.JWT_SECRET || "test-secret");
+  it("blocks agents from creating or editing tracking tags", async () => {
+    await DbFactory.seedAgent(env.DB, 22, "single-tag-agent", "Single Tag Agent");
+    const token = await generateAgentToken(22, "single-tag-agent", env.JWT_SECRET || "test-secret");
     const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
 
-    const firstResponse = await apiApp.fetch(
+    const response = await apiApp.fetch(
       new Request("http://localhost/api/portal/tracking", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: "Bearer " + token,
           "Content-Type": "application/json",
           Origin: "http://localhost",
         },
         body: JSON.stringify({
-          tag: "agent-us-primary-20",
+          tag: "single-tag-agent-20",
           label: "Primary",
           marketplace: "US",
         }),
@@ -123,57 +123,32 @@ describe("Portal Tracking API", () => {
       ctx as any
     );
 
-    const secondResponse = await apiApp.fetch(
-      new Request("http://localhost/api/portal/tracking", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          Origin: "http://localhost",
-        },
-        body: JSON.stringify({
-          tag: "agent-us-secondary-20",
-          label: "Secondary",
-          marketplace: "US",
-        }),
-      }),
-      env as any,
-      ctx as any
-    );
+    expect(response.status).toBe(403);
 
-    expect(firstResponse.status).toBe(201);
-    expect(secondResponse.status).toBe(201);
-
-    const { results } = await env.DB.prepare(
-      `SELECT tag, marketplace, is_default
-       FROM tracking_ids
-       WHERE agent_id = ?
-       ORDER BY created_at ASC`
+    const count = await env.DB.prepare(
+      "SELECT COUNT(*) AS count FROM tracking_ids WHERE agent_id = ?"
     )
       .bind(22)
-      .all<{ tag: string; marketplace: string; is_default: number }>();
+      .first<{ count: number }>();
 
-    expect(results).toHaveLength(2);
-    expect(results.every((row) => row.marketplace === "US")).toBe(true);
-    expect(results.filter((row) => row.is_default === 1)).toHaveLength(1);
-    expect(results[0]?.tag).toBe("agent-us-primary-20");
-    expect(results[1]?.tag).toBe("agent-us-secondary-20");
+    expect(count?.count).toBe(0);
   });
 
-  it("creates a marketplace slug alias automatically for portal-managed tags", async () => {
+  it("keeps one admin-managed tag and switches its public slug to the latest tracking", async () => {
     await DbFactory.seedAgent(env.DB, 23, "alias-agent", "Alias Agent");
-    const token = await generateAgentToken(23, "alias-agent", env.JWT_SECRET || "test-secret");
+    const adminToken = await generateAdminToken(env.JWT_SECRET || "test-secret");
     const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
 
-    const response = await apiApp.fetch(
-      new Request("http://localhost/api/portal/tracking", {
+    const firstResponse = await apiApp.fetch(
+      new Request("http://localhost/api/tracking", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: "Bearer " + adminToken,
           "Content-Type": "application/json",
           Origin: "http://localhost",
         },
         body: JSON.stringify({
+          agent_id: 23,
           tag: "alias-agent-uk-21",
           label: "UK",
           marketplace: "UK",
@@ -183,25 +158,64 @@ describe("Portal Tracking API", () => {
       ctx as any
     );
 
-    expect(response.status).toBe(201);
+    expect(firstResponse.status).toBe(201);
 
-    const tracking = await env.DB.prepare(
-      `SELECT id
-       FROM tracking_ids
-       WHERE agent_id = ? AND marketplace = ? AND tag = ?`
+    const firstTracking = await env.DB.prepare(
+      "SELECT id FROM tracking_ids WHERE agent_id = ? AND marketplace = ?"
     )
-      .bind(23, "UK", "alias-agent-uk-21")
+      .bind(23, "UK")
       .first<{ id: number }>();
 
-    const alias = await env.DB.prepare(
-      `SELECT slug
-       FROM agent_slug_aliases
-       WHERE tracking_id = ? AND marketplace = ?`
+    await env.DB.prepare(
+      "INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active) VALUES (923, 'B0SINGLE23', 'Single Tracking Product', 'https://img.test/single.jpg', 'UK', 'active', 1)"
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active) VALUES (23, 923, ?, 1)"
     )
-      .bind(tracking?.id ?? 0, "UK")
-      .first<{ slug: string }>();
+      .bind(firstTracking?.id)
+      .run();
 
-    expect(alias?.slug).toBe("alias-agent-uk");
+    const secondResponse = await apiApp.fetch(
+      new Request("http://localhost/api/tracking", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer " + adminToken,
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+        },
+        body: JSON.stringify({
+          agent_id: 23,
+          tag: "alias-agent-uk-new-21",
+          label: "UK Latest",
+          marketplace: "UK",
+        }),
+      }),
+      env as any,
+      ctx as any
+    );
+
+    expect(secondResponse.status).toBe(200);
+
+    const { results } = await env.DB.prepare(
+      "SELECT t.id, t.tag, t.is_default, t.is_portal_editable, asa.slug FROM tracking_ids t LEFT JOIN agent_slug_aliases asa ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace WHERE t.agent_id = ? AND t.marketplace = ?"
+    )
+      .bind(23, "UK")
+      .all<{ id: number; tag: string; is_default: number; is_portal_editable: number; slug: string | null }>();
+
+    expect(results).toEqual([
+      {
+        id: firstTracking?.id,
+        tag: "alias-agent-uk-new-21",
+        is_default: 1,
+        is_portal_editable: 0,
+        slug: "alias-agent-uk-new-21",
+      },
+    ]);
+
+    const mapping = await env.DB.prepare(
+      "SELECT tracking_id FROM agent_products WHERE agent_id = 23 AND product_id = 923"
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(firstTracking?.id);
   });
 
   it("returns live import capabilities for the portal products page", async () => {
@@ -581,7 +595,7 @@ describe("Portal Tracking API", () => {
     expect(updatedAlias?.slug).toBe("alias-admin-us-new");
   });
 
-  it("lets admin update portal edit access for an existing tag", async () => {
+  it("keeps tracking admin-only even when portal edit access is requested", async () => {
     await DbFactory.seedAgent(env.DB, 34, "portal-access-agent", "Portal Access Agent");
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active, is_portal_editable)
@@ -617,7 +631,7 @@ describe("Portal Tracking API", () => {
       .bind(709)
       .first<{ is_portal_editable: number }>();
 
-    expect(updatedTracking?.is_portal_editable).toBe(1);
+    expect(updatedTracking?.is_portal_editable).toBe(0);
   });
 
   it("lets admin replace the tracking tag while keeping the existing slug alias", async () => {
@@ -716,23 +730,20 @@ describe("Portal Tracking API", () => {
     );
   });
 
-  it("can switch the default tag within the same marketplace", async () => {
+  it("blocks agents from changing the admin-managed default tracking", async () => {
     await DbFactory.seedAgent(env.DB, 23, "default-switch-agent", "Default Switch Agent");
     const token = await generateAgentToken(23, "default-switch-agent", env.JWT_SECRET || "test-secret");
     const ctx = { passThroughOnException: () => {}, waitUntil: () => {} } as const;
 
     await env.DB.prepare(
-      `INSERT INTO tracking_ids (id, agent_id, tag, label, marketplace, is_default, is_active)
-       VALUES
-       (501, 23, 'default-switch-1-20', 'First', 'DE', 1, 1),
-       (502, 23, 'default-switch-2-20', 'Second', 'DE', 0, 1)`
+      "INSERT INTO tracking_ids (id, agent_id, tag, label, marketplace, is_default, is_active) VALUES (501, 23, 'default-switch-1-20', 'Primary', 'DE', 1, 1)"
     ).run();
 
     const response = await apiApp.fetch(
-      new Request("http://localhost/api/portal/tracking/502/default", {
+      new Request("http://localhost/api/portal/tracking/501/default", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: "Bearer " + token,
           Origin: "http://localhost",
         },
       }),
@@ -740,21 +751,15 @@ describe("Portal Tracking API", () => {
       ctx as any
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(403);
 
-    const { results } = await env.DB.prepare(
-      `SELECT id, is_default
-       FROM tracking_ids
-       WHERE agent_id = ? AND marketplace = 'DE'
-       ORDER BY id ASC`
+    const tracking = await env.DB.prepare(
+      "SELECT id, is_default FROM tracking_ids WHERE agent_id = ? AND marketplace = 'DE'"
     )
       .bind(23)
-      .all<{ id: number; is_default: number }>();
+      .first<{ id: number; is_default: number }>();
 
-    expect(results).toEqual([
-      { id: 501, is_default: 0 },
-      { id: 502, is_default: 1 },
-    ]);
+    expect(tracking).toEqual({ id: 501, is_default: 1 });
   });
 
   it("returns a marketplace-specific reason when live product data is unavailable", async () => {
@@ -972,11 +977,12 @@ describe("Portal Tracking API", () => {
   it("deletes a tag and remaps linked products to the marketplace site-primary tag even when queried with force", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 41, "force-delete-agent", "Force Delete Agent");
+    await DbFactory.seedAgent(env.DB, 43, "force-primary-agent", "Force Primary Agent");
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_site_primary, is_active)
        VALUES
          (741, 41, 'old-us-tag-20', 'US', 0, 0, 1),
-         (742, 41, 'default-us-tag-20', 'US', 1, 1, 1)`
+         (742, 43, 'default-us-tag-20', 'US', 1, 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
@@ -1012,7 +1018,7 @@ describe("Portal Tracking API", () => {
        WHERE id = 741`
     ).first<{ id: number }>();
 
-    expect(remapped).toEqual({ agent_id: 41, tracking_id: 742 });
+    expect(remapped).toEqual({ agent_id: 43, tracking_id: 742 });
     expect(deletedTag).toBeNull();
   });
 

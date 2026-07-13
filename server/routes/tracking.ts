@@ -3,59 +3,13 @@ import { HTTPException } from 'hono/http-exception';
 import { zValidator } from '@hono/zod-validator';
 import type { AppEnv } from '../utils/types';
 import { createTrackingIdSchema, updateTrackingIdSchema } from '../schemas';
-import { ensurePublicSlugAlias } from '../services/public-slugs';
 import {
   requireSitePrimaryTrackingTarget,
   remapAgentTrackingToSitePrimary,
 } from '../services/site-primary-remap';
+import { replaceSingleTrackingForAgentMarketplace } from '../services/single-tracking';
 
 const tracking = new Hono<AppEnv>();
-
-async function enforceSingleActiveTagForAgentMarketplace(
-  db: D1Database,
-  input: {
-    agentId: number;
-    marketplace: string;
-    keepTrackingId: number;
-  }
-) {
-  await db.prepare(
-    `UPDATE agent_products
-     SET tracking_id = ?,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE agent_id = ?
-       AND tracking_id IN (
-         SELECT id FROM tracking_ids
-         WHERE agent_id = ? AND marketplace = ? AND id != ?
-       )`
-  )
-    .bind(
-      input.keepTrackingId,
-      input.agentId,
-      input.agentId,
-      input.marketplace,
-      input.keepTrackingId
-    )
-    .run();
-
-  await db.prepare(
-    `UPDATE tracking_ids
-     SET is_active = 0,
-         is_default = 0
-     WHERE agent_id = ? AND marketplace = ? AND id != ?`
-  )
-    .bind(input.agentId, input.marketplace, input.keepTrackingId)
-    .run();
-
-  await db.prepare(
-    `UPDATE tracking_ids
-     SET is_active = 1,
-         is_default = 1
-     WHERE id = ?`
-  )
-    .bind(input.keepTrackingId)
-    .run();
-}
 
 /**
  * GET /api/tracking — List all tags with agent info
@@ -81,56 +35,34 @@ tracking.get('/', async (c) => {
 tracking.post('/', zValidator('json', createTrackingIdSchema), async (c) => {
   const data = c.req.valid('json');
 
-  const agent = await c.env.DB.prepare('SELECT id, slug FROM agents WHERE id = ? AND is_active = 1')
+  const agent = await c.env.DB.prepare('SELECT id FROM agents WHERE id = ? AND is_active = 1')
     .bind(data.agent_id)
-    .first<{ id: number; slug: string }>();
+    .first<{ id: number }>();
   if (!agent) throw new HTTPException(404, { message: 'Agent not found or inactive' });
 
+  const existing = await c.env.DB.prepare(
+    'SELECT id FROM tracking_ids WHERE agent_id = ? AND marketplace = ? LIMIT 1'
+  )
+    .bind(data.agent_id, data.marketplace)
+    .first<{ id: number }>();
+
   try {
-    await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_site_primary, is_active, is_portal_editable)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?)`
-    )
-      .bind(
-        data.agent_id,
-        data.tag,
-        data.label || null,
-        data.marketplace,
-        data.is_default ? 1 : 0,
-        data.is_site_primary ? 1 : 0,
-        data.is_portal_editable ? 1 : 0
-      )
-      .run();
-
-    const trackingId = await c.env.DB.prepare(
-      'SELECT * FROM tracking_ids WHERE agent_id = ? AND marketplace = ? AND tag = ? ORDER BY id DESC LIMIT 1'
-    )
-      .bind(data.agent_id, data.marketplace, data.tag)
-      .first<{ id: number; agent_id: number; marketplace: string }>();
-
-    if (!trackingId) {
-      throw new HTTPException(500, { message: 'Tracking tag was not saved.' });
-    }
-
-    await enforceSingleActiveTagForAgentMarketplace(c.env.DB, {
-      agentId: trackingId.agent_id,
-      marketplace: trackingId.marketplace,
-      keepTrackingId: trackingId.id,
-    });
-
-    await ensurePublicSlugAlias({
+    const trackingId = await replaceSingleTrackingForAgentMarketplace({
       db: c.env.DB,
-      agentId: trackingId.agent_id,
-      trackingId: trackingId.id,
-      marketplace: trackingId.marketplace,
-      fallbackSlug: agent.slug,
-      preferredAlias: data.alias_slug || null,
+      agentId: data.agent_id,
+      marketplace: data.marketplace,
+      tag: data.tag,
+      label: data.label || null,
+      aliasSlug: data.alias_slug || data.tag,
+      isSitePrimary: data.is_site_primary,
     });
 
     return c.json({
       trackingId,
-      message: 'Tag created. Other active tags for this agent + marketplace were turned off and linked products were moved to this tag.',
-    }, 201);
+      message: existing
+        ? 'Tracking switched to the latest tag. Duplicate rows were removed and linked products now use this tag.'
+        : 'Tracking tag created. Public slug matches the tracking tag by default.',
+    }, existing ? 200 : 201);
   } catch (error: unknown) {
     if (error instanceof HTTPException) throw error;
     if (error instanceof Error && error.message.includes('UNIQUE')) {
@@ -153,71 +85,45 @@ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
 
   const body = c.req.valid('json');
 
-  const current = await c.env.DB.prepare('SELECT * FROM tracking_ids WHERE id = ?')
-    .bind(id)
-    .first<{ id: number; agent_id: number; marketplace: string }>();
-  if (!current) throw new HTTPException(404, { message: 'Tag not found' });
-
-  const usage = await c.env.DB.prepare(
-    'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ? AND is_active = 1'
+  const current = await c.env.DB.prepare(
+    `SELECT t.id, t.agent_id, t.tag, t.label, t.marketplace, t.is_site_primary,
+            asa.slug as alias_slug
+     FROM tracking_ids t
+     LEFT JOIN agent_slug_aliases asa
+       ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
+     WHERE t.id = ?`
   )
     .bind(id)
-    .first<{ count: number }>();
+    .first<{
+      id: number;
+      agent_id: number;
+      tag: string;
+      label: string | null;
+      marketplace: string;
+      is_site_primary: number;
+      alias_slug: string | null;
+    }>();
+  if (!current) throw new HTTPException(404, { message: 'Tag not found' });
 
-  if (body.is_active === false && usage && usage.count > 0) {
-    throw new HTTPException(409, {
-      message: 'This tag is linked to active products. Replace or delete it first.',
-    });
-  }
-
-  const updates: string[] = [];
-  const values: (string | number | null)[] = [];
-
-  if (body.tag !== undefined) { updates.push('tag = ?'); values.push(body.tag); }
-  if (body.label !== undefined) { updates.push('label = ?'); values.push(body.label); }
-  if (body.is_default !== undefined) { updates.push('is_default = ?'); values.push(body.is_default ? 1 : 0); }
-  if (body.is_site_primary !== undefined) { updates.push('is_site_primary = ?'); values.push(body.is_site_primary ? 1 : 0); }
-  if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
-  if (body.is_portal_editable !== undefined) { updates.push('is_portal_editable = ?'); values.push(body.is_portal_editable ? 1 : 0); }
+  const nextTag = body.tag ?? current.tag;
+  const nextLabel = body.label !== undefined ? body.label : current.label;
+  const aliasWasFollowingTag = !current.alias_slug || current.alias_slug === current.tag.toLowerCase();
+  const nextAlias = body.alias_slug !== undefined
+    ? body.alias_slug || nextTag
+    : aliasWasFollowingTag
+      ? nextTag
+      : current.alias_slug;
 
   try {
-    if (updates.length > 0) {
-      values.push(id);
-      await c.env.DB.prepare(`UPDATE tracking_ids SET ${updates.join(', ')} WHERE id = ?`)
-        .bind(...values)
-        .run();
-    }
-
-    if (body.is_active !== false) {
-      await enforceSingleActiveTagForAgentMarketplace(c.env.DB, {
-        agentId: current.agent_id,
-        marketplace: current.marketplace,
-        keepTrackingId: current.id,
-      });
-    }
-
-    if (body.alias_slug !== undefined) {
-      const normalizedAliasSlug = body.alias_slug?.trim() || null;
-      if (normalizedAliasSlug) {
-        await c.env.DB.prepare(
-          `INSERT INTO agent_slug_aliases (agent_id, tracking_id, marketplace, slug, is_active)
-           VALUES (?, ?, ?, ?, 1)
-           ON CONFLICT(tracking_id, marketplace) DO UPDATE SET
-             slug = excluded.slug,
-             is_active = 1,
-             updated_at = CURRENT_TIMESTAMP`
-        )
-          .bind(current.agent_id, current.id, current.marketplace, normalizedAliasSlug)
-          .run();
-      } else {
-        await c.env.DB.prepare(
-          `DELETE FROM agent_slug_aliases
-           WHERE tracking_id = ? AND marketplace = ?`
-        )
-          .bind(current.id, current.marketplace)
-          .run();
-      }
-    }
+    await replaceSingleTrackingForAgentMarketplace({
+      db: c.env.DB,
+      agentId: current.agent_id,
+      marketplace: current.marketplace,
+      tag: nextTag,
+      label: nextLabel,
+      aliasSlug: nextAlias,
+      isSitePrimary: body.is_site_primary ?? (current.is_site_primary === 1),
+    });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('UNIQUE')) {
       throw new HTTPException(409, {
@@ -235,9 +141,13 @@ tracking.put('/:id', zValidator('json', updateTrackingIdSchema), async (c) => {
      JOIN agents a ON a.id = t.agent_id
      LEFT JOIN agent_slug_aliases asa
        ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
-     WHERE t.id = ?`
-  ).bind(id).first();
-  return c.json({ trackingId: updated, message: 'Tag updated. Single-tag mode is enforced for this agent + marketplace.' });
+     WHERE t.agent_id = ? AND t.marketplace = ?
+     LIMIT 1`
+  ).bind(current.agent_id, current.marketplace).first();
+  return c.json({
+    trackingId: updated,
+    message: 'Tracking updated. Public slug follows the tracking tag unless admin sets a custom slug.',
+  });
 });
 
 /**

@@ -539,9 +539,9 @@ export default function AgentsPage() {
               ? {
                   tag: tagForm.tag,
                   label: tagForm.label || null,
-                  is_default: tagForm.is_default,
-                  is_active: tagForm.is_active,
-                  is_portal_editable: tagForm.is_portal_editable,
+                  is_default: true,
+                  is_active: true,
+                  is_portal_editable: false,
                   alias_slug: tagForm.alias_slug || null,
                 }
               : {
@@ -549,8 +549,8 @@ export default function AgentsPage() {
                   tag: tagForm.tag,
                   label: tagForm.label || null,
                   marketplace: tagForm.marketplace,
-                  is_default: tagForm.is_default,
-                  is_portal_editable: tagForm.is_portal_editable,
+                  is_default: true,
+                  is_portal_editable: false,
                   alias_slug: tagForm.alias_slug || null,
                 }
           ),
@@ -1131,7 +1131,7 @@ export default function AgentsPage() {
                       <div>
                         <h3 className="m-0 text-lg font-bold text-[#f0f0f5]">Marketplace Tags</h3>
                         <p className="m-0 mt-1 text-sm text-[#8b8ba7]">
-                          Add tags manually, fix alias slugs, and control portal edit access.
+                          Keep one admin-managed tracking tag per marketplace and control its public slug.
                         </p>
                       </div>
                     </div>
@@ -1144,7 +1144,25 @@ export default function AgentsPage() {
                             <input
                               className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900] disabled:opacity-60"
                               value={tagForm.tag}
-                              onChange={(event) => setTagForm((current) => ({ ...current, tag: event.target.value }))}
+                              onChange={(event) =>
+                                setTagForm((current) => {
+                                  const nextTag = event.target.value;
+                                  const previousDefaultSlug = current.tag
+                                    .trim()
+                                    .toLowerCase()
+                                    .replace(/[^a-z0-9-]/g, "");
+                                  const shouldFollowTag =
+                                    !current.alias_slug || current.alias_slug === previousDefaultSlug;
+
+                                  return {
+                                    ...current,
+                                    tag: nextTag,
+                                    alias_slug: shouldFollowTag
+                                      ? nextTag.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+                                      : current.alias_slug,
+                                  };
+                                })
+                              }
                               required
                               placeholder="agent-name-20 or ?tag=agent-name-20"
                             />
@@ -1193,45 +1211,8 @@ export default function AgentsPage() {
                             />
                           </div>
                         </div>
-                        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-                          <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                            <input
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]"
-                              type="checkbox"
-                              checked={tagForm.is_default}
-                              onChange={(event) =>
-                                setTagForm((current) => ({ ...current, is_default: event.target.checked }))
-                              }
-                            />
-                            Default for this marketplace
-                          </label>
-                          <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                            <input
-                              className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]"
-                              type="checkbox"
-                              checked={tagForm.is_portal_editable}
-                              onChange={(event) =>
-                                setTagForm((current) => ({
-                                  ...current,
-                                  is_portal_editable: event.target.checked,
-                                }))
-                              }
-                            />
-                            Agent can edit in portal
-                          </label>
-                          {tagFormMode.type === "edit" ? (
-                            <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                              <input
-                                className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]"
-                                type="checkbox"
-                                checked={tagForm.is_active}
-                                onChange={(event) =>
-                                  setTagForm((current) => ({ ...current, is_active: event.target.checked }))
-                                }
-                              />
-                              Tag is active
-                            </label>
-                          ) : null}
+                        <div className="mt-4 rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+                          This marketplace keeps one active/default tracking tag. Adding a new one switches the existing record, and only admins can edit it.
                         </div>
                         {tagError ? <p className="text-red-500 text-sm m-0 mt-4">{tagError}</p> : null}
                         <div className="flex flex-col sm:flex-row gap-3 mt-4">

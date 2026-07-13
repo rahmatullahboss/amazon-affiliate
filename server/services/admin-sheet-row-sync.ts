@@ -1,5 +1,6 @@
 import { CacheService } from "./cache";
 import { writeAuditLog } from "./audit-log";
+import { replaceSingleTrackingForAgentMarketplace } from "./single-tracking";
 import {
   ensureProductRecord,
   refreshProductRecord,
@@ -244,12 +245,64 @@ async function resolveTrackingOwner(input: {
   productId: number | null;
 }): Promise<TrackingOwnerRow | null> {
   const requestedTag = normalizeTrackingTag(input.trackingTag);
+  const previousResolvedTag = normalizeTrackingTag(input.previousResolvedTrackingTag);
+  const previousAgentSlug = normalizeAgentSlug(input.previousAgentSlug);
+  const previousOwner = previousResolvedTag
+    ? await findTrackingOwnerByTag(input.db, input.marketplace, previousResolvedTag)
+    : null;
+  const previousAgent =
+    previousOwner === null && previousAgentSlug
+      ? await findAgentBySlug(input.db, previousAgentSlug)
+      : null;
+  const previousAgentId = previousOwner?.agent_id ?? previousAgent?.id ?? null;
+  const productTracking = input.productId
+    ? previousAgentId
+      ? await findProductTrackingOwnerForAgent(
+          input.db,
+          input.productId,
+          input.marketplace,
+          previousAgentId
+        )
+      : await findProductTrackingOwner(input.db, input.productId, input.marketplace)
+    : null;
+  const sheetChangedTag = previousResolvedTag !== null && requestedTag !== previousResolvedTag;
 
-  if (requestedTag) {
+  if (sheetChangedTag) {
+    if (!requestedTag) {
+      return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+    }
+
     return resolveOrCreateTrackingOwner({
       db: input.db,
       marketplace: input.marketplace,
       trackingTag: requestedTag,
+      preferredAgentId: previousAgentId ?? undefined,
+    });
+  }
+
+  if (requestedTag) {
+    // The sheet still contains its last confirmed value, so a changed website
+    // mapping/tag is authoritative and must be written back to the sheet.
+    if (
+      previousResolvedTag === requestedTag &&
+      productTracking &&
+      normalizeTrackingTag(productTracking.tracking_tag) !== requestedTag
+    ) {
+      return productTracking;
+    }
+
+    if (previousResolvedTag === requestedTag && !productTracking) {
+      const sitePrimary = await findSitePrimaryTrackingOwner(input.db, input.marketplace);
+      if (sitePrimary && normalizeTrackingTag(sitePrimary.tracking_tag) !== requestedTag) {
+        return sitePrimary;
+      }
+    }
+
+    return resolveOrCreateTrackingOwner({
+      db: input.db,
+      marketplace: input.marketplace,
+      trackingTag: requestedTag,
+      preferredAgentId: previousAgentId ?? undefined,
     });
   }
 
@@ -280,6 +333,7 @@ async function resolveOrCreateTrackingOwner(input: {
   db: D1Database;
   marketplace: string;
   trackingTag: string;
+  preferredAgentId?: number;
 }): Promise<TrackingOwnerRow | null> {
   const activeOwner = await findActiveTrackingOwnerByTag(
     input.db,
@@ -305,7 +359,11 @@ async function resolveOrCreateTrackingOwner(input: {
         .bind(existingOwner.agent_id)
         .run(),
       input.db
-        .prepare("UPDATE tracking_ids SET is_active = 1 WHERE id = ?")
+        .prepare(
+          `UPDATE tracking_ids
+           SET is_active = 1, is_default = 1, is_portal_editable = 0
+           WHERE id = ?`
+        )
         .bind(existingOwner.tracking_id)
         .run(),
     ]);
@@ -328,38 +386,32 @@ async function resolveOrCreateTrackingOwner(input: {
     );
   }
 
-  const agent = await findOrCreateSheetAgent(input.db, input.trackingTag);
+  const agent = input.preferredAgentId
+    ? await getOrReactivateAgentById(input.db, input.preferredAgentId)
+    : await findOrCreateSheetAgent(input.db, input.trackingTag);
   if (!agent) {
     throw new Error("Could not create or resolve an agent for this tracking tag.");
   }
 
-  const activeTagCount = await input.db
+  const previousTracking = await input.db
     .prepare(
-      `SELECT COUNT(*) AS count
+      `SELECT id
        FROM tracking_ids
-       WHERE agent_id = ?
-         AND marketplace = ?
-         AND is_active = 1`
+       WHERE agent_id = ? AND marketplace = ?
+       ORDER BY created_at DESC, id DESC
+       LIMIT 1`
     )
     .bind(agent.id, input.marketplace)
-    .first<{ count: number }>();
-  const isDefault = Number(activeTagCount?.count ?? 0) === 0 ? 1 : 0;
+    .first<{ id: number }>();
 
-  await input.db
-    .prepare(
-      `INSERT OR IGNORE INTO tracking_ids (
-         agent_id, tag, label, marketplace, is_default,
-         is_site_primary, is_active, is_portal_editable
-       ) VALUES (?, ?, ?, ?, ?, 0, 1, 1)`
-    )
-    .bind(
-      agent.id,
-      input.trackingTag,
-      "Auto-created from Admin Sheet",
-      input.marketplace,
-      isDefault
-    )
-    .run();
+  const savedTracking = await replaceSingleTrackingForAgentMarketplace({
+    db: input.db,
+    agentId: agent.id,
+    marketplace: input.marketplace,
+    tag: input.trackingTag,
+    label: "Auto-created from Admin Sheet",
+    aliasSlug: input.trackingTag,
+  });
 
   const createdOwner = await findActiveTrackingOwnerByTag(
     input.db,
@@ -371,14 +423,15 @@ async function resolveOrCreateTrackingOwner(input: {
   }
 
   await writeSheetAuditLogSafe(input.db, {
-    action: "sheet.tracking_tag.auto_created",
+    action: previousTracking ? "sheet.tracking_tag.switched" : "sheet.tracking_tag.auto_created",
     entityType: "tracking_id",
-    entityId: createdOwner.tracking_id,
+    entityId: savedTracking.id,
     details: {
       tag: input.trackingTag,
       marketplace: input.marketplace,
       agentId: createdOwner.agent_id,
       agentSlug: createdOwner.agent_slug,
+      replacedTrackingId: previousTracking?.id ?? null,
     },
   });
 
@@ -500,9 +553,11 @@ async function findTrackingOwnerByTag(
          t.id AS tracking_id,
          t.tag AS tracking_tag,
          a.id AS agent_id,
-         a.slug AS agent_slug
+         COALESCE(asa.slug, a.slug) AS agent_slug
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
+       LEFT JOIN agent_slug_aliases asa
+         ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
        WHERE t.tag = ?
          AND t.marketplace = ?
        LIMIT 1`
@@ -522,9 +577,11 @@ async function findActiveTrackingOwnerByTag(
          t.id AS tracking_id,
          t.tag AS tracking_tag,
          a.id AS agent_id,
-         a.slug AS agent_slug
+         COALESCE(asa.slug, a.slug) AS agent_slug
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
+       LEFT JOIN agent_slug_aliases asa
+         ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
        WHERE t.tag = ?
          AND t.marketplace = ?
          AND t.is_active = 1
@@ -545,9 +602,11 @@ async function findSitePrimaryTrackingOwner(
          t.id AS tracking_id,
          t.tag AS tracking_tag,
          a.id AS agent_id,
-         a.slug AS agent_slug
+         COALESCE(asa.slug, a.slug) AS agent_slug
        FROM tracking_ids t
        JOIN agents a ON a.id = t.agent_id
+       LEFT JOIN agent_slug_aliases asa
+         ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
        WHERE t.marketplace = ?
          AND t.is_site_primary = 1
          AND t.is_active = 1
@@ -570,10 +629,12 @@ async function findProductTrackingOwner(
          t.id AS tracking_id,
          t.tag AS tracking_tag,
          a.id AS agent_id,
-         a.slug AS agent_slug
+         COALESCE(asa.slug, a.slug) AS agent_slug
        FROM agent_products ap
        JOIN tracking_ids t ON t.id = ap.tracking_id
        JOIN agents a ON a.id = ap.agent_id
+       LEFT JOIN agent_slug_aliases asa
+         ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
        WHERE ap.product_id = ?
          AND t.marketplace = ?
          AND ap.is_active = 1
@@ -598,10 +659,12 @@ async function findProductTrackingOwnerForAgent(
          t.id AS tracking_id,
          t.tag AS tracking_tag,
          a.id AS agent_id,
-         a.slug AS agent_slug
+         COALESCE(asa.slug, a.slug) AS agent_slug
        FROM agent_products ap
        JOIN tracking_ids t ON t.id = ap.tracking_id
        JOIN agents a ON a.id = ap.agent_id
+       LEFT JOIN agent_slug_aliases asa
+         ON asa.tracking_id = t.id AND asa.marketplace = t.marketplace AND asa.is_active = 1
        WHERE ap.product_id = ?
          AND ap.agent_id = ?
          AND t.marketplace = ?

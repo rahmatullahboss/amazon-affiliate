@@ -329,7 +329,29 @@ export default function TrackingPage() {
             </div>
             <div>
               <label className="block text-sm text-[#a0a0b8] mb-1.5">Tag*</label>
-              <input className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]" value={form.tag} onChange={e => setForm({...form, tag: e.target.value})} required placeholder="agent-name-20 or ?tag=agent-name-20" />
+              <input
+                className="w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-lg text-[#f0f0f5] text-sm focus:outline-none focus:ring-2 focus:ring-[#ff9900]"
+                value={form.tag}
+                onChange={(event) => {
+                  const nextTag = event.target.value;
+                  const previousDefaultSlug = form.tag
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]/g, "");
+                  const shouldFollowTag =
+                    !form.alias_slug || form.alias_slug === previousDefaultSlug;
+
+                  setForm({
+                    ...form,
+                    tag: nextTag,
+                    alias_slug: shouldFollowTag
+                      ? nextTag.trim().toLowerCase().replace(/[^a-z0-9-]/g, "")
+                      : form.alias_slug,
+                  });
+                }}
+                required
+                placeholder="agent-name-20 or ?tag=agent-name-20"
+              />
               <p className="mt-2 text-xs text-[#8b8ba7] leading-relaxed m-0">
                 You can paste only the tag or the full tag format. The system stores the clean tag automatically.
               </p>
@@ -349,19 +371,12 @@ export default function TrackingPage() {
                 placeholder="agent-it or agent-us"
               />
               <p className="mt-2 text-xs text-[#8b8ba7] leading-relaxed m-0">
-                Optional marketplace-specific public slug. If set, links use this slug instead of the base agent slug.
+                By default this stays identical to the tracking tag. Only an admin can change it.
               </p>
             </div>
-            <div className="flex items-end gap-3 h-full mb-[0.125rem]">
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                  <input className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]" type="checkbox" checked={form.is_default} onChange={e => setForm({...form, is_default: e.target.checked})} />
-                  Set as default tag
-                </label>
-                <label className="flex items-center gap-2 text-sm text-[#a0a0b8] cursor-pointer">
-                  <input className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-[#ff9900] focus:ring-[#ff9900]" type="checkbox" checked={form.is_portal_editable} onChange={e => setForm({...form, is_portal_editable: e.target.checked})} />
-                  Agent can edit in portal
-                </label>
+            <div className="flex items-end h-full mb-[0.125rem]">
+              <div className="w-full rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+                One tracking tag is kept per agent and marketplace. Adding another tag switches the existing record automatically.
               </div>
             </div>
             <div className="col-span-1 sm:col-span-2 mt-2">

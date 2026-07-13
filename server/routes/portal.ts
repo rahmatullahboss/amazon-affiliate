@@ -7,7 +7,7 @@ import {
   ASIN_IMPORT_PAUSED_MESSAGE,
   BATCH_ASIN_IMPORT_ENABLED,
 } from '../utils/asin-import';
-import { portalAsinSubmissionSchema, portalTrackingReplaceDeleteSchema, portalTrackingSetupSchema } from '../schemas';
+import { portalAsinSubmissionSchema, portalTrackingSetupSchema } from '../schemas';
 import { CacheService } from '../services/cache';
 import {
   ensureProductRecord,
@@ -20,56 +20,9 @@ import {
   buildCanonicalRedirectUrl,
   getPublicAppOrigin,
 } from '../utils/url';
-import { ensurePublicSlugAlias, getPublicSlugForTracking } from '../services/public-slugs';
+import { getPublicSlugForTracking } from '../services/public-slugs';
 
 const portal = new Hono<AppEnv>();
-
-async function ensureMarketplaceDefaultTag(
-  db: D1Database,
-  agentId: number,
-  marketplace: string,
-  preferredTrackingId?: number
-): Promise<void> {
-  if (preferredTrackingId) {
-    await db.prepare('UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?')
-      .bind(agentId, marketplace)
-      .run();
-
-    await db.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ? AND agent_id = ?')
-      .bind(preferredTrackingId, agentId)
-      .run();
-    return;
-  }
-
-  const existingDefault = await db.prepare(
-    `SELECT id
-     FROM tracking_ids
-     WHERE agent_id = ? AND marketplace = ? AND is_active = 1 AND is_default = 1
-     LIMIT 1`
-  )
-    .bind(agentId, marketplace)
-    .first<{ id: number }>();
-
-  if (existingDefault) {
-    return;
-  }
-
-  const fallbackTag = await db.prepare(
-    `SELECT id
-     FROM tracking_ids
-     WHERE agent_id = ? AND marketplace = ? AND is_active = 1
-     ORDER BY created_at ASC
-     LIMIT 1`
-  )
-    .bind(agentId, marketplace)
-    .first<{ id: number }>();
-
-  if (fallbackTag) {
-    await db.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ?')
-      .bind(fallbackTag.id)
-      .run();
-  }
-}
 
 portal.get('/me', async (c) => {
   const userId = c.get('userId');
@@ -456,13 +409,13 @@ portal.get('/tracking', async (c) => {
   const isAdminRole = role === 'admin' || role === 'super_admin';
 
   if (!isAdminRole && (role !== 'agent' || !agentId)) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
+    throw new HTTPException(403, { message: 'Only linked agent accounts can view tracking' });
   }
 
   const { results } = await c.env.DB.prepare(
     `SELECT tracking_ids.id, tracking_ids.agent_id, tracking_ids.tag, tracking_ids.label,
             tracking_ids.marketplace, tracking_ids.is_default, tracking_ids.is_active,
-            tracking_ids.is_portal_editable, tracking_ids.created_at,
+            0 as is_portal_editable, tracking_ids.created_at,
             a.name as agent_name, a.slug as agent_slug,
             (
               SELECT COUNT(*)
@@ -490,357 +443,38 @@ portal.get('/tracking', async (c) => {
       usage_count: number;
     }>();
 
-  return c.json({ trackingIds: results ?? [], canCreate: !isAdminRole });
+  return c.json({ trackingIds: results ?? [], canCreate: false });
 });
 
-portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async (c) => {
-  const role = c.get('userRole');
-  const agentId = c.get('agentId');
-
-  if (role !== 'agent' || !agentId) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
-  }
-
-  const body = c.req.valid('json');
-
-  try {
-    const marketplaceTagCount = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS count
-       FROM tracking_ids
-       WHERE agent_id = ? AND marketplace = ? AND is_active = 1`
-    )
-      .bind(agentId, body.marketplace)
-      .first<{ count: number }>();
-
-    const shouldBeDefault = (marketplaceTagCount?.count ?? 0) === 0;
-
-    const insertResult = await c.env.DB.prepare(
-      `INSERT INTO tracking_ids (agent_id, tag, label, marketplace, is_default, is_active, is_portal_editable)
-       VALUES (?, ?, ?, ?, ?, 1, 1)`
-    )
-      .bind(agentId, body.tag, body.label || null, body.marketplace, shouldBeDefault ? 1 : 0)
-      .run();
-
-    const trackingIdValue = Number(insertResult.meta.last_row_id);
-    if (shouldBeDefault && Number.isFinite(trackingIdValue)) {
-      await ensureMarketplaceDefaultTag(c.env.DB, agentId, body.marketplace, trackingIdValue);
-    }
-
-    if (Number.isFinite(trackingIdValue)) {
-      const agent = await c.env.DB.prepare(
-        `SELECT slug
-         FROM agents
-         WHERE id = ?`
-      )
-        .bind(agentId)
-        .first<{ slug: string }>();
-
-      if (agent?.slug) {
-        await ensurePublicSlugAlias({
-          db: c.env.DB,
-          agentId,
-          trackingId: trackingIdValue,
-          marketplace: body.marketplace,
-          fallbackSlug: agent.slug,
-        });
-      }
-    }
-
-    const trackingId = await c.env.DB.prepare(
-      `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at
-       FROM tracking_ids
-       WHERE id = ? AND agent_id = ?`
-    )
-      .bind(trackingIdValue, agentId)
-      .first();
-
-    return c.json(
-      {
-        trackingId,
-        message: shouldBeDefault
-          ? 'Tag saved successfully and set as default for this marketplace.'
-          : 'Tag saved successfully',
-      },
-      201
-    );
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      throw new HTTPException(409, {
-        message:
-          'This tag is already assigned to another account. Use a different tag or ask admin to move it to this agent.',
-      });
-    }
-
-    throw error;
-  }
-});
-
-portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async (c) => {
-  const role = c.get('userRole');
-  const agentId = c.get('agentId');
-  const isAdminRole = role === 'admin' || role === 'super_admin';
-  const id = Number.parseInt(c.req.param('id'), 10);
-
-  if (!isAdminRole && (role !== 'agent' || !agentId)) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
-  }
-
-  if (Number.isNaN(id)) {
-    throw new HTTPException(400, { message: 'Invalid tag ID' });
-  }
-
-  const body = c.req.valid('json');
-
-  const current = await c.env.DB.prepare(
-    `SELECT id, agent_id, marketplace, is_portal_editable
-     FROM tracking_ids
-     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
-  )
-    .bind(...(isAdminRole ? [id] : [id, agentId]))
-    .first<{ id: number; agent_id: number; marketplace: string; is_portal_editable: number }>();
-
-  if (!current) {
-    throw new HTTPException(404, { message: 'Tag not found' });
-  }
-
-  if (current.is_portal_editable !== 1) {
-    throw new HTTPException(403, {
-      message: 'This tag is admin-managed and read-only in the agent portal.',
-    });
-  }
-
-  try {
-    await c.env.DB.prepare(
-      `UPDATE tracking_ids
-       SET tag = ?, label = ?, is_active = 1
-       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
-    )
-      .bind(...(isAdminRole ? [body.tag, body.label || null, id] : [body.tag, body.label || null, id, agentId]))
-      .run();
-
-    const trackingId = await c.env.DB.prepare(
-      `SELECT id, tag, label, marketplace, is_default, is_active, is_portal_editable, created_at
-       FROM tracking_ids
-       WHERE id = ? AND agent_id = ?`
-    )
-      .bind(...(isAdminRole ? [id] : [id, agentId]))
-      .first();
-
-    await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace);
-
-    return c.json({ trackingId, message: 'Tag updated successfully' });
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes('UNIQUE')) {
-      throw new HTTPException(409, {
-        message:
-          'This tag is already assigned to another account. Use a different tag or ask admin to move it to this agent.',
-      });
-    }
-
-    throw error;
-  }
-});
-
-portal.post('/tracking/:id/default', async (c) => {
-  const role = c.get('userRole');
-  const agentId = c.get('agentId');
-  const isAdminRole = role === 'admin' || role === 'super_admin';
-  const id = Number.parseInt(c.req.param('id'), 10);
-
-  if (!isAdminRole && (role !== 'agent' || !agentId)) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
-  }
-
-  if (Number.isNaN(id)) {
-    throw new HTTPException(400, { message: 'Invalid tag ID' });
-  }
-
-  const current = await c.env.DB.prepare(
-    `SELECT id, agent_id, marketplace, is_portal_editable
-     FROM tracking_ids
-     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'} AND is_active = 1`
-  )
-    .bind(...(isAdminRole ? [id] : [id, agentId]))
-    .first<{ id: number; agent_id: number; marketplace: string; is_portal_editable: number }>();
-
-  if (!current) {
-    throw new HTTPException(404, { message: 'Tag not found' });
-  }
-
-  if (current.is_portal_editable !== 1) {
-    throw new HTTPException(403, {
-      message: 'This tag is admin-managed and read-only in the agent portal.',
-    });
-  }
-
-  await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace, current.id);
-
-  const trackingId = await c.env.DB.prepare(
-    `SELECT id, tag, label, marketplace, is_default, is_active, created_at
-     FROM tracking_ids
-     WHERE id = ? AND agent_id = ?`
-  )
-    .bind(...(isAdminRole ? [id] : [id, agentId]))
-    .first();
-
-  return c.json({ trackingId, message: 'Default tag updated successfully' });
-});
-
-portal.delete('/tracking/:id', async (c) => {
-  const role = c.get('userRole');
-  const agentId = c.get('agentId');
-  const isAdminRole = role === 'admin' || role === 'super_admin';
-  const id = Number.parseInt(c.req.param('id'), 10);
-
-  if (!isAdminRole && (role !== 'agent' || !agentId)) {
-    throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
-  }
-
-  if (Number.isNaN(id)) {
-    throw new HTTPException(400, { message: 'Invalid tag ID' });
-  }
-
-  const current = await c.env.DB.prepare(
-    `SELECT id, agent_id, marketplace, is_default, is_portal_editable
-     FROM tracking_ids
-     WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
-  )
-    .bind(...(isAdminRole ? [id] : [id, agentId]))
-    .first<{ id: number; agent_id: number; marketplace?: string; is_default?: number; is_portal_editable?: number }>();
-
-  if (!current) {
-    throw new HTTPException(404, { message: 'Tag not found' });
-  }
-
-  if (current.is_portal_editable !== 1) {
-    throw new HTTPException(403, {
-      message: 'This tag is admin-managed and read-only in the agent portal.',
-    });
-  }
-
-  const usage = await c.env.DB.prepare(
-    'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ?'
-  )
-    .bind(id)
-    .first<{ count: number }>();
-
-  const cascade = c.req.query('cascade') === '1';
-  const usageCount = usage?.count ?? 0;
-
-  if (usageCount > 0 && !cascade) {
-    throw new HTTPException(409, {
-      message: 'This tag is already linked to products. Replace it or delete it with its linked products.',
-    });
-  }
-
-  if (usageCount > 0 && cascade) {
-    await c.env.DB.prepare('DELETE FROM agent_products WHERE tracking_id = ?').bind(id).run();
-  }
-
-  await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(id).run();
-
-  if (current.marketplace) {
-    await ensureMarketplaceDefaultTag(c.env.DB, current.agent_id, current.marketplace);
-  }
-
-  return c.json({
-    message:
-      usageCount > 0 && cascade
-        ? `Tag deleted successfully. Removed ${usageCount} linked product mapping${usageCount > 1 ? 's' : ''}.`
-        : 'Tag deleted successfully',
+portal.post('/tracking', zValidator('json', portalTrackingSetupSchema), async () => {
+  throw new HTTPException(403, {
+    message: 'Tracking is admin-managed. Ask an admin to add or change the tracking tag.',
   });
 });
 
-portal.post(
-  '/tracking/:id/replace-delete',
-  zValidator('json', portalTrackingReplaceDeleteSchema),
-  async (c) => {
-    const role = c.get('userRole');
-    const agentId = c.get('agentId');
-    const isAdminRole = role === 'admin' || role === 'super_admin';
-    const id = Number.parseInt(c.req.param('id'), 10);
+portal.put('/tracking/:id', zValidator('json', portalTrackingSetupSchema), async () => {
+  throw new HTTPException(403, {
+    message: 'Tracking is admin-managed. Use the admin tracking page to make this change.',
+  });
+});
 
-    if (!isAdminRole && (role !== 'agent' || !agentId)) {
-      throw new HTTPException(403, { message: 'Only linked agent accounts can manage tags' });
-    }
+portal.post('/tracking/:id/default', async () => {
+  throw new HTTPException(403, {
+    message: 'Tracking is admin-managed. Use the admin tracking page to make this change.',
+  });
+});
 
-    if (Number.isNaN(id)) {
-      throw new HTTPException(400, { message: 'Invalid tag ID' });
-    }
+portal.delete('/tracking/:id', async () => {
+  throw new HTTPException(403, {
+    message: 'Tracking is admin-managed. Use the admin tracking page to make this change.',
+  });
+});
 
-    const body = c.req.valid('json');
-
-    const current = await c.env.DB.prepare(
-      `SELECT id, agent_id, marketplace, is_default, is_portal_editable
-       FROM tracking_ids
-       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'}`
-    )
-      .bind(...(isAdminRole ? [id] : [id, agentId]))
-      .first<{ id: number; agent_id: number; marketplace: string; is_default: number; is_portal_editable: number }>();
-
-    if (!current) {
-      throw new HTTPException(404, { message: 'Tag not found' });
-    }
-
-    if (current.is_portal_editable !== 1) {
-      throw new HTTPException(403, {
-        message: 'This tag is admin-managed and read-only in the agent portal.',
-      });
-    }
-
-    const replacement = await c.env.DB.prepare(
-      `SELECT id, marketplace
-       FROM tracking_ids
-       WHERE id = ? ${isAdminRole ? '' : 'AND agent_id = ?'} AND is_active = 1`
-    )
-      .bind(...(isAdminRole ? [body.replacement_tracking_id] : [body.replacement_tracking_id, agentId]))
-      .first<{ id: number; marketplace: string }>();
-
-    if (!replacement || replacement.id === current.id) {
-      throw new HTTPException(400, { message: 'Select another active tag to replace this one.' });
-    }
-
-    if (replacement.marketplace !== current.marketplace) {
-      throw new HTTPException(400, {
-        message: `Replacement tag must be from the same marketplace (${current.marketplace}).`,
-      });
-    }
-
-    const usage = await c.env.DB.prepare(
-      'SELECT COUNT(*) as count FROM agent_products WHERE tracking_id = ?'
-    )
-      .bind(current.id)
-      .first<{ count: number }>();
-
-    const usageCount = usage?.count ?? 0;
-
-    await c.env.DB.prepare(
-      `UPDATE agent_products
-       SET tracking_id = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE tracking_id = ? AND agent_id = ?`
-    )
-      .bind(replacement.id, current.id, current.agent_id)
-      .run();
-
-    if (current.is_default) {
-      await c.env.DB.prepare(
-        'UPDATE tracking_ids SET is_default = 0 WHERE agent_id = ? AND marketplace = ?'
-      )
-        .bind(current.agent_id, current.marketplace)
-        .run();
-
-      await c.env.DB.prepare('UPDATE tracking_ids SET is_default = 1 WHERE id = ?')
-        .bind(replacement.id)
-        .run();
-    }
-
-    await c.env.DB.prepare('DELETE FROM tracking_ids WHERE id = ?').bind(current.id).run();
-
-    return c.json({
-      message: `Tag replaced and deleted successfully. Moved ${usageCount} linked product mapping${usageCount > 1 ? 's' : ''}.`,
-    });
-  }
-);
+portal.post('/tracking/:id/replace-delete', async () => {
+  throw new HTTPException(403, {
+    message: 'Tracking is admin-managed. Use the admin tracking page to make this change.',
+  });
+});
 
 portal.post('/products/submit', zValidator('json', portalAsinSubmissionSchema), async (c) => {
   const role = c.get('userRole');

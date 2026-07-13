@@ -57,8 +57,10 @@ export default function PortalTrackingPage() {
     }
 
     const data = (await response.json()) as { trackingIds: TrackingIdRow[]; canCreate?: boolean };
-    setTrackingIds(data.trackingIds);
-    setCanCreate(data.canCreate ?? true);
+    setTrackingIds(
+      data.trackingIds.map((trackingId) => ({ ...trackingId, is_portal_editable: 0 }))
+    );
+    setCanCreate(false);
   }
 
   useEffect(() => {

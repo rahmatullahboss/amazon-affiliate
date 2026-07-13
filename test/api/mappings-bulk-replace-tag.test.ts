@@ -40,6 +40,7 @@ describe("Mappings bulk-replace-tag API", () => {
   it("replaces the source tag on every matching mapping when no mapping_ids filter is provided", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 501, "bulk-replace-agent", "Bulk Replace Agent");
+    await DbFactory.seedAgent(env.DB, 517, "bulk-replace-target", "Bulk Replace Target");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES
@@ -51,14 +52,14 @@ describe("Mappings bulk-replace-tag API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (601, 501, 'replace-old-20', 'US', 1, 1),
-         (602, 501, 'replace-new-20', 'US', 0, 1)`
+         (602, 517, 'replace-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
        VALUES
          (401, 501, 701, 601, NULL, 1),
          (402, 501, 702, 601, NULL, 1),
-         (403, 501, 703, 602, NULL, 1)`
+         (403, 517, 703, 602, NULL, 1)`
     ).run();
 
     const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
@@ -79,7 +80,7 @@ describe("Mappings bulk-replace-tag API", () => {
     const { results } = await env.DB.prepare(
       `SELECT id, tracking_id
        FROM agent_products
-       WHERE agent_id = 501
+       WHERE agent_id = 517
        ORDER BY id ASC`
     ).all<{ id: number; tracking_id: number }>();
 
@@ -93,6 +94,7 @@ describe("Mappings bulk-replace-tag API", () => {
   it("only updates the mapping_ids that were explicitly selected", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 502, "filter-agent", "Filter Agent");
+    await DbFactory.seedAgent(env.DB, 518, "filter-target", "Filter Target");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES
@@ -104,7 +106,7 @@ describe("Mappings bulk-replace-tag API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (611, 502, 'filter-old-20', 'US', 1, 1),
-         (612, 502, 'filter-new-20', 'US', 0, 1)`
+         (612, 518, 'filter-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -131,22 +133,22 @@ describe("Mappings bulk-replace-tag API", () => {
     );
 
     const { results } = await env.DB.prepare(
-      `SELECT id, tracking_id
+      `SELECT id, agent_id, tracking_id
        FROM agent_products
-       WHERE agent_id = 502
        ORDER BY id ASC`
-    ).all<{ id: number; tracking_id: number }>();
+    ).all<{ id: number; agent_id: number; tracking_id: number }>();
 
     expect(results).toEqual([
-      { id: 411, tracking_id: 612 },
-      { id: 412, tracking_id: 612 },
-      { id: 413, tracking_id: 611 },
+      { id: 411, agent_id: 518, tracking_id: 612 },
+      { id: 412, agent_id: 518, tracking_id: 612 },
+      { id: 413, agent_id: 502, tracking_id: 611 },
     ]);
   });
 
   it("does not reactivate an inactive historical mapping during bulk replacement", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 503, "reactivate-agent", "Reactivate Agent");
+    await DbFactory.seedAgent(env.DB, 519, "reactivate-target", "Reactivate Target");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (721, 'B0BR000021', 'Historical Product', 'https://example.com/r.webp', 'US', 'active', 1)`
@@ -155,7 +157,7 @@ describe("Mappings bulk-replace-tag API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (621, 503, 'reactivate-old-20', 'US', 1, 1),
-         (622, 503, 'reactivate-new-20', 'US', 0, 1)`
+         (622, 519, 'reactivate-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -344,12 +346,13 @@ describe("Mappings bulk-replace-tag API", () => {
 
   it("rejects when the target tag is inactive", async () => {
     await DbFactory.seedAdmin(env.DB);
-    await DbFactory.seedAgent(env.DB, 509, "inactive-target-agent", "Inactive Target");
+    await DbFactory.seedAgent(env.DB, 509, "inactive-source-agent", "Inactive Source");
+    await DbFactory.seedAgent(env.DB, 520, "inactive-target-agent", "Inactive Target");
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (671, 509, 'active-source-20', 'US', 1, 1),
-         (672, 509, 'inactive-target-20', 'US', 0, 0)`
+         (672, 520, 'inactive-target-20', 'US', 1, 0)`
     ).run();
 
     const token = await generateAdminToken(env.JWT_SECRET || "test-secret");
@@ -371,6 +374,7 @@ describe("Mappings bulk-replace-tag API", () => {
   it("writes an audit log entry after a successful bulk replace", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 510, "audit-agent", "Audit Agent");
+    await DbFactory.seedAgent(env.DB, 521, "audit-target", "Audit Target");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (731, 'B0BR000031', 'Audit Product', 'https://example.com/a.webp', 'US', 'active', 1)`
@@ -379,7 +383,7 @@ describe("Mappings bulk-replace-tag API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
          (681, 510, 'audit-old-20', 'US', 1, 1),
-         (682, 510, 'audit-new-20', 'US', 0, 1)`
+         (682, 521, 'audit-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -423,7 +427,7 @@ describe("Mappings bulk-replace-tag API", () => {
     });
   });
 
-  it("replaces every matching mapping by tag name when mapping_ids are omitted", async () => {
+  it("skips tag-name replacement when the account has no matching replacement tag", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 511, "name-filter-agent", "Name Filter Agent");
     await env.DB.prepare(
@@ -434,9 +438,7 @@ describe("Mappings bulk-replace-tag API", () => {
     ).run();
     await env.DB.prepare(
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
-       VALUES
-         (691, 511, 'name-old-20', 'US', 1, 1),
-         (692, 511, 'name-new-20', 'US', 0, 1)`
+       VALUES (691, 511, 'name-old-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -457,9 +459,13 @@ describe("Mappings bulk-replace-tag API", () => {
 
     expect(response.status).toBe(200);
     const payload = (await response.json()) as {
-      summary?: { matched?: number; updated?: number };
+      summary?: { matched?: number; updated?: number; skippedMissingReplacement?: number };
     };
-    expect(payload.summary).toMatchObject({ matched: 2, updated: 2 });
+    expect(payload.summary).toMatchObject({
+      matched: 2,
+      updated: 0,
+      skippedMissingReplacement: 2,
+    });
 
     const { results } = await env.DB.prepare(
       `SELECT id, tracking_id
@@ -469,8 +475,8 @@ describe("Mappings bulk-replace-tag API", () => {
     ).all<{ id: number; tracking_id: number }>();
 
     expect(results).toEqual([
-      { id: 441, tracking_id: 692 },
-      { id: 442, tracking_id: 692 },
+      { id: 441, tracking_id: 691 },
+      { id: 442, tracking_id: 691 },
     ]);
   });
 });

@@ -131,7 +131,7 @@ describe("admin sheet row webhook", () => {
     expect(tracking?.tag).toBe("admin-us-20");
   });
 
-  it("keeps a non-blank sheet tag authoritative through the webhook", async () => {
+  it("uses the previous agent slug to write a website-renamed tag back to the sheet", async () => {
     await env.DB.prepare(
       `INSERT INTO agents (id, slug, name, is_active)
        VALUES (702, 'other-agent', 'Other Agent', 1)`
@@ -180,8 +180,8 @@ describe("admin sheet row webhook", () => {
       results: [
         {
           rowNumber: 2,
-          resolvedTrackingTag: "admin-us-20",
-          bridgePageUrl: "https://dealsrky.com/admin-us-20/us/B0WEBHK001",
+          resolvedTrackingTag: "admin-us-live-20",
+          bridgePageUrl: "https://dealsrky.com/adminsheet/us/B0WEBHK001",
         },
       ],
     });

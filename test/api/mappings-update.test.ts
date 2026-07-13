@@ -13,9 +13,10 @@ describe("Mappings update API", () => {
     await env.DB.prepare("DELETE FROM users").run();
   });
 
-  it("lets admin replace a product mapping with another active tag for the same agent", async () => {
+  it("rejects replacing a mapping with a tag owned by another account", async () => {
     await DbFactory.seedAdmin(env.DB);
     await DbFactory.seedAgent(env.DB, 41, "mapping-agent", "Mapping Agent");
+    await DbFactory.seedAgent(env.DB, 46, "mapping-target-agent", "Mapping Target Agent");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (901, 'B0MAP00001', 'Mapping Product', 'https://example.com/product.webp', 'US', 'active', 1)`
@@ -24,7 +25,7 @@ describe("Mappings update API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
        (801, 41, 'mapping-old-20', 'US', 1, 1),
-       (802, 41, 'mapping-new-20', 'US', 0, 1)`
+       (802, 46, 'mapping-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -37,27 +38,23 @@ describe("Mappings update API", () => {
       new Request("http://localhost/api/mappings/701", {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: "Bearer " + adminToken,
           "Content-Type": "application/json",
           Origin: "http://localhost",
         },
-        body: JSON.stringify({
-          tracking_id: 802,
-        }),
+        body: JSON.stringify({ tracking_id: 802 }),
       }),
       env as never,
       { waitUntil: () => undefined } as never
     );
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
 
     const mapping = await env.DB.prepare(
-      `SELECT tracking_id
-       FROM agent_products
-       WHERE id = 701`
-    ).first<{ tracking_id: number }>();
+      "SELECT agent_id, tracking_id FROM agent_products WHERE id = 701"
+    ).first<{ agent_id: number; tracking_id: number }>();
 
-    expect(mapping?.tracking_id).toBe(802);
+    expect(mapping).toEqual({ agent_id: 41, tracking_id: 801 });
   });
 
   it("lets admin toggle homepage visibility for a specific mapping", async () => {
@@ -157,9 +154,10 @@ describe("Mappings update API", () => {
     });
   });
 
-  it("bulk assigns one active tag across selected products for the same agent", async () => {
+  it("bulk assigns one account tracking tag across selected products", async () => {
     await DbFactory.seedAdmin(env.DB);
-    await DbFactory.seedAgent(env.DB, 42, "bulk-agent", "Bulk Agent");
+    await DbFactory.seedAgent(env.DB, 42, "bulk-source-agent", "Bulk Source Agent");
+    await DbFactory.seedAgent(env.DB, 47, "bulk-target-agent", "Bulk Target Agent");
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES
@@ -170,7 +168,7 @@ describe("Mappings update API", () => {
       `INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active)
        VALUES
        (811, 42, 'bulk-old-20', 'US', 1, 1),
-       (812, 42, 'bulk-new-20', 'US', 0, 1)`
+       (812, 47, 'bulk-new-20', 'US', 1, 1)`
     ).run();
     await env.DB.prepare(
       `INSERT INTO agent_products (id, agent_id, product_id, tracking_id, custom_title, is_active)
@@ -183,13 +181,13 @@ describe("Mappings update API", () => {
       new Request("http://localhost/api/mappings/bulk-assign", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${adminToken}`,
+          Authorization: "Bearer " + adminToken,
           "Content-Type": "application/json",
           Origin: "http://localhost",
         },
         body: JSON.stringify({
           product_ids: [911, 912],
-          agent_id: 42,
+          agent_id: 47,
           tracking_id: 812,
         }),
       }),
@@ -202,7 +200,7 @@ describe("Mappings update API", () => {
     const { results } = await env.DB.prepare(
       `SELECT product_id, tracking_id
        FROM agent_products
-       WHERE agent_id = 42
+       WHERE agent_id = 47 AND is_active = 1
        ORDER BY product_id ASC`
     ).all<{ product_id: number; tracking_id: number }>();
 

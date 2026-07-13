@@ -132,13 +132,16 @@ export async function ensurePublicSlugAlias(input: {
     .bind(input.trackingId, input.marketplace)
     .first<{ slug: string }>();
 
-  if (existingAlias?.slug) {
-    return existingAlias.slug;
-  }
-
   const normalizedPreferredAlias = input.preferredAlias
     ? normalizePublicSlugValue(input.preferredAlias)
     : "";
+
+  if (
+    existingAlias?.slug &&
+    (!normalizedPreferredAlias || existingAlias.slug === normalizedPreferredAlias)
+  ) {
+    return existingAlias.slug;
+  }
   const normalizedFallbackSlug = normalizePublicSlugValue(input.fallbackSlug);
   const marketplaceSuffix = input.marketplace.trim().toLowerCase();
   const baseAlias =

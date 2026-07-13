@@ -78,12 +78,7 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("switches a product to an existing active tag without renaming global tags", async () => {
-    await env.DB.prepare(
-      `INSERT INTO tracking_ids (
-         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
-       ) VALUES (5004, 501, 'admin-us-new-20', 'US', 0, 0, 1)`
-    ).run();
+  it("keeps the existing single tracking row when the sheet tag is unchanged", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (6005, 'B0TAGSYNC1', 'Tag Sync Product', 'https://img.test/tag-sync.jpg', 'US', 'active', 1)`
@@ -102,7 +97,7 @@ describe("admin sheet row sync", () => {
           rowNumber: 6,
           asin: "B0TAGSYNC1",
           marketplace: "US",
-          trackingTag: "admin-us-new-20",
+          trackingTag: "admin-us-20",
           previousResolvedTrackingTag: "admin-us-20",
           customTitle: null,
         },
@@ -112,21 +107,21 @@ describe("admin sheet row sync", () => {
     expect(result.results[0]).toMatchObject({
       rowNumber: 6,
       status: "existing",
-      resolvedTrackingTag: "admin-us-new-20",
+      resolvedTrackingTag: "admin-us-20",
     });
 
-    const tracking = await env.DB.prepare(
-      "SELECT tag FROM tracking_ids WHERE id = 5001"
-    ).first<{ tag: string }>();
-    expect(tracking?.tag).toBe("admin-us-20");
+    const { results } = await env.DB.prepare(
+      "SELECT id, tag FROM tracking_ids WHERE agent_id = 501 AND marketplace = 'US'"
+    ).all<{ id: number; tag: string }>();
+    expect(results).toEqual([{ id: 5001, tag: "admin-us-20" }]);
 
     const mapping = await env.DB.prepare(
       "SELECT tracking_id FROM agent_products WHERE agent_id = 501 AND product_id = 6005"
     ).first<{ tracking_id: number }>();
-    expect(mapping?.tracking_id).toBe(5004);
+    expect(mapping?.tracking_id).toBe(5001);
   });
 
-  it("creates a new agent and tag when an edited sheet tag does not exist", async () => {
+  it("switches the existing account to a new sheet tag without creating a duplicate account", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (6007, 'B0TAGNEW01', 'New Tag Product', 'https://img.test/new-tag.jpg', 'US', 'active', 1)`
@@ -159,47 +154,43 @@ describe("admin sheet row sync", () => {
       bridgePageUrl: "https://dealsrky.com/new-agent-tag-20/us/B0TAGNEW01",
     });
 
-    const previousTracking = await env.DB.prepare(
-      "SELECT tag FROM tracking_ids WHERE id = 5001"
-    ).first<{ tag: string }>();
-    expect(previousTracking?.tag).toBe("admin-us-20");
-
-    const createdAgent = await env.DB.prepare(
-      "SELECT id, name, slug, is_active FROM agents WHERE slug = 'new-agent-tag-20'"
-    ).first<{ id: number; name: string; slug: string; is_active: number }>();
-    expect(createdAgent).toMatchObject({
-      name: "new-agent-tag-20",
-      slug: "new-agent-tag-20",
-      is_active: 1,
-    });
-
-    const createdTracking = await env.DB.prepare(
-      `SELECT id, agent_id, tag, marketplace, is_active
+    const switchedTracking = await env.DB.prepare(
+      `SELECT id, agent_id, tag, marketplace, is_default, is_active, is_portal_editable
        FROM tracking_ids
-       WHERE tag = 'new-agent-tag-20'`
+       WHERE id = 5001`
     ).first<{
       id: number;
       agent_id: number;
       tag: string;
       marketplace: string;
+      is_default: number;
       is_active: number;
+      is_portal_editable: number;
     }>();
-    expect(createdTracking).toMatchObject({
-      agent_id: createdAgent?.id,
+    expect(switchedTracking).toMatchObject({
+      id: 5001,
+      agent_id: 501,
       tag: "new-agent-tag-20",
       marketplace: "US",
+      is_default: 1,
       is_active: 1,
+      is_portal_editable: 0,
     });
 
-    const newMapping = await env.DB.prepare(
-      "SELECT tracking_id FROM agent_products WHERE agent_id = ? AND product_id = 6007"
-    ).bind(createdAgent?.id).first<{ tracking_id: number }>();
-    expect(newMapping?.tracking_id).toBe(createdTracking?.id);
+    const duplicateAgent = await env.DB.prepare(
+      "SELECT id FROM agents WHERE slug = 'new-agent-tag-20'"
+    ).first<{ id: number }>();
+    expect(duplicateAgent).toBeNull();
 
-    const previousMapping = await env.DB.prepare(
+    const mapping = await env.DB.prepare(
       "SELECT tracking_id FROM agent_products WHERE agent_id = 501 AND product_id = 6007"
     ).first<{ tracking_id: number }>();
-    expect(previousMapping?.tracking_id).toBe(5001);
+    expect(mapping?.tracking_id).toBe(5001);
+
+    const alias = await env.DB.prepare(
+      "SELECT slug FROM agent_slug_aliases WHERE tracking_id = 5001 AND marketplace = 'US'"
+    ).first<{ slug: string }>();
+    expect(alias?.slug).toBe("new-agent-tag-20");
   });
 
   it("auto-creates an agent and tag for a brand-new explicit sheet tag", async () => {
@@ -280,7 +271,7 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("keeps a non-blank sheet tag authoritative instead of falling back to another website tag", async () => {
+  it("writes a website-renamed tag back for the same agent without choosing another agent mapping", async () => {
     await env.DB.prepare(
       `INSERT INTO agents (id, slug, name, is_active)
        VALUES (502, 'other-agent', 'Other Agent', 1)`
@@ -324,24 +315,16 @@ describe("admin sheet row sync", () => {
     expect(result.results[0]).toMatchObject({
       rowNumber: 7,
       status: "existing",
-      resolvedTrackingTag: "admin-us-20",
-      bridgePageUrl: "https://dealsrky.com/admin-us-20/us/B0TAGLIVE1",
+      resolvedTrackingTag: "admin-us-live-20",
+      bridgePageUrl: "https://dealsrky.com/adminsheet/us/B0TAGLIVE1",
     });
-
-    const createdAgent = await env.DB.prepare(
-      "SELECT id FROM agents WHERE slug = 'admin-us-20'"
-    ).first<{ id: number }>();
-    const createdTracking = await env.DB.prepare(
-      "SELECT id, agent_id FROM tracking_ids WHERE tag = 'admin-us-20'"
-    ).first<{ id: number; agent_id: number }>();
-    expect(createdTracking?.agent_id).toBe(createdAgent?.id);
 
     const mapping = await env.DB.prepare(
       `SELECT tracking_id
        FROM agent_products
-       WHERE agent_id = ? AND product_id = 6006`
-    ).bind(createdAgent?.id).first<{ tracking_id: number }>();
-    expect(mapping?.tracking_id).toBe(createdTracking?.id);
+       WHERE agent_id = 501 AND product_id = 6006`
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(5001);
   });
 
   it("fetches a missing product once and returns generated links", async () => {
