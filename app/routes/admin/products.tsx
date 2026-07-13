@@ -63,6 +63,11 @@ interface ProductPagination {
   totalPages: number;
 }
 
+interface ProductFetchOptions {
+  showLoading?: boolean;
+  preserveScroll?: boolean;
+}
+
 interface ProductSummary {
   totalProducts: number;
   activeProducts: number;
@@ -343,9 +348,17 @@ export default function ProductsPage() {
 
   async function fetchProducts(
     page = productPagination.page,
-    selectedMarketplace: ProductMarketplaceFilter = marketplaceFilter
+    selectedMarketplace: ProductMarketplaceFilter = marketplaceFilter,
+    options: ProductFetchOptions = {}
   ) {
-    setLoading(true);
+    const showLoading = options.showLoading !== false;
+    const scrollPosition =
+      options.preserveScroll && typeof window !== "undefined" ? window.scrollY : null;
+
+    if (showLoading) {
+      setLoading(true);
+    }
+
     try {
       const query = new URLSearchParams({
         page: String(page),
@@ -365,7 +378,17 @@ export default function ProductsPage() {
     } catch (requestError) {
       console.error(requestError);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
+
+      if (scrollPosition !== null) {
+        window.requestAnimationFrame(() => {
+          window.requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollPosition, behavior: "auto" });
+          });
+        });
+      }
     }
   }
 
@@ -490,7 +513,10 @@ export default function ProductsPage() {
 
       setSheetMessage(payload.message || "Product and its mappings deleted.");
       await fetchMappingAdminData();
-      await fetchProducts(productPagination.page);
+      await fetchProducts(productPagination.page, marketplaceFilter, {
+        showLoading: false,
+        preserveScroll: true,
+      });
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -534,7 +560,10 @@ export default function ProductsPage() {
       setSheetMessage(payload.message || "Selected products and their mappings deleted.");
       setSelectedProductIds([]);
       await fetchMappingAdminData();
-      await fetchProducts(productPagination.page);
+      await fetchProducts(productPagination.page, marketplaceFilter, {
+        showLoading: false,
+        preserveScroll: true,
+      });
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Failed to delete selected products");
     } finally {

@@ -244,66 +244,12 @@ async function resolveTrackingOwner(input: {
   productId: number | null;
 }): Promise<TrackingOwnerRow | null> {
   const requestedTag = normalizeTrackingTag(input.trackingTag);
-  const previousResolvedTag = normalizeTrackingTag(input.previousResolvedTrackingTag);
-  const previousAgentSlug = normalizeAgentSlug(input.previousAgentSlug);
-  const previousOwner = previousResolvedTag
-    ? await findTrackingOwnerByTag(input.db, input.marketplace, previousResolvedTag)
-    : null;
-  const previousAgent =
-    previousOwner === null && previousAgentSlug
-      ? await findAgentBySlug(input.db, previousAgentSlug)
-      : null;
-  const previousAgentId = previousOwner?.agent_id ?? previousAgent?.id ?? null;
-  const productTracking = input.productId
-    ? previousAgentId
-      ? await findProductTrackingOwnerForAgent(
-          input.db,
-          input.productId,
-          input.marketplace,
-          previousAgentId
-        )
-      : await findProductTrackingOwner(input.db, input.productId, input.marketplace)
-    : null;
-  const sheetChangedTag = previousResolvedTag !== null && requestedTag !== previousResolvedTag;
-
-  if (sheetChangedTag) {
-    if (!requestedTag) {
-      return findSitePrimaryTrackingOwner(input.db, input.marketplace);
-    }
-
-    // A sheet edit may switch the row to another tag or create a new one, but
-    // it never renames the previous global tracking record.
-    return resolveOrCreateTrackingOwner({
-      db: input.db,
-      marketplace: input.marketplace,
-      trackingTag: requestedTag,
-      preferredAgentId: previousAgentId,
-    });
-  }
 
   if (requestedTag) {
-    // When the sheet still contains the last confirmed value but the website
-    // mapping has changed, the website is authoritative and is written back.
-    if (
-      previousResolvedTag === requestedTag &&
-      productTracking &&
-      normalizeTrackingTag(productTracking.tracking_tag) !== requestedTag
-    ) {
-      return productTracking;
-    }
-
-    if (previousResolvedTag === requestedTag && !productTracking) {
-      const sitePrimary = await findSitePrimaryTrackingOwner(input.db, input.marketplace);
-      if (sitePrimary && normalizeTrackingTag(sitePrimary.tracking_tag) !== requestedTag) {
-        return sitePrimary;
-      }
-    }
-
     return resolveOrCreateTrackingOwner({
       db: input.db,
       marketplace: input.marketplace,
       trackingTag: requestedTag,
-      preferredAgentId: previousAgentId,
     });
   }
 
@@ -334,7 +280,6 @@ async function resolveOrCreateTrackingOwner(input: {
   db: D1Database;
   marketplace: string;
   trackingTag: string;
-  preferredAgentId: number | null;
 }): Promise<TrackingOwnerRow | null> {
   const activeOwner = await findActiveTrackingOwnerByTag(
     input.db,
@@ -383,9 +328,7 @@ async function resolveOrCreateTrackingOwner(input: {
     );
   }
 
-  const agent = input.preferredAgentId
-    ? await getOrReactivateAgentById(input.db, input.preferredAgentId)
-    : await findOrCreateSheetAgent(input.db, input.trackingTag);
+  const agent = await findOrCreateSheetAgent(input.db, input.trackingTag);
   if (!agent) {
     throw new Error("Could not create or resolve an agent for this tracking tag.");
   }

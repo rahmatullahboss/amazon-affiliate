@@ -409,6 +409,9 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
                 This link is tracked for the assigned agent. Final price, delivery,
                 availability, and reviews are always shown on the retailer page.
               </p>
+              <p className="mt-3 text-xs leading-5 text-gray-500">
+                {INLINE_AFFILIATE_DISCLOSURE}
+              </p>
             </div>
 
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -423,9 +426,6 @@ export default function BridgePage({ loaderData }: Route.ComponentProps) {
             </div>
             <p className="mt-4 text-sm leading-6 text-gray-600">
               {AMAZON_DESTINATION_NOTE}
-            </p>
-            <p className="mt-2 text-xs leading-5 text-gray-500">
-              {INLINE_AFFILIATE_DISCLOSURE}
             </p>
             <div className="mt-5">
               <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">

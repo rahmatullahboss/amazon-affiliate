@@ -126,7 +126,7 @@ describe("admin sheet row sync", () => {
     expect(mapping?.tracking_id).toBe(5004);
   });
 
-  it("creates a new tag for the existing agent without renaming the previous global tag", async () => {
+  it("creates a new agent and tag when an edited sheet tag does not exist", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
        VALUES (6007, 'B0TAGNEW01', 'New Tag Product', 'https://img.test/new-tag.jpg', 'US', 'active', 1)`
@@ -156,12 +156,22 @@ describe("admin sheet row sync", () => {
       rowNumber: 8,
       status: "existing",
       resolvedTrackingTag: "new-agent-tag-20",
+      bridgePageUrl: "https://dealsrky.com/new-agent-tag-20/us/B0TAGNEW01",
     });
 
     const previousTracking = await env.DB.prepare(
       "SELECT tag FROM tracking_ids WHERE id = 5001"
     ).first<{ tag: string }>();
     expect(previousTracking?.tag).toBe("admin-us-20");
+
+    const createdAgent = await env.DB.prepare(
+      "SELECT id, name, slug, is_active FROM agents WHERE slug = 'new-agent-tag-20'"
+    ).first<{ id: number; name: string; slug: string; is_active: number }>();
+    expect(createdAgent).toMatchObject({
+      name: "new-agent-tag-20",
+      slug: "new-agent-tag-20",
+      is_active: 1,
+    });
 
     const createdTracking = await env.DB.prepare(
       `SELECT id, agent_id, tag, marketplace, is_active
@@ -175,16 +185,21 @@ describe("admin sheet row sync", () => {
       is_active: number;
     }>();
     expect(createdTracking).toMatchObject({
-      agent_id: 501,
+      agent_id: createdAgent?.id,
       tag: "new-agent-tag-20",
       marketplace: "US",
       is_active: 1,
     });
 
-    const mapping = await env.DB.prepare(
+    const newMapping = await env.DB.prepare(
+      "SELECT tracking_id FROM agent_products WHERE agent_id = ? AND product_id = 6007"
+    ).bind(createdAgent?.id).first<{ tracking_id: number }>();
+    expect(newMapping?.tracking_id).toBe(createdTracking?.id);
+
+    const previousMapping = await env.DB.prepare(
       "SELECT tracking_id FROM agent_products WHERE agent_id = 501 AND product_id = 6007"
     ).first<{ tracking_id: number }>();
-    expect(mapping?.tracking_id).toBe(createdTracking?.id);
+    expect(previousMapping?.tracking_id).toBe(5001);
   });
 
   it("auto-creates an agent and tag for a brand-new explicit sheet tag", async () => {
@@ -265,7 +280,7 @@ describe("admin sheet row sync", () => {
     });
   });
 
-  it("writes a website-renamed tag back for the same agent without choosing another agent mapping", async () => {
+  it("keeps a non-blank sheet tag authoritative instead of falling back to another website tag", async () => {
     await env.DB.prepare(
       `INSERT INTO agents (id, slug, name, is_active)
        VALUES (502, 'other-agent', 'Other Agent', 1)`
@@ -309,16 +324,24 @@ describe("admin sheet row sync", () => {
     expect(result.results[0]).toMatchObject({
       rowNumber: 7,
       status: "existing",
-      resolvedTrackingTag: "admin-us-live-20",
-      bridgePageUrl: "https://dealsrky.com/adminsheet/us/B0TAGLIVE1",
+      resolvedTrackingTag: "admin-us-20",
+      bridgePageUrl: "https://dealsrky.com/admin-us-20/us/B0TAGLIVE1",
     });
+
+    const createdAgent = await env.DB.prepare(
+      "SELECT id FROM agents WHERE slug = 'admin-us-20'"
+    ).first<{ id: number }>();
+    const createdTracking = await env.DB.prepare(
+      "SELECT id, agent_id FROM tracking_ids WHERE tag = 'admin-us-20'"
+    ).first<{ id: number; agent_id: number }>();
+    expect(createdTracking?.agent_id).toBe(createdAgent?.id);
 
     const mapping = await env.DB.prepare(
       `SELECT tracking_id
        FROM agent_products
-       WHERE agent_id = 501 AND product_id = 6006`
-    ).first<{ tracking_id: number }>();
-    expect(mapping?.tracking_id).toBe(5001);
+       WHERE agent_id = ? AND product_id = 6006`
+    ).bind(createdAgent?.id).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(createdTracking?.id);
   });
 
   it("fetches a missing product once and returns generated links", async () => {
