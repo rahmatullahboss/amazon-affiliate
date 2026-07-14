@@ -367,7 +367,7 @@ function manualReconcile() {
   let total = 0;
 
   sheets.forEach((sheet) => {
-    const rowNumbers = getRowsWithAsin_(sheet);
+    const rowNumbers = getSubmittedRows_(sheet);
     total += rowNumbers.length;
     if (rowNumbers.length) {
       syncSelectedRows_(sheet, rowNumbers, { forceUpdateExisting: false });
@@ -376,8 +376,8 @@ function manualReconcile() {
 
   SpreadsheetApp.getUi().alert(
     total
-      ? "Reconciliation completed for " + total + " rows."
-      : "No ASIN rows found."
+      ? "Reconciliation completed for " + total + " submitted rows."
+      : "No submitted ASIN rows found. Mark submit as YES first."
   );
 }
 
@@ -650,14 +650,19 @@ function readSubmittableRows_(sheet, rowNumbers, options) {
 
     if (!asin || submit !== "YES") return;
 
+    const sheetTrackingTag = normalizeTrackingTag_(values[COLUMN.TRACKING_TAG - 1]);
+    const previousResolvedTrackingTag = normalizeTrackingTag_(
+      values[COLUMN.RESOLVED_TRACKING_TAG - 1]
+    );
+
     rows.push({
       rowNumber,
       asin,
       marketplace: sheetMarketplace || normalizeText_(values[COLUMN.MARKETPLACE - 1]).toUpperCase(),
-      trackingTag: normalizeTrackingTag_(values[COLUMN.TRACKING_TAG - 1]),
-      previousResolvedTrackingTag: normalizeTrackingTag_(
-        values[COLUMN.RESOLVED_TRACKING_TAG - 1]
-      ),
+      // A blank editable cell means "keep the last confirmed mapping", not
+      // "replace the website mapping with the marketplace default".
+      trackingTag: sheetTrackingTag || previousResolvedTrackingTag,
+      previousResolvedTrackingTag,
       previousAgentSlug: extractAgentSlug_(
         values[COLUMN.BRIDGE_PAGE_URL - 1] || values[COLUMN.STOREFRONT_URL - 1]
       ),
@@ -1038,9 +1043,12 @@ function extractAsin_(text) {
 
 function setupTrigger() {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const managedHandlerNames = new Set(["onAdminSheetEdit", "hourlyReconcile"]);
 
   ScriptApp.getProjectTriggers().forEach((trigger) => {
-    ScriptApp.deleteTrigger(trigger);
+    if (managedHandlerNames.has(trigger.getHandlerFunction())) {
+      ScriptApp.deleteTrigger(trigger);
+    }
   });
 
   ScriptApp.newTrigger("onAdminSheetEdit")
@@ -1054,6 +1062,6 @@ function setupTrigger() {
     .create();
 
   SpreadsheetApp.getUi().alert(
-    "Setup complete: immediate edit sync and hourly website-to-sheet reconciliation are ready."
+    "Setup complete: immediate edit sync and hourly website-to-sheet reconciliation are ready. Other project triggers were preserved."
   );
 }

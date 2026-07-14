@@ -78,6 +78,97 @@ describe("admin sheet row sync", () => {
     });
   });
 
+  it("preserves the existing mapping when the editable sheet tag is blank", async () => {
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (503, 'custom-owner', 'Custom Owner', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (5006, 503, 'custom-owner-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6010, 'B0BLANKTAG', 'Blank Tag Product', 'https://img.test/blank-tag.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (503, 6010, 5006, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 5,
+          asin: "B0BLANKTAG",
+          marketplace: "US",
+          trackingTag: "",
+          previousResolvedTrackingTag: "custom-owner-20",
+          previousAgentSlug: "custom-owner",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      status: "existing",
+      resolvedTrackingTag: "custom-owner-20",
+      bridgePageUrl: "https://dealsrky.com/custom-owner/us/B0BLANKTAG",
+    });
+
+    const mapping = await env.DB.prepare(
+      "SELECT agent_id, tracking_id FROM agent_products WHERE product_id = 6010 AND is_active = 1"
+    ).first<{ agent_id: number; tracking_id: number }>();
+    expect(mapping).toEqual({ agent_id: 503, tracking_id: 5006 });
+  });
+
+  it("recovers an existing website mapping when both sheet tracking fields are blank", async () => {
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (504, 'recovered-owner', 'Recovered Owner', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (5007, 504, 'recovered-owner-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6011, 'B0RECOVER1', 'Recovered Product', 'https://img.test/recovered.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (504, 6011, 5007, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 6,
+          asin: "B0RECOVER1",
+          marketplace: "US",
+          trackingTag: null,
+          previousResolvedTrackingTag: null,
+          previousAgentSlug: null,
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results[0]).toMatchObject({
+      status: "existing",
+      resolvedTrackingTag: "recovered-owner-20",
+      bridgePageUrl: "https://dealsrky.com/recovered-owner/us/B0RECOVER1",
+    });
+  });
+
   it("keeps the existing single tracking row when the sheet tag is unchanged", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)

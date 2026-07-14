@@ -258,23 +258,33 @@ async function resolveTrackingOwner(input: {
       ? await findAgentBySlug(input.db, previousAgentSlug)
       : null;
   const previousAgentId = previousOwner?.agent_id ?? previousAgent?.id ?? null;
-  const productTracking = input.productId
-    ? previousAgentId
-      ? await findProductTrackingOwnerForAgent(
-          input.db,
-          input.productId,
-          input.marketplace,
-          previousAgentId
-        )
-      : await findProductTrackingOwner(input.db, input.productId, input.marketplace)
-    : null;
-  const sheetChangedTag = previousResolvedTag !== null && requestedTag !== previousResolvedTag;
-
-  if (sheetChangedTag) {
-    if (!requestedTag) {
-      return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+  let productTracking: TrackingOwnerRow | null = null;
+  if (input.productId) {
+    if (previousAgentId) {
+      productTracking = await findProductTrackingOwnerForAgent(
+        input.db,
+        input.productId,
+        input.marketplace,
+        previousAgentId
+      );
     }
 
+    productTracking ??= await findProductTrackingOwner(
+      input.db,
+      input.productId,
+      input.marketplace
+    );
+  }
+
+  // Only a new, non-blank tag is an intentional sheet-side change. A blank
+  // tracking cell is treated as missing input so reconciliation cannot replace
+  // an existing website mapping with the marketplace default.
+  const sheetChangedTag =
+    requestedTag !== null &&
+    previousResolvedTag !== null &&
+    requestedTag !== previousResolvedTag;
+
+  if (sheetChangedTag) {
     return resolveOrCreateTrackingOwner({
       db: input.db,
       marketplace: input.marketplace,
@@ -309,7 +319,7 @@ async function resolveTrackingOwner(input: {
     });
   }
 
-  return findSitePrimaryTrackingOwner(input.db, input.marketplace);
+  return productTracking ?? findSitePrimaryTrackingOwner(input.db, input.marketplace);
 }
 
 function normalizeTrackingTag(value: string | null | undefined): string | null {
