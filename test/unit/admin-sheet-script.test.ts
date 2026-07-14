@@ -35,4 +35,13 @@ describe("admin Google Apps Script safety", () => {
     expect(manualReconcileSource).toContain("getSubmittedRows_(sheet)");
     expect(manualReconcileSource).not.toContain("getRowsWithAsin_(sheet)");
   });
+
+  it("includes a versioned system check for key, headers, triggers, and blank tags", () => {
+    expect(script).toContain('const SCRIPT_VERSION = "2026.07.14-safe-reconcile";');
+    expect(script).toContain("function runSystemCheck()");
+    expect(script).toContain("SHEET_SYNC_KEY is missing from Script Properties.");
+    expect(script).toContain("Header mismatch: ");
+    expect(script).toContain("Blank tracking + resolved tag protected: ");
+    expect(script).toContain("Blank tracking + blank resolved (default candidates): ");
+  });
 });

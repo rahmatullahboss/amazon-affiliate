@@ -14,6 +14,7 @@
 // Country-tab preparation never clears existing product rows.
 // =============================================================
 
+const SCRIPT_VERSION = "2026.07.14-safe-reconcile";
 const WEBHOOK_URL = "https://dealsrky.com/api/webhooks/sheet-row-sync";
 const AUTH_VALUE = PropertiesService.getScriptProperties().getProperty(
   ["SHEET", "SYNC", "KEY"].join("_")
@@ -76,6 +77,7 @@ function onOpen() {
     .addItem("Clear Failed Status — Current Tab", "clearFailedStatusCurrentTab")
     .addSeparator()
     .addItem("Show Summary", "showSummary")
+    .addItem("Run System Check", "runSystemCheck")
     .addItem("Hide New ASINs", "hideNewAsins")
     .addItem("Unhide New ASINs", "unhideNewAsins")
     .addItem("Setup Trigger", "setupTrigger")
@@ -591,6 +593,112 @@ function showSummary() {
   });
 
   SpreadsheetApp.getUi().alert(lines.join("\n"));
+}
+
+function runSystemCheck() {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const expectedHeaders = [
+    "asin",
+    "marketplace",
+    "tracking_tag",
+    "custom_title",
+    "submit",
+    "sync_status",
+    "product_title",
+    "bridge_page_url",
+    "storefront_url",
+    "redirect_url",
+    "order_link",
+    "resolved_tracking_tag",
+    "error_message",
+    "synced_at",
+  ];
+  const issues = [];
+  const details = [];
+  let protectedBlankTags = 0;
+  let defaultCandidates = 0;
+  let submittedRows = 0;
+
+  if (!AUTH_VALUE) {
+    issues.push("SHEET_SYNC_KEY is missing from Script Properties.");
+  }
+
+  Object.keys(COUNTRY_SHEET_MARKETPLACE).forEach((sheetName) => {
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      issues.push("Missing country tab: " + sheetName);
+      return;
+    }
+
+    const actualHeaders = sheet
+      .getRange(1, 1, 1, expectedHeaders.length)
+      .getDisplayValues()[0]
+      .map((value) => normalizeText_(value).toLowerCase());
+    const headerMatches = expectedHeaders.every(
+      (header, index) => actualHeaders[index] === header
+    );
+    if (!headerMatches) {
+      issues.push("Header mismatch: " + sheetName);
+    }
+
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return;
+
+    const values = sheet
+      .getRange(2, 1, lastRow - 1, COLUMN.SYNCED_AT)
+      .getDisplayValues();
+    values.forEach((row) => {
+      const asin = normalizeText_(row[COLUMN.ASIN - 1]);
+      const submit = normalizeText_(row[COLUMN.SUBMIT - 1]).toUpperCase();
+      if (!asin || submit !== "YES") return;
+
+      submittedRows += 1;
+      const trackingTag = normalizeTrackingTag_(row[COLUMN.TRACKING_TAG - 1]);
+      const resolvedTag = normalizeTrackingTag_(
+        row[COLUMN.RESOLVED_TRACKING_TAG - 1]
+      );
+
+      if (!trackingTag && resolvedTag) protectedBlankTags += 1;
+      if (!trackingTag && !resolvedTag) defaultCandidates += 1;
+    });
+  });
+
+  const managedTriggerCounts = {
+    onAdminSheetEdit: 0,
+    hourlyReconcile: 0,
+  };
+  ScriptApp.getProjectTriggers().forEach((trigger) => {
+    const handlerName = trigger.getHandlerFunction();
+    if (Object.prototype.hasOwnProperty.call(managedTriggerCounts, handlerName)) {
+      managedTriggerCounts[handlerName] += 1;
+    }
+  });
+
+  if (managedTriggerCounts.onAdminSheetEdit !== 1) {
+    issues.push(
+      "onAdminSheetEdit trigger count is " + managedTriggerCounts.onAdminSheetEdit + ". Run Setup Trigger."
+    );
+  }
+  if (managedTriggerCounts.hourlyReconcile !== 1) {
+    issues.push(
+      "hourlyReconcile trigger count is " + managedTriggerCounts.hourlyReconcile + ". Run Setup Trigger."
+    );
+  }
+
+  details.push("Script version: " + SCRIPT_VERSION);
+  details.push("Submitted rows: " + submittedRows);
+  details.push("Blank tracking + resolved tag protected: " + protectedBlankTags);
+  details.push("Blank tracking + blank resolved (default candidates): " + defaultCandidates);
+  details.push(
+    "Managed triggers: edit=" + managedTriggerCounts.onAdminSheetEdit +
+      ", hourly=" + managedTriggerCounts.hourlyReconcile
+  );
+
+  SpreadsheetApp.getUi().alert(
+    issues.length
+      ? "System Check: ACTION NEEDED\n\n" + issues.join("\n") + "\n\n" + details.join("\n")
+      : "System Check: OK\n\n" + details.join("\n")
+  );
 }
 
 function hideNewAsins() {
