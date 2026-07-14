@@ -108,6 +108,7 @@ async function resolveMappedProduct(input: {
       AND ap.is_active = 1
       AND p.is_active = 1
       AND p.status = 'active'
+      AND p.is_adult = 0
       AND p.asin = ?
       ${hasMarket ? 'AND p.marketplace = ?' : ''}
     ORDER BY p.created_at DESC
@@ -146,6 +147,7 @@ async function resolveMappedProducts(input: {
       AND ap.is_active = 1
       AND p.is_active = 1
       AND p.status = 'active'
+      AND p.is_adult = 0
       ${hasMarket ? 'AND p.marketplace = ?' : ''}
     ORDER BY p.created_at DESC
     LIMIT ? OFFSET ?

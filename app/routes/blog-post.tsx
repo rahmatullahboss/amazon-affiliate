@@ -162,6 +162,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
              AND marketplace = ?
              AND is_active = 1
              AND status = 'active'
+             AND is_adult = 0
            LIMIT 1`
         )
           .bind(row.generation_focus_asin, row.generation_marketplace)

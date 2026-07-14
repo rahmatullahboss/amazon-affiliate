@@ -259,6 +259,7 @@ async function selectTopic(db: D1Database): Promise<TopicSelection | null> {
        FROM products p
        WHERE p.is_active = 1
          AND p.status = 'active'
+         AND p.is_adult = 0
          AND NOT EXISTS (
            SELECT 1
            FROM blog_posts bp

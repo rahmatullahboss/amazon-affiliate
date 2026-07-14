@@ -27,6 +27,11 @@ import {
 } from '../services/product-ingestion';
 import { writeAuditLog } from '../services/audit-log';
 import { buildBlogImageUrl, buildStoredImageKey } from '../services/blog';
+import {
+  backfillMissingDefaultProductMappings,
+  ensureDefaultProductMapping,
+} from '../services/default-product-mapping';
+import { detectAdultProduct } from '../services/product-safety';
 
 const products = new Hono<AppEnv>();
 
@@ -59,6 +64,11 @@ products.get('/', async (c) => {
 
   const whereClause = whereConditions.length ? 'WHERE ' + whereConditions.join(' AND ') : '';
 
+  await backfillMissingDefaultProductMappings(
+    c.env.DB,
+    hasMarketplaceFilter ? marketplaceFilter : null
+  );
+
   const totalResult = await c.env.DB.prepare(`SELECT COUNT(*) as count FROM products ${whereClause}`)
     .bind(...whereParams)
     .first<{ count: number | string }>();
@@ -78,7 +88,13 @@ products.get('/', async (c) => {
          (SELECT COUNT(*) FROM clicks WHERE product_id = p.id) as total_clicks
        FROM products p
        ${whereClause}
-       ORDER BY p.created_at DESC
+       ORDER BY
+         CASE WHEN EXISTS (
+           SELECT 1 FROM agent_products ap_missing
+           WHERE ap_missing.product_id = p.id AND ap_missing.is_active = 1
+         ) THEN 1 ELSE 0 END ASC,
+         p.created_at DESC,
+         p.id ASC
        LIMIT ? OFFSET ?`
     )
       .bind(...whereParams, pageSize, offset)
@@ -89,6 +105,11 @@ products.get('/', async (c) => {
          SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as active_products,
          SUM(CASE WHEN status = 'pending_review' THEN 1 ELSE 0 END) as pending_review_products,
          SUM(CASE WHEN status = 'rejected' THEN 1 ELSE 0 END) as rejected_products,
+         SUM(CASE WHEN is_adult = 1 THEN 1 ELSE 0 END) as adult_blocked_products,
+         SUM(CASE WHEN NOT EXISTS (
+           SELECT 1 FROM agent_products ap_summary
+           WHERE ap_summary.product_id = products.id AND ap_summary.is_active = 1
+         ) THEN 1 ELSE 0 END) as missing_tracking_products,
          SUM(
            CASE
              WHEN title LIKE '%Amazon Product B0%'
@@ -107,6 +128,8 @@ products.get('/', async (c) => {
       active_products: number;
       pending_review_products: number;
       rejected_products: number;
+      adult_blocked_products: number;
+      missing_tracking_products: number;
       needs_refresh_products: number;
     }>(),
   ]);
@@ -118,6 +141,8 @@ products.get('/', async (c) => {
       activeProducts: summaryResult?.active_products ?? 0,
       pendingReviewProducts: summaryResult?.pending_review_products ?? 0,
       rejectedProducts: summaryResult?.rejected_products ?? 0,
+      adultBlockedProducts: summaryResult?.adult_blocked_products ?? 0,
+      missingTrackingProducts: summaryResult?.missing_tracking_products ?? 0,
       needsRefreshProducts: summaryResult?.needs_refresh_products ?? 0,
     },
     pagination: {
@@ -180,16 +205,36 @@ products.post('/', zValidator('json', createProductSchema), async (c) => {
   const data = c.req.valid('json');
 
   try {
+    const safety = detectAdultProduct({
+      title: data.title,
+      category: data.category,
+    });
+
     await c.env.DB.prepare(
-      `INSERT INTO products (asin, title, image_url, marketplace, category)
-       VALUES (?, ?, ?, ?, ?)`
+      `INSERT INTO products (
+         asin, title, image_url, marketplace, category, is_adult, adult_detection_reason
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(data.asin, data.title, data.image_url, data.marketplace, data.category || null)
+      .bind(
+        data.asin,
+        data.title,
+        data.image_url,
+        data.marketplace,
+        data.category || null,
+        safety.isAdult ? 1 : 0,
+        safety.reason
+      )
       .run();
 
     const product = await c.env.DB.prepare('SELECT * FROM products WHERE asin = ? AND marketplace = ?')
       .bind(data.asin, data.marketplace)
-      .first();
+      .first<{ id: number; marketplace: string } & Record<string, unknown>>();
+
+    if (!product) {
+      throw new Error('Product creation failed unexpectedly');
+    }
+
+    await ensureDefaultProductMapping(c.env.DB, product.id, product.marketplace);
 
     return c.json({ product, message: 'Product created successfully' }, 201);
   } catch (error: unknown) {
@@ -306,6 +351,8 @@ products.post('/fetch-asin', zValidator('json', fetchAsinSchema), async (c) => {
       requireRealProductData: true,
     });
 
+    await ensureDefaultProductMapping(c.env.DB, product.id, product.marketplace);
+
     return c.json({ product, message: 'Product fetched and saved' }, 201);
   } catch (error) {
     if (error instanceof HTTPException) throw error;
@@ -371,6 +418,19 @@ products.post('/bulk-import', zValidator('json', bulkAsinImportSchema), async (c
   } catch (error) {
     console.error('[Products] Bulk import error:', error);
     throw new HTTPException(500, { message: 'Bulk import failed. Try with fewer ASINs.' });
+  }
+
+  const productPlaceholders = uniqueAsins.map(() => '?').join(', ');
+  const productRows = await c.env.DB.prepare(
+    "SELECT id, marketplace FROM products WHERE marketplace = ? AND asin IN (" +
+      productPlaceholders +
+      ")"
+  )
+    .bind(marketplace, ...uniqueAsins)
+    .all<{ id: number; marketplace: string }>();
+
+  for (const product of productRows.results ?? []) {
+    await ensureDefaultProductMapping(c.env.DB, product.id, product.marketplace);
   }
 
   const created = results.filter(r => r.status === 'created').length;
@@ -666,8 +726,19 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
 
   const body = c.req.valid('json');
 
-  const product = await c.env.DB.prepare('SELECT asin, marketplace FROM products WHERE id = ?')
-    .bind(id).first<{ asin: string; marketplace: string }>();
+  const product = await c.env.DB.prepare(
+    'SELECT asin, marketplace, title, category, description, features, is_adult FROM products WHERE id = ?'
+  )
+    .bind(id)
+    .first<{
+      asin: string;
+      marketplace: string;
+      title: string;
+      category: string | null;
+      description: string | null;
+      features: string | null;
+      is_adult: number;
+    }>();
   if (!product) throw new HTTPException(404, { message: 'Product not found' });
 
   const relatedAgents = await c.env.DB.prepare(
@@ -691,6 +762,29 @@ products.put('/:id', zValidator('json', updateProductSchema), async (c) => {
   if (body.order_requirement !== undefined) { updates.push('order_requirement = ?'); values.push(body.order_requirement); }
   if (body.is_active !== undefined) { updates.push('is_active = ?'); values.push(body.is_active ? 1 : 0); }
   if (body.status !== undefined) { updates.push('status = ?'); values.push(body.status); }
+
+  if (body.is_adult !== undefined) {
+    updates.push('is_adult = ?');
+    values.push(body.is_adult ? 1 : 0);
+    updates.push('adult_detection_reason = ?');
+    values.push(body.is_adult ? 'Manually hidden by admin' : null);
+  } else if (
+    body.title !== undefined ||
+    body.category !== undefined ||
+    body.description !== undefined ||
+    body.features !== undefined
+  ) {
+    const safety = detectAdultProduct({
+      title: body.title ?? product.title,
+      category: body.category !== undefined ? body.category : product.category,
+      description: body.description !== undefined ? body.description : product.description,
+      features: body.features !== undefined ? body.features : product.features,
+    });
+    updates.push('is_adult = ?');
+    values.push(safety.isAdult ? 1 : 0);
+    updates.push('adult_detection_reason = ?');
+    values.push(safety.reason);
+  }
 
   if (updates.length === 0) {
     throw new HTTPException(400, { message: 'No fields to update' });

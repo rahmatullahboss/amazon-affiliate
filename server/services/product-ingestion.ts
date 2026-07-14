@@ -5,6 +5,7 @@ import {
   EDITORIAL_VARIANT_COUNT,
 } from "./product-editorial";
 import { fetchCreatorsProduct } from "./creators-api";
+import { detectAdultProduct } from "./product-safety";
 
 export interface AmazonProductData {
   title: string;
@@ -29,6 +30,8 @@ export interface ProductRecord {
   review_content?: string | null;
   product_images?: string | null;
   aplus_images?: string | null;
+  is_adult?: number;
+  adult_detection_reason?: string | null;
 }
 
 interface EnsureProductInput {
@@ -729,7 +732,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
   let product = await input.db
     .prepare(
-      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason
        FROM products
        WHERE asin = ? AND marketplace = ?`
     )
@@ -793,6 +796,12 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       description,
       features: resolvedFeatures,
     });
+    const safety = detectAdultProduct({
+      title,
+      category,
+      description,
+      features: resolvedFeatures,
+    });
 
     await input.db
       .prepare(
@@ -807,9 +816,11 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
            review_content,
            product_images,
            aplus_images,
+           is_adult,
+           adult_detection_reason,
            status,
            fetched_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         asin,
@@ -822,6 +833,8 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
         reviewContent,
         productImages,
         aplusImages,
+        safety.isAdult ? 1 : 0,
+        safety.reason,
         status,
         fetched ? new Date().toISOString() : null
       )
@@ -829,7 +842,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
     product = await input.db
       .prepare(
-        `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+        `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason
          FROM products
          WHERE asin = ? AND marketplace = ?`
       )
@@ -884,6 +897,22 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
       });
       updates.push("review_content = ?");
       values.push(resolvedReviewContent);
+      const safety = detectAdultProduct({
+        title: explicitTitle || product.title,
+        category: input.category !== undefined ? explicitCategory : product.category ?? null,
+        description:
+          input.description !== undefined
+            ? explicitDescription
+            : product.description ?? null,
+        features:
+          input.features !== undefined
+            ? input.features ?? []
+            : parseFeatureList(product.features),
+      });
+      updates.push("is_adult = ?");
+      values.push(safety.isAdult ? 1 : 0);
+      updates.push("adult_detection_reason = ?");
+      values.push(safety.reason);
     }
     if (input.productImages !== undefined) {
       updates.push("product_images = ?");
@@ -907,7 +936,7 @@ export async function ensureProductRecord(input: EnsureProductInput): Promise<Pr
 
       product = await input.db
         .prepare(
-          `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+          `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason
            FROM products
            WHERE id = ?`
         )
@@ -978,7 +1007,7 @@ export async function regenerateProductEditorialContent(input: {
 }): Promise<ProductRecord> {
   const product = await input.db
     .prepare(
-      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason
        FROM products
        WHERE id = ?`
     )
@@ -1003,7 +1032,7 @@ export async function regenerateProductEditorialContent(input: {
 
   const updated = await input.db
     .prepare(
-      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images
+      `SELECT id, asin, title, image_url, marketplace, category, status, description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason
        FROM products
        WHERE id = ?`
     )

@@ -127,7 +127,7 @@ async function syncAdminSheetRow(input: {
     let product = await input.db
       .prepare(
         `SELECT id, asin, title, image_url, marketplace, category, status,
-                description, features, review_content, product_images, aplus_images, is_active
+                description, features, review_content, product_images, aplus_images, is_adult, adult_detection_reason, is_active
          FROM products
          WHERE asin = ? AND marketplace = ?
          LIMIT 1`
@@ -211,6 +211,8 @@ async function syncAdminSheetRow(input: {
 
     const baseUrl = (input.publicAppUrl || "https://dealsrky.com").replace(/\/+$/, "");
     const marketplacePath = marketplace.toLowerCase();
+    const redirectUrl = baseUrl + "/go/" + tracking.agent_slug + "/" + marketplacePath + "/" + asin;
+    const isAdult = product.is_adult === 1;
 
     return {
       rowNumber: input.row.rowNumber,
@@ -218,10 +220,10 @@ async function syncAdminSheetRow(input: {
       marketplace,
       status: shouldRefreshExisting ? "updated" : existed ? "existing" : "live",
       productTitle: product.title,
-      bridgePageUrl: `${baseUrl}/${tracking.agent_slug}/${marketplacePath}/${asin}`,
-      storefrontUrl: `${baseUrl}/${tracking.agent_slug}`,
-      redirectUrl: `${baseUrl}/go/${tracking.agent_slug}/${marketplacePath}/${asin}`,
-      orderLink: `${baseUrl}/deals/${asin}`,
+      bridgePageUrl: isAdult ? null : baseUrl + "/" + tracking.agent_slug + "/" + marketplacePath + "/" + asin,
+      storefrontUrl: isAdult ? null : baseUrl + "/" + tracking.agent_slug,
+      redirectUrl,
+      orderLink: isAdult ? redirectUrl : baseUrl + "/deals/" + asin,
       resolvedTrackingTag: normalizeTrackingTag(tracking.tracking_tag),
       errorMessage: null,
       syncedAt,

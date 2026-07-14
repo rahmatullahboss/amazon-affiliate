@@ -58,7 +58,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   const { results: products } = await env.DB.prepare(`
     SELECT id, asin, title, image_url, category, description, price, original_price, rating
     FROM products
-    WHERE category = ? AND marketplace = ? AND is_active = 1 AND status = 'active'
+    WHERE category = ? AND marketplace = ? AND is_active = 1 AND status = 'active' AND is_adult = 0
     ORDER BY created_at DESC
   `).bind(category.name, selectedMarketplace).all<CategoryProduct>();
 

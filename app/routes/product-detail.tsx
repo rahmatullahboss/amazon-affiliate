@@ -83,7 +83,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
       `
         SELECT id, asin, title, image_url, category, marketplace, review_content, product_images, aplus_images
         FROM products
-        WHERE asin = ? AND is_active = 1 AND status = 'active'
+        WHERE asin = ? AND is_active = 1 AND status = 'active' AND is_adult = 0
         ORDER BY created_at DESC, id DESC
       `
     )
@@ -142,7 +142,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           `
             SELECT id, asin, title, image_url, category, marketplace
             FROM products
-            WHERE category = ? AND asin != ? AND is_active = 1 AND status = 'active'
+            WHERE category = ? AND asin != ? AND is_active = 1 AND status = 'active' AND is_adult = 0
             ORDER BY created_at DESC
             LIMIT 12
           `
@@ -151,7 +151,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
           `
             SELECT id, asin, title, image_url, category, marketplace
             FROM products
-            WHERE asin != ? AND is_active = 1 AND status = 'active'
+            WHERE asin != ? AND is_active = 1 AND status = 'active' AND is_adult = 0
             ORDER BY created_at DESC
             LIMIT 12
           `

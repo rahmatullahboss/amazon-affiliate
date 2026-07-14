@@ -84,6 +84,7 @@ export const updateProductSchema = z.object({
   features: z.array(z.string().min(1).max(280)).max(12).optional().nullable(),
   order_requirement: z.string().max(500).optional().nullable(),
   is_active: z.boolean().optional(),
+  is_adult: z.boolean().optional(),
   status: z.enum(PRODUCT_STATUSES).optional(),
 });
 

@@ -88,6 +88,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
        AND ap.is_active = 1
        AND p.is_active = 1
        AND p.status = 'active'
+       AND p.is_adult = 0
        AND t.is_active = 1
      ORDER BY ap.updated_at DESC, ap.id DESC`
   )

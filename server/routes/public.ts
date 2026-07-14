@@ -39,7 +39,7 @@ router.get("/products/featured", async (c) => {
       id, asin, title, image_url, category, 
       price, original_price, rating, description 
     FROM products 
-    WHERE is_active = 1 AND status = 'active'
+    WHERE is_active = 1 AND status = 'active' AND is_adult = 0
     ORDER BY created_at DESC
     LIMIT 8
   `).all();
@@ -57,7 +57,7 @@ router.get("/products/category/:slug", async (c) => {
       p.price, p.original_price, p.rating, p.description 
     FROM products p
     JOIN categories c ON p.category = c.name
-    WHERE p.is_active = 1 AND p.status = 'active' AND c.slug = ?
+    WHERE p.is_active = 1 AND p.status = 'active' AND p.is_adult = 0 AND c.slug = ?
     ORDER BY p.created_at DESC
   `).bind(slug).all();
 
@@ -75,14 +75,14 @@ router.get("/products", async (c) => {
       id, asin, title, image_url, category, 
       price, original_price, rating, description 
     FROM products 
-    WHERE is_active = 1 AND status = 'active'
+    WHERE is_active = 1 AND status = 'active' AND is_adult = 0
     ORDER BY created_at DESC
     LIMIT ? OFFSET ?
   `).bind(limit, offset).all();
 
   // Get total count
   const countResult = await c.env.DB.prepare(
-    "SELECT COUNT(*) as total FROM products WHERE is_active = 1 AND status = 'active'"
+    "SELECT COUNT(*) as total FROM products WHERE is_active = 1 AND status = 'active' AND is_adult = 0"
   ).first<{ total: number }>();
 
   return c.json({

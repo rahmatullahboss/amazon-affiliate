@@ -182,6 +182,16 @@ const loadBridgeResolution = async () => {
     throw redirect(storefrontPath);
   }
 
+  if (resolution.row.is_adult === 1) {
+    throw redirect(
+      buildCanonicalRedirectPath(
+        resolution.row.agent_slug,
+        resolution.row.asin,
+        resolution.resolvedMarketplace
+      )
+    );
+  }
+
   if (!country) {
     const canonicalLocation = buildCanonicalBridgeRedirectLocation(
       request.url,

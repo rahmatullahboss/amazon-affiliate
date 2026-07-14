@@ -24,6 +24,8 @@ interface Product {
   is_active: number;
   agent_count: number;
   total_clicks: number;
+  is_adult: number;
+  adult_detection_reason: string | null;
 }
 
 interface ProductMapping {
@@ -74,6 +76,8 @@ interface ProductSummary {
   pendingReviewProducts: number;
   rejectedProducts: number;
   needsRefreshProducts: number;
+  adultBlockedProducts: number;
+  missingTrackingProducts: number;
 }
 
 interface ImportResult {
@@ -138,6 +142,7 @@ interface ProductEditorForm {
   review_content: string;
   featuresText: string;
   order_requirement: string;
+  is_adult: boolean;
 }
 
 function analyzeBulkAsins(text: string) {
@@ -168,6 +173,8 @@ export default function ProductsPage() {
     pendingReviewProducts: 0,
     rejectedProducts: 0,
     needsRefreshProducts: 0,
+    adultBlockedProducts: 0,
+    missingTrackingProducts: 0,
   });
   const [productPagination, setProductPagination] = useState<ProductPagination>({
     page: 1,
@@ -203,6 +210,7 @@ export default function ProductsPage() {
     review_content: "",
     featuresText: "",
     order_requirement: "",
+    is_adult: false,
   });
   const [savingProductId, setSavingProductId] = useState<number | null>(null);
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
@@ -284,6 +292,7 @@ export default function ProductsPage() {
       review_content: product.review_content || "",
       featuresText: parseProductFeatures(product.features).join("\n"),
       order_requirement: product.order_requirement || "",
+      is_adult: product.is_adult === 1,
     });
     setError("");
     setSheetMessage("");
@@ -299,6 +308,7 @@ export default function ProductsPage() {
       review_content: "",
       featuresText: "",
       order_requirement: "",
+      is_adult: false,
     });
     setUploadingProductImage(false);
   }
@@ -602,6 +612,7 @@ export default function ProductsPage() {
           review_content: editorForm.review_content.trim() || null,
           features,
           order_requirement: editorForm.order_requirement.trim() || null,
+          is_adult: editorForm.is_adult,
         }),
       });
 
@@ -1378,6 +1389,25 @@ export default function ProductsPage() {
                 placeholder="Example: US only, minimum order 2, price under $30"
               />
             </div>
+            <div className="lg:col-span-2 rounded-xl border border-amber-500/25 bg-amber-500/10 p-4">
+              <label className="flex items-start gap-3 text-sm text-amber-100">
+                <input
+                  type="checkbox"
+                  checked={editorForm.is_adult}
+                  onChange={(event) =>
+                    setEditorForm((current) => ({ ...current, is_adult: event.target.checked }))
+                  }
+                  className="mt-0.5 h-4 w-4 rounded border-amber-300/40 bg-white/5 text-amber-500 focus:ring-amber-500"
+                />
+                <span>
+                  <strong className="block">Adult or sexually explicit product</strong>
+                  <span className="mt-1 block text-xs leading-relaxed text-amber-200/80">
+                    Keep tracking and the Amazon order redirect active, but hide the product from
+                    homepage, deals, categories, storefronts, blogs, Telegram lists, and bridge content.
+                  </span>
+                </span>
+              </label>
+            </div>
             <div>
               <label className="block text-sm text-[#a0a0b8] mb-1.5">Features</label>
               <textarea
@@ -1842,7 +1872,7 @@ export default function ProductsPage() {
         <p className="text-[#6b6b85] m-0">Loading...</p>
       ) : (
         <div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-7 gap-4 mb-6">
             {[
               {
                 label: "Total",
@@ -1863,6 +1893,16 @@ export default function ProductsPage() {
                 label: "Rejected",
                 value: productSummary.rejectedProducts,
                 tone: "text-red-400",
+              },
+              {
+                label: "Missing Tracking",
+                value: productSummary.missingTrackingProducts,
+                tone: "text-red-300",
+              },
+              {
+                label: "Adult Hidden",
+                value: productSummary.adultBlockedProducts,
+                tone: "text-amber-300",
               },
               {
                 label: "Needs Refresh",
@@ -2059,6 +2099,14 @@ export default function ProductsPage() {
                         className="px-2 py-0.5 rounded-full bg-red-500/15 text-red-300 text-xs font-bold"
                       >
                         inactive
+                      </span>
+                    ) : null}
+                    {product.is_adult === 1 ? (
+                      <span
+                        className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 text-xs font-bold"
+                        title={product.adult_detection_reason || "Hidden from public website"}
+                      >
+                        adult · public hidden
                       </span>
                     ) : null}
                   </div>

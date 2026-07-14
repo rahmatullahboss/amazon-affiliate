@@ -69,6 +69,7 @@ export interface AgentProductResolutionRow {
   tracking_tag: string;
   marketplace: string;
   custom_title: string | null;
+  is_adult: number;
 }
 
 export interface AgentProductResolution {
@@ -129,7 +130,7 @@ function isAmazonProductFetchError(
 const AGENT_PRODUCT_SELECT = `SELECT
   a.slug as agent_slug, a.name as agent_name, a.id as agent_id,
   p.asin, p.title as product_title, p.image_url, p.description, p.review_content, p.features,
-  p.product_images, p.aplus_images, p.id as product_id,
+  p.product_images, p.aplus_images, p.id as product_id, p.is_adult,
   t.tag as tracking_tag, t.marketplace,
   ap.custom_title
 FROM agent_products ap

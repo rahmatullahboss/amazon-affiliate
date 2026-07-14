@@ -50,11 +50,11 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   const [productsResult, countResult, categoriesResult] = await Promise.all([
     env.DB.prepare(`
       SELECT * FROM products
-      WHERE is_active = 1 AND status = 'active' AND marketplace = ?
+      WHERE is_active = 1 AND status = 'active' AND is_adult = 0 AND marketplace = ?
       ORDER BY created_at DESC LIMIT ? OFFSET ?
     `).bind(selectedMarketplace, limit, offset).all<DealsProduct>(),
     env.DB.prepare(`
-      SELECT COUNT(*) as total FROM products WHERE is_active = 1 AND status = 'active' AND marketplace = ?
+      SELECT COUNT(*) as total FROM products WHERE is_active = 1 AND status = 'active' AND is_adult = 0 AND marketplace = ?
     `).bind(selectedMarketplace).first<{ total: number }>(),
     env.DB.prepare(`
       SELECT name, slug FROM categories WHERE is_active = 1 ORDER BY display_order ASC

@@ -123,6 +123,10 @@ const handlePageRequest = async (c: Context<AppEnv>) => {
     throw new HTTPException(404, { message: 'Product page not found' });
   }
 
+  if (resolution.row.is_adult === 1) {
+    throw new HTTPException(404, { message: 'Product page not found' });
+  }
+
   const row = resolution.row;
   const resolvedMarketplace = resolution.resolvedMarketplace;
 

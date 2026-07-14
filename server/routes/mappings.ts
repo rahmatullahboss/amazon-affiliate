@@ -735,7 +735,7 @@ mappings.get('/links/:agentSlug', async (c) => {
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
      WHERE ap.agent_id = (SELECT id FROM agents WHERE slug = ?)
-       AND ap.is_active = 1 AND p.is_active = 1`
+       AND ap.is_active = 1 AND p.is_active = 1 AND p.is_adult = 0`
   )
     .bind(agentSlug)
     .all<{

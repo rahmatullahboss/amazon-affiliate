@@ -1102,4 +1102,61 @@ describe('Redirect Engine API', () => {
     const { results } = await env.DB.prepare('SELECT id FROM clicks').all<{ id: number }>();
     expect(results).toHaveLength(0);
   });
+
+  it('hides adult bridge content while keeping the tracked Amazon redirect active', async () => {
+    const agentId = 1701;
+
+    await DbFactory.seedAgent(env.DB, agentId, 'adult-agent', 'Adult Agent');
+    await env.DB.prepare(
+      "INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active, is_adult, adult_detection_reason) VALUES (1702, 'B0ADULT123', 'Adult Product', 'http://img.com/adult.jpg', 'UK', 'active', 1, 1, 'Test adult product')"
+    ).run();
+    await env.DB.prepare(
+      "INSERT INTO tracking_ids (id, agent_id, tag, marketplace, is_default, is_active) VALUES (1703, ?, 'adult-agent-21', 'UK', 1, 1)"
+    )
+      .bind(agentId)
+      .run();
+    await env.DB.prepare(
+      "INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active) VALUES (?, 1702, 1703, 1)"
+    )
+      .bind(agentId)
+      .run();
+
+    const bridgeResult = await bridgeLoader({
+      request: new Request('http://localhost/adult-agent/uk/B0ADULT123'),
+      params: { agent: 'adult-agent', country: 'uk', asin: 'B0ADULT123' },
+      context: {
+        cloudflare: {
+          env: env as unknown,
+          ctx: { waitUntil: () => undefined },
+        },
+      },
+    } as never).catch((value: unknown) => value);
+
+    expect(bridgeResult).toBeInstanceOf(Response);
+    expect((bridgeResult as Response).status).toBe(302);
+    expect((bridgeResult as Response).headers.get('Location')).toBe(
+      '/go/adult-agent/uk/B0ADULT123'
+    );
+
+    const pageResponse = await apiApp.fetch(
+      new Request('http://localhost/api/page/adult-agent/uk/B0ADULT123'),
+      env as never,
+      { waitUntil: () => undefined, passThroughOnException: () => undefined } as never
+    );
+    expect(pageResponse.status).toBe(404);
+
+    const redirectResponse = await apiApp.fetch(
+      new Request('http://localhost/go/adult-agent/uk/B0ADULT123', {
+        headers: { 'User-Agent': 'Mozilla/5.0 Adult redirect test' },
+      }),
+      env as never,
+      { waitUntil: () => undefined, passThroughOnException: () => undefined } as never
+    );
+
+    expect(redirectResponse.status).toBe(302);
+    expect(redirectResponse.headers.get('Location')).toContain(
+      'amazon.co.uk/dp/B0ADULT123'
+    );
+    expect(redirectResponse.headers.get('Location')).toContain('tag=adult-agent-21');
+  });
 });
