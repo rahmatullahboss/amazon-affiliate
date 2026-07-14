@@ -14,7 +14,7 @@
 // Country-tab preparation never clears existing product rows.
 // =============================================================
 
-const SCRIPT_VERSION = "2026.07.14-safe-reconcile";
+const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v2";
 const WEBHOOK_URL = "https://dealsrky.com/api/webhooks/sheet-row-sync";
 const AUTH_VALUE = PropertiesService.getScriptProperties().getProperty(
   ["SHEET", "SYNC", "KEY"].join("_")
@@ -615,9 +615,13 @@ function runSystemCheck() {
   ];
   const issues = [];
   const details = [];
+  const inputSheets = [];
   let protectedBlankTags = 0;
   let defaultCandidates = 0;
   let submittedRows = 0;
+  let missingMarketplaceRows = 0;
+  let invalidTrackingRows = 0;
+  let staleProcessingRows = 0;
 
   if (!AUTH_VALUE) {
     issues.push("SHEET_SYNC_KEY is missing from Script Properties.");
@@ -629,7 +633,13 @@ function runSystemCheck() {
       issues.push("Missing country tab: " + sheetName);
       return;
     }
+    inputSheets.push(sheet);
+  });
 
+  const newAsinsSheet = spreadsheet.getSheetByName(INPUT_SHEET_NAME);
+  if (newAsinsSheet) inputSheets.push(newAsinsSheet);
+
+  inputSheets.forEach((sheet) => {
     const actualHeaders = sheet
       .getRange(1, 1, 1, expectedHeaders.length)
       .getDisplayValues()[0]
@@ -638,30 +648,59 @@ function runSystemCheck() {
       (header, index) => actualHeaders[index] === header
     );
     if (!headerMatches) {
-      issues.push("Header mismatch: " + sheetName);
+      issues.push("Header mismatch: " + sheet.getName());
     }
 
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return;
 
+    const sheetMarketplace = getMarketplaceForSheet_(sheet);
     const values = sheet
       .getRange(2, 1, lastRow - 1, COLUMN.SYNCED_AT)
       .getDisplayValues();
     values.forEach((row) => {
       const asin = normalizeText_(row[COLUMN.ASIN - 1]);
+      if (!asin) return;
+
+      const status = normalizeText_(row[COLUMN.SYNC_STATUS - 1]);
+      const syncedAtText = normalizeText_(row[COLUMN.SYNCED_AT - 1]);
+      const syncedAtMs = Date.parse(syncedAtText);
+      if (
+        status === "Processing" &&
+        (!Number.isFinite(syncedAtMs) || Date.now() - syncedAtMs > 15 * 60 * 1000)
+      ) {
+        staleProcessingRows += 1;
+      }
+
       const submit = normalizeText_(row[COLUMN.SUBMIT - 1]).toUpperCase();
-      if (!asin || submit !== "YES") return;
+      if (submit !== "YES") return;
 
       submittedRows += 1;
+      const marketplace =
+        sheetMarketplace || normalizeText_(row[COLUMN.MARKETPLACE - 1]).toUpperCase();
       const trackingTag = normalizeTrackingTag_(row[COLUMN.TRACKING_TAG - 1]);
       const resolvedTag = normalizeTrackingTag_(
         row[COLUMN.RESOLVED_TRACKING_TAG - 1]
       );
 
+      if (!marketplace) missingMarketplaceRows += 1;
+      if (!isValidTrackingTag_(trackingTag) || !isValidTrackingTag_(resolvedTag)) {
+        invalidTrackingRows += 1;
+      }
       if (!trackingTag && resolvedTag) protectedBlankTags += 1;
       if (!trackingTag && !resolvedTag) defaultCandidates += 1;
     });
   });
+
+  if (missingMarketplaceRows > 0) {
+    issues.push("Submitted rows missing marketplace: " + missingMarketplaceRows);
+  }
+  if (invalidTrackingRows > 0) {
+    issues.push("Rows with invalid tracking-tag format: " + invalidTrackingRows);
+  }
+  if (staleProcessingRows > 0) {
+    issues.push("Rows stuck in Processing for over 15 minutes: " + staleProcessingRows);
+  }
 
   const managedTriggerCounts = {
     onAdminSheetEdit: 0,
@@ -689,6 +728,9 @@ function runSystemCheck() {
   details.push("Submitted rows: " + submittedRows);
   details.push("Blank tracking + resolved tag protected: " + protectedBlankTags);
   details.push("Blank tracking + blank resolved (default candidates): " + defaultCandidates);
+  details.push("Missing marketplace rows: " + missingMarketplaceRows);
+  details.push("Invalid tracking-tag rows: " + invalidTrackingRows);
+  details.push("Stale Processing rows: " + staleProcessingRows);
   details.push(
     "Managed triggers: edit=" + managedTriggerCounts.onAdminSheetEdit +
       ", hourly=" + managedTriggerCounts.hourlyReconcile
@@ -772,7 +814,9 @@ function readSubmittableRows_(sheet, rowNumbers, options) {
       trackingTag: sheetTrackingTag || previousResolvedTrackingTag,
       previousResolvedTrackingTag,
       previousAgentSlug: extractAgentSlug_(
-        values[COLUMN.BRIDGE_PAGE_URL - 1] || values[COLUMN.STOREFRONT_URL - 1]
+        values[COLUMN.BRIDGE_PAGE_URL - 1] ||
+          values[COLUMN.STOREFRONT_URL - 1] ||
+          values[COLUMN.REDIRECT_URL - 1]
       ),
       customTitle: normalizeText_(values[COLUMN.CUSTOM_TITLE - 1]),
       forceUpdateExisting: forceUpdateExisting,
@@ -805,7 +849,7 @@ function callRowSyncWebhook_(rows) {
   const responseText = response.getContentText();
 
   if (statusCode < 200 || statusCode >= 300) {
-    throw new Error("HTTP " + statusCode + ": " + responseText);
+    throw new Error("HTTP " + statusCode + ": " + truncateCellText_(responseText));
   }
 
   const payload = JSON.parse(responseText);
@@ -814,13 +858,34 @@ function callRowSyncWebhook_(rows) {
     throw new Error("Webhook returned an invalid response.");
   }
 
+  const expectedRowNumbers = new Set(rows.map((row) => row.rowNumber));
+  const returnedRowNumbers = new Set();
+
+  payload.results.forEach((result) => {
+    const rowNumber = result && result.rowNumber;
+    if (
+      !Number.isInteger(rowNumber) ||
+      !expectedRowNumbers.has(rowNumber) ||
+      returnedRowNumbers.has(rowNumber)
+    ) {
+      throw new Error("Webhook returned an unexpected or duplicate row result.");
+    }
+    returnedRowNumbers.add(rowNumber);
+  });
+
+  if (returnedRowNumbers.size !== expectedRowNumbers.size) {
+    throw new Error("Webhook did not return a result for every submitted row.");
+  }
+
   return payload.results;
 }
 
 function markRowsProcessing_(sheet, rows) {
+  const processingStartedAt = new Date().toISOString();
   rows.forEach((row) => {
     sheet.getRange(row.rowNumber, COLUMN.SYNC_STATUS).setValue("Processing");
     sheet.getRange(row.rowNumber, COLUMN.ERROR_MESSAGE).clearContent();
+    sheet.getRange(row.rowNumber, COLUMN.SYNCED_AT).setValue(processingStartedAt);
   });
 }
 
@@ -834,6 +899,18 @@ function writeResults_(sheet, results) {
           : result.status === "updated"
             ? "Updated"
             : "Failed";
+    const syncedAt = result.syncedAt || new Date().toISOString();
+
+    if (status === "Failed") {
+      // A row-level API or product lookup failure must not erase the last known
+      // good title, links, or resolved tracking value from the Sheet.
+      sheet.getRange(result.rowNumber, COLUMN.SYNC_STATUS).setValue(status);
+      sheet
+        .getRange(result.rowNumber, COLUMN.ERROR_MESSAGE)
+        .setValue(truncateCellText_(result.errorMessage || "Row sync failed."));
+      sheet.getRange(result.rowNumber, COLUMN.SYNCED_AT).setValue(syncedAt);
+      return;
+    }
 
     const existingResolvedTrackingTag = normalizeTrackingTag_(
       sheet.getRange(result.rowNumber, COLUMN.RESOLVED_TRACKING_TAG).getDisplayValue()
@@ -857,16 +934,17 @@ function writeResults_(sheet, results) {
         result.redirectUrl || "",
         result.orderLink || "",
         confirmedTrackingTag,
-        result.errorMessage || "",
-        result.syncedAt || new Date().toISOString(),
+        "",
+        syncedAt,
       ]]);
   });
 }
 
 function writeChunkFailure_(sheet, rows, message) {
+  const safeMessage = truncateCellText_(message || "Webhook request failed.");
   rows.forEach((row) => {
     sheet.getRange(row.rowNumber, COLUMN.SYNC_STATUS).setValue("Failed");
-    sheet.getRange(row.rowNumber, COLUMN.ERROR_MESSAGE).setValue(message);
+    sheet.getRange(row.rowNumber, COLUMN.ERROR_MESSAGE).setValue(safeMessage);
     sheet.getRange(row.rowNumber, COLUMN.SYNCED_AT).setValue(new Date().toISOString());
   });
 }
@@ -923,10 +1001,15 @@ function prepareCountrySheet_(sheet) {
     "synced_at",
   ];
 
-  const currentHeader = sheet.getRange(1, 1, 1, header.length).getDisplayValues()[0];
-  const headerMissing = currentHeader.slice(0, 5).join("").trim() === "";
+  const currentHeader = sheet
+    .getRange(1, 1, 1, header.length)
+    .getDisplayValues()[0]
+    .map((value) => normalizeText_(value).toLowerCase());
+  const headerMatches = header.every(
+    (expected, index) => currentHeader[index] === expected
+  );
 
-  if (headerMissing) {
+  if (!headerMatches) {
     sheet.getRange(1, 1, 1, header.length).setValues([header]);
   }
 
@@ -1120,6 +1203,11 @@ function normalizeText_(value) {
   return String(value || "").trim();
 }
 
+function truncateCellText_(value) {
+  const text = String(value || "");
+  return text.length > 5000 ? text.slice(0, 4997) + "..." : text;
+}
+
 function normalizeTrackingTag_(value) {
   return normalizeText_(value)
     .replace(/[\u200B-\u200D\uFEFF]/g, "")
@@ -1127,11 +1215,16 @@ function normalizeTrackingTag_(value) {
     .trim();
 }
 
+function isValidTrackingTag_(value) {
+  const trackingTag = normalizeTrackingTag_(value);
+  return !trackingTag || /^[A-Za-z0-9][A-Za-z0-9-]*-[A-Za-z0-9]+$/.test(trackingTag);
+}
+
 function extractAgentSlug_(value) {
   const text = normalizeText_(value);
   if (!text) return "";
 
-  const match = text.match(/^https?:\/\/[^/]+\/([^/?#]+)/i);
+  const match = text.match(/^https?:\/\/[^/]+\/(?:go\/)?([^/?#]+)/i);
   return match ? normalizeText_(match[1]).toLowerCase() : "";
 }
 
