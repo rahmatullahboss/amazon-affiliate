@@ -79,17 +79,41 @@ export async function syncAdminSheetRows(input: {
     throw new Error("A maximum of 100 rows can be synced per request.");
   }
 
-  const results: AdminSheetSyncRowResult[] = [];
+  const groupedRows = new Map<
+    string,
+    Array<{ index: number; row: AdminSheetSyncRowInput }>
+  >();
 
-  for (let offset = 0; offset < input.rows.length; offset += CONCURRENCY) {
-    const chunk = input.rows.slice(offset, offset + CONCURRENCY);
-    const chunkResults = await Promise.all(
-      chunk.map((row) => syncAdminSheetRow({ ...input, row }))
+  input.rows.forEach((row, index) => {
+    const normalizedAsin = extractAsinFromInput(row.asin) ?? row.asin.trim().toUpperCase();
+    const marketplace = row.marketplace.trim().toUpperCase();
+    const productKey = `${marketplace}:${normalizedAsin || `invalid-row-${index}`}`;
+    const group = groupedRows.get(productKey) ?? [];
+    group.push({ index, row });
+    groupedRows.set(productKey, group);
+  });
+
+  const groups = Array.from(groupedRows.values());
+  const resultsByIndex: AdminSheetSyncRowResult[] = new Array(input.rows.length);
+
+  // Rows targeting the same marketplace + ASIN are processed in input order so
+  // duplicate Sheet rows cannot race and produce timing-dependent mappings.
+  // Different products still run concurrently for normal batch performance.
+  for (let offset = 0; offset < groups.length; offset += CONCURRENCY) {
+    const chunk = groups.slice(offset, offset + CONCURRENCY);
+    await Promise.all(
+      chunk.map(async (group) => {
+        for (const item of group) {
+          resultsByIndex[item.index] = await syncAdminSheetRow({
+            ...input,
+            row: item.row,
+          });
+        }
+      })
     );
-    results.push(...chunkResults);
   }
 
-  return { results };
+  return { results: resultsByIndex };
 }
 
 async function syncAdminSheetRow(input: {

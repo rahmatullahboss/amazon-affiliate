@@ -62,7 +62,7 @@ describe("admin Google Apps Script safety", () => {
   });
 
   it("includes a versioned system check for key, headers, triggers, and blank tags", () => {
-    expect(script).toContain('const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v2";');
+    expect(script).toContain('const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v3";');
     expect(script).toContain("function runSystemCheck()");
     expect(script).toContain("SHEET_SYNC_KEY is missing from Script Properties.");
     expect(script).toContain("Header mismatch: ");
@@ -71,6 +71,10 @@ describe("admin Google Apps Script safety", () => {
     expect(script).toContain("Submitted rows missing marketplace: ");
     expect(script).toContain("Rows with invalid tracking-tag format: ");
     expect(script).toContain("Rows stuck in Processing for over 15 minutes: ");
+    expect(script).toContain(
+      "Duplicate marketplace/ASIN products with conflicting tracking tags: "
+    );
+    expect(script).toContain("Duplicate submitted rows: ");
   });
 
   it("recovers the agent slug from both public and tracked redirect URLs", () => {

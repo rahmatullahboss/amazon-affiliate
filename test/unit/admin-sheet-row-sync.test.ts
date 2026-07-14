@@ -333,6 +333,72 @@ describe("admin sheet row sync", () => {
     });
   });
 
+  it("processes duplicate product rows sequentially in input order", async () => {
+    await env.DB.prepare(
+      `INSERT INTO agents (id, slug, name, is_active)
+       VALUES (505, 'duplicate-owner', 'Duplicate Owner', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO tracking_ids (
+         id, agent_id, tag, marketplace, is_default, is_site_primary, is_active
+       ) VALUES (5008, 505, 'duplicate-old-20', 'US', 1, 0, 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6012, 'B0DUPSEQ01', 'Duplicate Product', 'https://img.test/duplicate.jpg', 'US', 'active', 1)`
+    ).run();
+    await env.DB.prepare(
+      `INSERT INTO agent_products (agent_id, product_id, tracking_id, is_active)
+       VALUES (505, 6012, 5008, 1)`
+    ).run();
+
+    const result = await syncAdminSheetRows({
+      db: env.DB,
+      kv: env.KV,
+      publicAppUrl: "https://dealsrky.com",
+      rows: [
+        {
+          rowNumber: 20,
+          asin: "B0DUPSEQ01",
+          marketplace: "US",
+          trackingTag: "duplicate-first-20",
+          previousResolvedTrackingTag: "duplicate-old-20",
+          previousAgentSlug: "duplicate-owner",
+          customTitle: null,
+        },
+        {
+          rowNumber: 21,
+          asin: "https://www.amazon.com/dp/B0DUPSEQ01",
+          marketplace: "us",
+          trackingTag: "duplicate-second-20",
+          previousResolvedTrackingTag: "duplicate-old-20",
+          previousAgentSlug: "duplicate-owner",
+          customTitle: null,
+        },
+      ],
+    });
+
+    expect(result.results.map((item) => item.rowNumber)).toEqual([20, 21]);
+    expect(result.results.map((item) => item.resolvedTrackingTag)).toEqual([
+      "duplicate-first-20",
+      "duplicate-second-20",
+    ]);
+
+    const tracking = await env.DB.prepare(
+      `SELECT id, tag
+       FROM tracking_ids
+       WHERE agent_id = 505 AND marketplace = 'US' AND is_active = 1`
+    ).first<{ id: number; tag: string }>();
+    expect(tracking).toEqual({ id: 5008, tag: "duplicate-second-20" });
+
+    const mapping = await env.DB.prepare(
+      `SELECT tracking_id
+       FROM agent_products
+       WHERE agent_id = 505 AND product_id = 6012 AND is_active = 1`
+    ).first<{ tracking_id: number }>();
+    expect(mapping?.tracking_id).toBe(5008);
+  });
+
   it("removes accidental wrapping quotes from a tracking tag", async () => {
     await env.DB.prepare(
       `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)

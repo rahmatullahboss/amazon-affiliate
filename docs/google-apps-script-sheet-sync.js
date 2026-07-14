@@ -14,7 +14,7 @@
 // Country-tab preparation never clears existing product rows.
 // =============================================================
 
-const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v2";
+const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v3";
 const WEBHOOK_URL = "https://dealsrky.com/api/webhooks/sheet-row-sync";
 const AUTH_VALUE = PropertiesService.getScriptProperties().getProperty(
   ["SHEET", "SYNC", "KEY"].join("_")
@@ -622,6 +622,9 @@ function runSystemCheck() {
   let missingMarketplaceRows = 0;
   let invalidTrackingRows = 0;
   let staleProcessingRows = 0;
+  let duplicateSubmittedRows = 0;
+  let conflictingDuplicateProducts = 0;
+  const submittedProducts = new Map();
 
   if (!AUTH_VALUE) {
     issues.push("SHEET_SYNC_KEY is missing from Script Properties.");
@@ -689,7 +692,27 @@ function runSystemCheck() {
       }
       if (!trackingTag && resolvedTag) protectedBlankTags += 1;
       if (!trackingTag && !resolvedTag) defaultCandidates += 1;
+
+      if (marketplace) {
+        const normalizedAsin = extractAsin_(asin) || asin.toUpperCase();
+        const productKey = marketplace + ":" + normalizedAsin;
+        const effectiveTag = trackingTag || resolvedTag || "";
+        const existingProduct = submittedProducts.get(productKey);
+
+        if (existingProduct) {
+          duplicateSubmittedRows += 1;
+          if (effectiveTag) existingProduct.tags.add(effectiveTag);
+        } else {
+          submittedProducts.set(productKey, {
+            tags: new Set(effectiveTag ? [effectiveTag] : []),
+          });
+        }
+      }
     });
+  });
+
+  submittedProducts.forEach((product) => {
+    if (product.tags.size > 1) conflictingDuplicateProducts += 1;
   });
 
   if (missingMarketplaceRows > 0) {
@@ -700,6 +723,12 @@ function runSystemCheck() {
   }
   if (staleProcessingRows > 0) {
     issues.push("Rows stuck in Processing for over 15 minutes: " + staleProcessingRows);
+  }
+  if (conflictingDuplicateProducts > 0) {
+    issues.push(
+      "Duplicate marketplace/ASIN products with conflicting tracking tags: " +
+        conflictingDuplicateProducts
+    );
   }
 
   const managedTriggerCounts = {
@@ -731,6 +760,8 @@ function runSystemCheck() {
   details.push("Missing marketplace rows: " + missingMarketplaceRows);
   details.push("Invalid tracking-tag rows: " + invalidTrackingRows);
   details.push("Stale Processing rows: " + staleProcessingRows);
+  details.push("Duplicate submitted rows: " + duplicateSubmittedRows);
+  details.push("Conflicting duplicate products: " + conflictingDuplicateProducts);
   details.push(
     "Managed triggers: edit=" + managedTriggerCounts.onAdminSheetEdit +
       ", hourly=" + managedTriggerCounts.hourlyReconcile
