@@ -59,6 +59,7 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
     }
 
     const provider = config.provider;
+    const scriptUrl = config.scriptUrl;
     const sessionKey = getSessionKey(provider);
     if (hasLoadedThisSession(sessionKey)) {
       return;
@@ -80,7 +81,7 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
 
       const script = document.createElement("script");
       script.async = true;
-      script.src = config.scriptUrl as string;
+      script.src = scriptUrl;
       script.setAttribute(SCRIPT_DATA_ATTRIBUTE, provider);
       script.setAttribute("data-dealsrky-placement", "single-session-public");
 
@@ -94,7 +95,11 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
         { once: true }
       );
 
-      document.body.appendChild(script);
+      // Monetag documents Vignette tags for the document head. Adsterra Social
+      // Bar tags are normally placed near the end of body. We preserve that
+      // placement while still applying DealsRky's delayed/session safety gate.
+      const parent = provider === "monetag" ? document.head : document.body;
+      parent.appendChild(script);
     };
 
     const loadWhenVisible = () => {
