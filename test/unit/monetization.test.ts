@@ -47,6 +47,16 @@ describe("monetization configuration", () => {
     });
   });
 
+  it("normalizes protocol-relative publisher script URLs to HTTPS", () => {
+    expect(
+      buildPublicMonetizationConfig({
+        ADS_ENABLED: "true",
+        ADS_PROVIDER: "adsterra",
+        ADSTERRA_SCRIPT_URL: "//ads.example.com/native.js",
+      }).scriptUrl
+    ).toBe("https://ads.example.com/native.js");
+  });
+
   it("refuses non-HTTPS or incomplete ad configuration", () => {
     expect(
       buildPublicMonetizationConfig({
