@@ -1,3 +1,5 @@
+import type { PublicMonetizationConfig } from "./monetization";
+
 export interface PublicSocialLink {
   url: string;
   enabled: boolean;
@@ -11,6 +13,7 @@ export interface PublicSocialLinks {
 
 export interface PublicLayoutLoaderData {
   socialLinks: PublicSocialLinks | null;
+  monetization: PublicMonetizationConfig;
 }
 
 export const EMPTY_PUBLIC_SOCIAL_LINKS: PublicSocialLinks = {
