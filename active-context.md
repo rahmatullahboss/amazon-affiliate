@@ -1,63 +1,76 @@
 # Active Context — Amazon Affiliate
 
-> Updated: 2026-07-13
-> CodexPro reads this on every `workspace_summary` call. Keep current.
+> Updated: 2026-08-12
+> Keep this file current so the next agent can continue without rediscovery.
 
 ## Current task
 
-All current Admin Sheet tracking-sync changes were verified, committed, and pushed to the repository default branch.
+Add conversion-safe Adsterra/Monetag monetization support to DealsRky for the client's request for a single dismissible ad without disrupting Amazon affiliate conversions.
 
 ## Branch / worktree
 
-- Active branch: `master`.
-- `origin/HEAD` points to `origin/master`; this repository has no `main` branch, so the user's request to merge into main was applied to the actual default branch, `master`.
-- No deployment was performed; deploy only with explicit user instruction.
+- Active branch: `task/dealsrky-monetization-ads-20260812`.
+- Base/default branch: `master`.
+- No production deployment has been performed.
+- Do not deploy or merge until verification is complete and the user explicitly requests deployment/merge.
 
-## Files touched this session
+## Implementation
 
-- `server/services/admin-sheet-row-sync.ts`
-  - Supports switching to existing tags, creating new tags, and reactivating inactive agents/tags from Admin Sheet input.
-  - Preserves the previous global tracking tag instead of renaming it.
-  - Keeps the website mapping authoritative when the sheet value has not intentionally changed.
-  - Writes safe audit-log entries for auto-created agents and tracking tags.
-- `test/unit/admin-sheet-row-sync.test.ts`
-  - Added coverage for auto-created agents/tags, existing-agent tag creation, and same-agent mapping reconciliation.
-  - Fixed a test fixture that incorrectly created a second active site-primary US tag, violating the unique marketplace constraint.
-- `docs/superpowers/specs/2026-06-25-admin-sheet-row-sync-design.md`
-  - Updated the synchronization behavior documentation.
-- `active-context.md`
-  - Updated session state and verification evidence.
+- `app/utils/monetization.ts`
+  - Typed Adsterra/Monetag provider configuration.
+  - Only one provider can be active at a time.
+  - Accepts HTTPS and protocol-relative publisher script URLs, normalizing the latter to HTTPS.
+  - Default load delay: 10 seconds; allowed range: 3–60 seconds.
+  - Protects conversion routes with a default-deny policy for unknown multi-segment routes.
+- `app/components/MonetizationAds.tsx`
+  - Delayed loading only while the page is visible.
+  - At most one successful injection per browser-tab session.
+  - No Amazon CTA interception or click wrapping.
+  - Disabled in the native Capacitor app.
+  - Monetag script targets document head; Adsterra script targets document body.
+- `app/routes/public-layout.tsx`
+  - Mounts monetization only inside the shared public layout.
+- `app/utils/social-links.ts`
+  - Public layout loader data includes monetization configuration.
+- `wrangler.jsonc`
+  - Adds `ADS_ENABLED`, `ADS_PROVIDER`, `ADSTERRA_SCRIPT_URL`, `MONETAG_SCRIPT_URL`, and `ADS_LOAD_DELAY_MS`.
+  - Ads remain disabled by default.
+- `test/unit/monetization.test.ts`
+  - Covers provider selection, script URL validation/normalization, delay clamping, and route safety.
+- `docs/monetization-ads.md`
+  - Activation and production verification instructions.
+- `.ai-bridge/*`
+  - Plan, project map, decisions, open activation dependency, and status are documented.
 
-## Product-page disclosure request
+## Conversion safeguards
 
-- `app/routes/product-detail.tsx` already renders the Amazon affiliate disclosure inside the shared highlighted destination/pricing callout and does not render a second disclosure below the `View on Amazon` CTA.
-- Because the shared `/deals/:asin` route is used for dynamic product pages, the existing source already applies this placement to all product pages.
+Ads must not load on:
+- `/t/:trackingTag/:asin`
+- `/:agent/:country/:asin`
+- `/:agent/:asin`
+- admin routes
+- portal routes
+- native Capacitor app sessions
 
-## Verification
+Amazon CTA clicks are not intercepted, delayed, or wrapped by the monetization integration.
 
-- Initial full test run exposed one invalid test fixture: a second active `is_site_primary = 1` US tag violated `idx_tracking_ids_site_primary_marketplace`.
-- Targeted test: `test/unit/admin-sheet-row-sync.test.ts` — 11/11 passed.
-- Full test suite: 44 files, 245 tests passed.
-- `npm run typecheck` passed.
-- `npm run build` passed.
-- `git diff --check` passed.
+## Activation dependency
 
-## Git result
+Live ads are intentionally not enabled yet. Activation requires the exact publisher-generated native dismissible ad tag/script from the DealsRky Adsterra or Monetag account. Do not invent a zone ID or use another publisher's tag.
 
-- Feature commit: `2687ac1` — `feat: sync and create tracking tags from admin sheet`.
-- Pushed successfully to `origin/master`.
+If the publisher tag contains required inline JavaScript in addition to an external `src`, adapt the integration to that exact tag rather than guessing its structure.
 
-## Pending decisions / next concrete step
+## Verification status
 
-- Retry one real ASIN row from the Admin Sheet and verify the new tag/agent behavior against the live D1 database.
-- A real Zyte API key is still needed for live Zyte fallback verification.
-- Deploy only when the user explicitly requests deployment.
+- GitHub source/diff review completed during implementation.
+- The feature branch was confirmed ahead of and not behind `master` at the review point.
+- Amazon CodexPro connector returned HTTP 502.
+- Mac `local_dev` connector also returned HTTP 502.
+- Because both executable workspace connectors were unavailable, `npm test`, `npm run typecheck`, and `npm run build` have not yet been run for this branch.
 
-## Operational reminders
+## Next concrete steps
 
-- CodexPro MCP is live at `https://aff.online-bazar.top/mcp?codexpro_token=[REDACTED_SECRET]`
-- Profile: `~/.codexpro/profiles/05ebc342a8080fb254121b0d.json`. Mode `agent`, write `workspace`, bash `full`, auth on.
-- Local MCP: `http://127.0.0.1:8790/mcp`.
-- Daily use: `cd "/Users/rahmatullahzisan/Desktop/Dev/Amazon affiliate" && codexpro start`.
-
-> This file is updated by the agent at the end of every turn so the next session has fresh state.
+1. Restore either project connector and run targeted monetization tests, full typecheck, and build.
+2. Obtain the exact DealsRky publisher-generated dismissible Adsterra or Monetag tag/script.
+3. Configure one provider and browser-verify the network-native close button, delayed loading, once-per-session behavior, and zero ad loading on conversion routes.
+4. Merge/deploy only after verification and explicit instruction.
