@@ -37,8 +37,10 @@ function parseHttpsScriptUrl(value?: string): string | null {
     return null;
   }
 
+  const normalized = candidate.startsWith("//") ? `https:${candidate}` : candidate;
+
   try {
-    const parsed = new URL(candidate);
+    const parsed = new URL(normalized);
     if (parsed.protocol !== "https:" || parsed.username || parsed.password) {
       return null;
     }
