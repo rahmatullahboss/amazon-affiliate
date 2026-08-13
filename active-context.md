@@ -1,63 +1,47 @@
-# Active Context — Amazon Affiliate
+# Active Context — DealsRky Monetization Ads
 
-> Updated: 2026-07-13
-> CodexPro reads this on every `workspace_summary` call. Keep current.
+## Branch
+`task/dealsrky-monetization-ads-20260812`
 
-## Current task
+## Current state
+Monetization implementation has been adversarially reviewed and executable verification is green. Ads remain OFF pending the complete real publisher-generated tag/code and browser verification of the selected format.
 
-All current Admin Sheet tracking-sync changes were verified, committed, and pushed to the repository default branch.
+## Verified behavior
+- Supports Adsterra and Monetag with only one selected provider active.
+- Requires `ADS_TAG_ADAPTER=single-script-src` in addition to provider and exact script URL.
+- Ads default OFF.
+- Default load delay is 10 seconds.
+- Maximum one injection attempt per browser tab session across providers.
+- Session-storage failure fails closed; script-load failure does not permit retry.
+- Public browsing/content routes are eligible.
+- Tracking shortcut and both agent bridge route shapes are blocked.
+- Admin/portal are separate non-ad layouts; public links into them hard-navigate to prevent third-party SPA runtime carry-over.
+- Agent storefront product links hard-navigate into protected bridge routes for the same reason.
+- Native Capacitor app does not inject web ads.
+- Amazon CTA code is untouched and not intercepted/wrapped by monetization.
+- No fake zone IDs or publisher scripts are committed.
 
-## Branch / worktree
+## Exact-tag safety
+The current adapter may be used only when the complete publisher-generated tag is actually a single external script source and does not require inline config, companion scripts, service-worker setup, or required extra script attributes. If the real tag differs, keep ads disabled and implement its exact structure.
 
-- Active branch: `master`.
-- `origin/HEAD` points to `origin/master`; this repository has no `main` branch, so the user's request to merge into main was applied to the actual default branch, `master`.
-- No deployment was performed; deploy only with explicit user instruction.
+For the current non-Popunder requirement:
+- Adsterra: prefer Social Bar.
+- Monetag: prefer standalone Vignette Banner.
+- Do not use Monetag MultiTag because it includes Onclick/Popunder.
 
-## Files touched this session
+## Verification — 2026-08-13
+- Monetization targeted tests: 21/21 passed.
+- Full `npm test`: 52/52 test files, 294/294 tests passed.
+- `npm run typecheck`: passed.
+- `npm run build`: passed.
 
-- `server/services/admin-sheet-row-sync.ts`
-  - Supports switching to existing tags, creating new tags, and reactivating inactive agents/tags from Admin Sheet input.
-  - Preserves the previous global tracking tag instead of renaming it.
-  - Keeps the website mapping authoritative when the sheet value has not intentionally changed.
-  - Writes safe audit-log entries for auto-created agents and tracking tags.
-- `test/unit/admin-sheet-row-sync.test.ts`
-  - Added coverage for auto-created agents/tags, existing-agent tag creation, and same-agent mapping reconciliation.
-  - Fixed a test fixture that incorrectly created a second active site-primary US tag, violating the unique marketplace constraint.
-- `docs/superpowers/specs/2026-06-25-admin-sheet-row-sync-design.md`
-  - Updated the synchronization behavior documentation.
-- `active-context.md`
-  - Updated session state and verification evidence.
+Non-failing test warnings remain around the existing Workers test harness/AI remote binding/listener teardown; there are no failed tests.
 
-## Product-page disclosure request
+## Type boundary fix
+Clean Wrangler type generation exposed a pre-existing mismatch between generated `Env` and the application's manual `Bindings`. The Worker entry now uses `WorkerBindings = Env & Bindings`, and monetization vars are declared in the application binding contract. Typecheck passes without unsafe double casts.
 
-- `app/routes/product-detail.tsx` already renders the Amazon affiliate disclosure inside the shared highlighted destination/pricing callout and does not render a second disclosure below the `View on Amazon` CTA.
-- Because the shared `/deals/:asin` route is used for dynamic product pages, the existing source already applies this placement to all product pages.
+## PR #2
+`feat: add conversion-safe Adsterra/Monetag monetization` remains open and draft against `master`. GitHub reported it mergeable at review time. It has not been merged or deployed.
 
-## Verification
-
-- Initial full test run exposed one invalid test fixture: a second active `is_site_primary = 1` US tag violated `idx_tracking_ids_site_primary_marketplace`.
-- Targeted test: `test/unit/admin-sheet-row-sync.test.ts` — 11/11 passed.
-- Full test suite: 44 files, 245 tests passed.
-- `npm run typecheck` passed.
-- `npm run build` passed.
-- `git diff --check` passed.
-
-## Git result
-
-- Feature commit: `2687ac1` — `feat: sync and create tracking tags from admin sheet`.
-- Pushed successfully to `origin/master`.
-
-## Pending decisions / next concrete step
-
-- Retry one real ASIN row from the Admin Sheet and verify the new tag/agent behavior against the live D1 database.
-- A real Zyte API key is still needed for live Zyte fallback verification.
-- Deploy only when the user explicitly requests deployment.
-
-## Operational reminders
-
-- CodexPro MCP is live at `https://aff.online-bazar.top/mcp?codexpro_token=[REDACTED_SECRET]`
-- Profile: `~/.codexpro/profiles/05ebc342a8080fb254121b0d.json`. Mode `agent`, write `workspace`, bash `full`, auth on.
-- Local MCP: `http://127.0.0.1:8790/mcp`.
-- Daily use: `cd "/Users/rahmatullahzisan/Desktop/Dev/Amazon affiliate" && codexpro start`.
-
-> This file is updated by the agent at the end of every turn so the next session has fresh state.
+## Remaining input
+Obtain the full generated tag/code from the chosen DealsRky Adsterra or Monetag publisher account. Do not enable production ads until that exact tag has been reviewed against the adapter and browser-verified.

@@ -88,10 +88,11 @@ export function Header() {
             <SocialIconsInline socialLinks={socialLinks} />
             <div className="h-4 w-px bg-gray-200"></div>
             <div className="flex items-center gap-3 text-sm">
-              <Link to="/portal/login" className="font-medium text-gray-500 transition-colors hover:text-gray-900">
+              <Link reloadDocument to="/portal/login" className="font-medium text-gray-500 transition-colors hover:text-gray-900">
                 Agent Login
               </Link>
               <Link
+                reloadDocument
                 to="/admin/login"
                 className="rounded-full bg-gray-100 px-3 py-1.5 font-bold text-gray-700 transition-colors hover:bg-gray-200"
               >
@@ -157,10 +158,10 @@ export function Header() {
               onItemClick={() => setIsMobileMenuOpen(false)}
             />
             <div className="my-1 h-px w-full bg-gray-100"></div>
-            <Link to="/portal/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link reloadDocument to="/portal/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
               Agent Portal
             </Link>
-            <Link to="/admin/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
+            <Link reloadDocument to="/admin/login" className="flex items-center gap-2 font-semibold text-gray-500 hover:text-gray-900" onClick={() => setIsMobileMenuOpen(false)}>
               Admin Access
             </Link>
           </nav>

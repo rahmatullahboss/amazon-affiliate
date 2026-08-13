@@ -145,6 +145,7 @@ export default function AgentStorefrontPage({ loaderData }: Route.ComponentProps
                 key={`${data.agent.publicSlug}-${product.asin}`}
                 item={product}
                 href={`/${data.agent.publicSlug}/${product.marketplace.toLowerCase()}/${product.asin}`}
+                reloadDocument
               />
             ))}
           </div>

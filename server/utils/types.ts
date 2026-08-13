@@ -43,6 +43,12 @@ export type Bindings = {
   LWA_CLIENT_ID?: string;
   LWA_CLIENT_SECRET?: string;
   LWA_CREATORS_SCOPE?: string;
+  ADS_ENABLED?: string;
+  ADS_PROVIDER?: string;
+  ADS_TAG_ADAPTER?: string;
+  ADSTERRA_SCRIPT_URL?: string;
+  MONETAG_SCRIPT_URL?: string;
+  ADS_LOAD_DELAY_MS?: string;
 };
 
 // Hono app types

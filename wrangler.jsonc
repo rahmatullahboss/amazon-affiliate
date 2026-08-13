@@ -55,6 +55,12 @@
     "OLLAMA_CLOUD_BASE_URL": "https://api.ollama.com",
     "OLLAMA_CLOUD_MODEL": "minimax-m2.7:cloud",
     "LWA_CREATORS_SCOPE": "creatorsapi::read",
+    "ADS_ENABLED": "false",
+    "ADS_PROVIDER": "",
+    "ADS_TAG_ADAPTER": "",
+    "ADSTERRA_SCRIPT_URL": "",
+    "MONETAG_SCRIPT_URL": "",
+    "ADS_LOAD_DELAY_MS": "10000",
     "TELEGRAM_BOT_TOKEN": "",
     "TELEGRAM_WEBHOOK_SECRET": ""
   },

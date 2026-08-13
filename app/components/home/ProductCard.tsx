@@ -24,6 +24,7 @@ interface ProductCardProps {
   description?: string;
   primaryCtaLabel?: string;
   secondaryCtaLabel?: string;
+  reloadDocument?: boolean;
 }
 
 export function ProductCard({
@@ -35,6 +36,7 @@ export function ProductCard({
   description,
   primaryCtaLabel = "Open product page",
   secondaryCtaLabel,
+  reloadDocument = false,
 }: ProductCardProps) {
   const url = href || (item.asin ? `/deals/${item.asin}` : `/deals`);
   const primaryUrl = primaryHref || url;
@@ -51,7 +53,7 @@ export function ProductCard({
           </span>
         </div>
 
-        <Link to={url} className="block">
+        <Link to={url} reloadDocument={reloadDocument} className="block">
           <div className="relative mb-4 flex aspect-square w-full items-center justify-center rounded-[1.2rem] bg-[#f5f8f8] p-4">
             <img
               src={item.image_url}
@@ -77,6 +79,7 @@ export function ProductCard({
         <div className="mt-4 flex items-center gap-3">
           <Link
             to={primaryUrl}
+            reloadDocument={reloadDocument}
             className="inline-flex items-center justify-center rounded-full bg-primary px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
           >
             {primaryCtaLabel}
@@ -84,6 +87,7 @@ export function ProductCard({
           {secondaryCtaLabel ? (
             <Link
               to={url}
+              reloadDocument={reloadDocument}
               className="text-sm font-semibold text-gray-600 transition-colors hover:text-primary"
             >
               {secondaryCtaLabel}
@@ -97,6 +101,7 @@ export function ProductCard({
   return (
     <Link
       to={url}
+      reloadDocument={reloadDocument}
       className="group block rounded-[1.75rem] border border-gray-200 bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-[0_20px_60px_-30px_rgba(11,128,128,0.35)]"
     >
       <div className="mb-4 flex items-center justify-between gap-3">

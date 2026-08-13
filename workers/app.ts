@@ -3,11 +3,14 @@ import { apiApp } from "../server/api";
 import { createBlogImageResponse } from "../server/services/blog";
 import { generateScheduledBlogDraft, publishDueScheduledBlogPosts } from "../server/services/blog-generation";
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
+import type { Bindings } from "../server/utils/types";
+
+type WorkerBindings = Env & Bindings;
 
 declare module "react-router" {
   export interface AppLoadContext {
     cloudflare: {
-      env: Env;
+      env: WorkerBindings;
       ctx: ExecutionContext;
     };
   }
@@ -252,4 +255,4 @@ export default {
       ctx.waitUntil(Promise.resolve(console.error(`[SCHEDULE] Task failed: ${message}`, error)));
     }
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<WorkerBindings>;
