@@ -9,6 +9,7 @@ describe("monetization configuration", () => {
     expect(buildPublicMonetizationConfig({})).toEqual({
       enabled: false,
       provider: null,
+      tagAdapter: null,
       scriptUrl: null,
       loadDelayMs: 10_000,
     });
@@ -19,6 +20,7 @@ describe("monetization configuration", () => {
       buildPublicMonetizationConfig({
         ADS_ENABLED: "true",
         ADS_PROVIDER: "adsterra",
+        ADS_TAG_ADAPTER: "single-script-src",
         ADSTERRA_SCRIPT_URL: "https://ads.example.com/adsterra.js",
         MONETAG_SCRIPT_URL: "https://ads.example.com/monetag.js",
         ADS_LOAD_DELAY_MS: "12000",
@@ -26,6 +28,7 @@ describe("monetization configuration", () => {
     ).toEqual({
       enabled: true,
       provider: "adsterra",
+      tagAdapter: "single-script-src",
       scriptUrl: "https://ads.example.com/adsterra.js",
       loadDelayMs: 12_000,
     });
@@ -36,12 +39,14 @@ describe("monetization configuration", () => {
       buildPublicMonetizationConfig({
         ADS_ENABLED: "1",
         ADS_PROVIDER: "monetag",
+        ADS_TAG_ADAPTER: "single-script-src",
         ADSTERRA_SCRIPT_URL: "https://ads.example.com/adsterra.js",
         MONETAG_SCRIPT_URL: "https://ads.example.com/monetag.js",
       })
     ).toEqual({
       enabled: true,
       provider: "monetag",
+      tagAdapter: "single-script-src",
       scriptUrl: "https://ads.example.com/monetag.js",
       loadDelayMs: 10_000,
     });
@@ -52,6 +57,7 @@ describe("monetization configuration", () => {
       buildPublicMonetizationConfig({
         ADS_ENABLED: "true",
         ADS_PROVIDER: "adsterra",
+        ADS_TAG_ADAPTER: "single-script-src",
         ADSTERRA_SCRIPT_URL: "//ads.example.com/native.js",
       }).scriptUrl
     ).toBe("https://ads.example.com/native.js");
@@ -62,6 +68,7 @@ describe("monetization configuration", () => {
       buildPublicMonetizationConfig({
         ADS_ENABLED: "true",
         ADS_PROVIDER: "adsterra",
+        ADS_TAG_ADAPTER: "single-script-src",
         ADSTERRA_SCRIPT_URL: "http://ads.example.com/insecure.js",
       }).enabled
     ).toBe(false);
@@ -70,6 +77,25 @@ describe("monetization configuration", () => {
       buildPublicMonetizationConfig({
         ADS_ENABLED: "true",
         ADS_PROVIDER: "monetag",
+      }).enabled
+    ).toBe(false);
+  });
+
+  it("requires an explicitly confirmed supported tag adapter before activation", () => {
+    expect(
+      buildPublicMonetizationConfig({
+        ADS_ENABLED: "true",
+        ADS_PROVIDER: "adsterra",
+        ADSTERRA_SCRIPT_URL: "https://ads.example.com/adsterra.js",
+      }).enabled
+    ).toBe(false);
+
+    expect(
+      buildPublicMonetizationConfig({
+        ADS_ENABLED: "true",
+        ADS_PROVIDER: "monetag",
+        ADS_TAG_ADAPTER: "inline-plus-script",
+        MONETAG_SCRIPT_URL: "https://ads.example.com/monetag.js",
       }).enabled
     ).toBe(false);
   });

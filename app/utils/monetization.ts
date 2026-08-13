@@ -1,8 +1,10 @@
 export type MonetizationProvider = "adsterra" | "monetag";
+export type MonetizationTagAdapter = "single-script-src";
 
 export interface MonetizationEnvironment {
   ADS_ENABLED?: string;
   ADS_PROVIDER?: string;
+  ADS_TAG_ADAPTER?: string;
   ADSTERRA_SCRIPT_URL?: string;
   MONETAG_SCRIPT_URL?: string;
   ADS_LOAD_DELAY_MS?: string;
@@ -11,6 +13,7 @@ export interface MonetizationEnvironment {
 export interface PublicMonetizationConfig {
   enabled: boolean;
   provider: MonetizationProvider | null;
+  tagAdapter: MonetizationTagAdapter | null;
   scriptUrl: string | null;
   loadDelayMs: number;
 }
@@ -29,6 +32,12 @@ function parseProvider(value?: string): MonetizationProvider | null {
     return normalized;
   }
   return null;
+}
+
+function parseTagAdapter(value?: string): MonetizationTagAdapter | null {
+  return (value ?? "").trim().toLowerCase() === "single-script-src"
+    ? "single-script-src"
+    : null;
 }
 
 function parseHttpsScriptUrl(value?: string): string | null {
@@ -62,17 +71,23 @@ export function buildPublicMonetizationConfig(
   env: MonetizationEnvironment
 ): PublicMonetizationConfig {
   const provider = parseProvider(env.ADS_PROVIDER);
+  const tagAdapter = parseTagAdapter(env.ADS_TAG_ADAPTER);
   const scriptUrl =
     provider === "adsterra"
       ? parseHttpsScriptUrl(env.ADSTERRA_SCRIPT_URL)
       : provider === "monetag"
         ? parseHttpsScriptUrl(env.MONETAG_SCRIPT_URL)
         : null;
-  const enabled = isEnabledFlag(env.ADS_ENABLED) && provider !== null && scriptUrl !== null;
+  const enabled =
+    isEnabledFlag(env.ADS_ENABLED) &&
+    provider !== null &&
+    tagAdapter !== null &&
+    scriptUrl !== null;
 
   return {
     enabled,
     provider: enabled ? provider : null,
+    tagAdapter: enabled ? tagAdapter : null,
     scriptUrl: enabled ? scriptUrl : null,
     loadDelayMs: parseLoadDelay(env.ADS_LOAD_DELAY_MS),
   };

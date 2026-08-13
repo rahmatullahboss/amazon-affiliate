@@ -10,35 +10,30 @@ interface MonetizationAdsProps {
   config: PublicMonetizationConfig;
 }
 
-const SESSION_KEY_PREFIX = "dealsrky:monetization:shown:v1";
+const SESSION_KEY = "dealsrky:monetization:injected:v2";
 const SCRIPT_DATA_ATTRIBUTE = "data-dealsrky-monetization";
+const SCRIPT_SELECTOR = `script[${SCRIPT_DATA_ATTRIBUTE}]`;
 
-function getSessionKey(provider: NonNullable<PublicMonetizationConfig["provider"]>): string {
-  return `${SESSION_KEY_PREFIX}:${provider}`;
+function hasClaimedSession(): boolean {
+  try {
+    return window.sessionStorage.getItem(SESSION_KEY) === "1";
+  } catch {
+    // Fail closed when tab-scoped storage cannot enforce the one-injection cap.
+    return true;
+  }
 }
 
-function hasLoadedThisSession(key: string): boolean {
+function claimSession(): boolean {
   try {
-    return window.sessionStorage.getItem(key) === "1";
+    if (window.sessionStorage.getItem(SESSION_KEY) === "1") {
+      return false;
+    }
+
+    window.sessionStorage.setItem(SESSION_KEY, "1");
+    return window.sessionStorage.getItem(SESSION_KEY) === "1";
   } catch {
+    // Do not inject if the tab-scoped cap cannot be persisted reliably.
     return false;
-  }
-}
-
-function markLoadedThisSession(key: string): void {
-  try {
-    window.sessionStorage.setItem(key, "1");
-  } catch {
-    // Storage can be unavailable in privacy-restricted browsers. The DOM marker
-    // still prevents duplicate injection during the current document lifetime.
-  }
-}
-
-function clearLoadedThisSession(key: string): void {
-  try {
-    window.sessionStorage.removeItem(key);
-  } catch {
-    // Nothing else to recover when storage is unavailable.
   }
 }
 
@@ -51,6 +46,7 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
       typeof document === "undefined" ||
       !config.enabled ||
       !config.provider ||
+      config.tagAdapter !== "single-script-src" ||
       !config.scriptUrl ||
       isNativeCapacitorApp() ||
       !isMonetizationEligiblePath(location.pathname)
@@ -60,13 +56,7 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
 
     const provider = config.provider;
     const scriptUrl = config.scriptUrl;
-    const sessionKey = getSessionKey(provider);
-    if (hasLoadedThisSession(sessionKey)) {
-      return;
-    }
-
-    const selector = `script[${SCRIPT_DATA_ATTRIBUTE}="${provider}"]`;
-    if (document.querySelector(selector)) {
+    if (hasClaimedSession() || document.querySelector(SCRIPT_SELECTOR)) {
       return;
     }
 
@@ -75,21 +65,20 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
     let cancelled = false;
 
     const injectScript = () => {
-      if (cancelled || hasLoadedThisSession(sessionKey) || document.querySelector(selector)) {
+      if (cancelled || document.querySelector(SCRIPT_SELECTOR) || !claimSession()) {
         return;
       }
 
       const script = document.createElement("script");
-      script.async = true;
       script.src = scriptUrl;
       script.setAttribute(SCRIPT_DATA_ATTRIBUTE, provider);
       script.setAttribute("data-dealsrky-placement", "single-session-public");
 
-      markLoadedThisSession(sessionKey);
       script.addEventListener(
         "error",
         () => {
-          clearLoadedThisSession(sessionKey);
+          // Keep the tab-scoped claim even on network failure: a later route must
+          // not turn a failed first attempt into a second ad injection attempt.
           script.remove();
         },
         { once: true }
@@ -131,7 +120,14 @@ export function MonetizationAds({ config }: MonetizationAdsProps) {
         document.removeEventListener("visibilitychange", visibilityHandler);
       }
     };
-  }, [config.enabled, config.loadDelayMs, config.provider, config.scriptUrl, location.pathname]);
+  }, [
+    config.enabled,
+    config.loadDelayMs,
+    config.provider,
+    config.scriptUrl,
+    config.tagAdapter,
+    location.pathname,
+  ]);
 
   return null;
 }

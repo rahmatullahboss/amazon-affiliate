@@ -57,6 +57,7 @@
     "LWA_CREATORS_SCOPE": "creatorsapi::read",
     "ADS_ENABLED": "false",
     "ADS_PROVIDER": "",
+    "ADS_TAG_ADAPTER": "",
     "ADSTERRA_SCRIPT_URL": "",
     "MONETAG_SCRIPT_URL": "",
     "ADS_LOAD_DELAY_MS": "10000",
