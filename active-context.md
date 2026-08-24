@@ -7,6 +7,15 @@
 
 All current Admin Sheet tracking-sync changes were verified, committed, and pushed to the repository default branch.
 
+## 2026-08-24 — Public page ad scripts
+
+- Implemented on isolated branch `codex/public-page-ad-scripts-20260824` in `.worktrees/public-page-ad-scripts-20260824`.
+- Public web pages load the exact supplied popunder, native banner, and bottom-of-body scripts through `app/components/PublicAds.tsx` and `app/routes/public-layout.tsx`.
+- Native Capacitor, admin, portal, tracking/bridge redirect, and affiliate CTA flows remain outside the ad boundary.
+- Focused unit test: 2/2 passed. Full unit suite: 52 files / 275 tests passed. Browser ad boundary: desktop + mobile 2/2 passed.
+- Typecheck is blocked by pre-existing `workers/app.ts` `Env`/`JWT_SECRET` mismatch. Build passed. Existing storefront E2E has 4 pass, 1 skip, 1 unrelated local-data CTA failure.
+- No production deployment, push, DNS, remote D1 mutation, or affiliate tracking change was performed.
+
 ## Branch / worktree
 
 - Active branch: `master`.

@@ -4,7 +4,7 @@
 
 **Goal:** Add the three supplied ad snippets to public web pages only, with native Capacitor, admin, portal, redirect, and affiliate CTA flows excluded.
 
-**Architecture:** Keep all publisher constants and runtime gating in `app/components/PublicAds.tsx`. Mount the banner in `PublicLayout` after the header and mount the body-end loader after the footer; inject the single popunder into `document.head` after hydration. No root-level global script or route-level duplication.
+**Architecture:** Keep all publisher constants and runtime gating in the pure `app/utils/public-ads.ts` contract module, re-exported by `app/components/PublicAds.tsx`. Mount the banner in `PublicLayout` after the header and mount the body-end loader after the footer; inject the single popunder into `document.head` after hydration. No root-level global script or route-level duplication.
 
 **Tech Stack:** React 19, React Router 7, TypeScript, Vitest, React Router build, Cloudflare Workers SSR.
 
@@ -14,11 +14,12 @@
 
 **Files:**
 - Create: `test/unit/public-ads.test.ts`
-- Test: `app/components/PublicAds.tsx` after implementation
+- Test: `app/utils/public-ads.ts` after implementation
+- Test: `test/e2e/public-ads.spec.ts` after layout integration
 
 - [ ] **Step 1: Write the failing tests**
 
-Add tests that import the planned public exports and assert the exact publisher inputs and runtime gate:
+Add tests that import the pure ad-contract exports and assert the exact publisher inputs and runtime gate without importing React/JSX into the Cloudflare worker test pool:
 
 ```ts
 import { describe, expect, it } from "vitest";
@@ -28,7 +29,7 @@ import {
   POPUNDER_SCRIPT_SRC,
   BOTTOM_SCRIPT_SRC,
   shouldEnablePublicAds,
-} from "../../app/components/PublicAds";
+} from "../../app/utils/public-ads";
 
 describe("public ad contract", () => {
   it("keeps the publisher-supplied script sources and container exact", () => {
@@ -57,16 +58,17 @@ describe("public ad contract", () => {
 
 Run: `npm test -- --run test/unit/public-ads.test.ts`
 
-Expected: FAIL because `app/components/PublicAds.tsx` and its exports do not exist yet.
+Expected: FAIL because `app/utils/public-ads.ts` and its exports do not exist yet.
 
 ### Task 2: Implement the isolated public ad component
 
 **Files:**
+- Create: `app/utils/public-ads.ts`
 - Create: `app/components/PublicAds.tsx`
 
 - [ ] **Step 1: Add the exact constants and runtime gate**
 
-Export the four exact strings and this pure gate:
+Export the four exact strings and this pure gate from `app/utils/public-ads.ts`, then re-export them from `app/components/PublicAds.tsx`:
 
 ```ts
 export function shouldEnablePublicAds(isNativeApp: boolean): boolean {
@@ -97,9 +99,9 @@ Import `PublicAds` and `PublicAdsBodyEnd`. Render `PublicAds` after `<Header />`
 
 - [ ] **Step 2: Run the focused public tests**
 
-Run: `npm test -- --run test/unit/public-ads.test.ts test/e2e/storefront.spec.ts`
+Run: `npm test -- --run test/unit/public-ads.test.ts` and `npx playwright test test/e2e/public-ads.spec.ts`
 
-Expected: PASS for the ad contract and existing storefront smoke coverage, subject to the repository's configured e2e environment.
+Expected: PASS for the ad contract and public/admin route boundary, subject to the repository's configured e2e environment.
 
 ### Task 4: Update project session records and verify the complete change
 
