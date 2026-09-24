@@ -1,11 +1,20 @@
 # Active Context — Amazon Affiliate
 
-> Updated: 2026-07-13
+> Updated: 2026-09-24
 > CodexPro reads this on every `workspace_summary` call. Keep current.
 
 ## Current task
 
-All current Admin Sheet tracking-sync changes were verified, committed, and pushed to the repository default branch.
+Add the two newly supplied Adsterra codes to DealsRky public web pages with a dismissible native banner near the top and the second script at the end of the public layout. Remove the older extra popunder zone so only the two supplied codes remain.
+
+## 2026-09-24 — Adsterra placement update
+
+- Branch: `feat/dealsrky-adsterra-placements-20260924`.
+- `app/utils/public-ads.ts`: removed the old `pl30967642` popunder source; retained only the supplied `pl30967643` native banner and `pl30967644` body-end script.
+- `app/components/PublicAds.tsx`: native banner now has a visible close button; body-end script remains after the public footer.
+- Shared `public-layout.tsx` already places the native banner immediately below the header and the body-end script after the footer, so both the homepage and `/deals/:asin` product pages receive the requested top/end placement.
+- Native Capacitor remains excluded.
+- Source changes are committed on the feature branch. No production deployment has been performed yet.
 
 ## 2026-08-24 — Public page ad scripts
 
