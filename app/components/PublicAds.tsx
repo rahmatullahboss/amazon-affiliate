@@ -4,7 +4,6 @@ import {
   BOTTOM_SCRIPT_SRC,
   NATIVE_BANNER_CONTAINER_ID,
   NATIVE_BANNER_SCRIPT_SRC,
-  POPUNDER_SCRIPT_SRC,
   shouldEnablePublicAds,
 } from "../utils/public-ads";
 
@@ -12,7 +11,6 @@ export {
   BOTTOM_SCRIPT_SRC,
   NATIVE_BANNER_CONTAINER_ID,
   NATIVE_BANNER_SCRIPT_SRC,
-  POPUNDER_SCRIPT_SRC,
   shouldEnablePublicAds,
 } from "../utils/public-ads";
 
@@ -26,42 +24,36 @@ function usePublicAdsEnabled(): boolean {
   return enabled;
 }
 
-function ensurePopunderScript() {
-  const existingScript = document.head.querySelector(
-    `script[src="${POPUNDER_SCRIPT_SRC}"]`
-  );
-
-  if (existingScript) {
-    return;
-  }
-
-  const script = document.createElement("script");
-  script.src = POPUNDER_SCRIPT_SRC;
-  document.head.appendChild(script);
-}
-
 export function PublicAds() {
   const enabled = usePublicAdsEnabled();
+  const [dismissed, setDismissed] = useState(false);
 
-  useEffect(() => {
-    if (enabled) {
-      ensurePopunderScript();
-    }
-  }, [enabled]);
-
-  if (!enabled) {
+  if (!enabled || dismissed) {
     return null;
   }
 
   return (
-    <>
-      <script
-        async
-        data-cfasync="false"
-        src={NATIVE_BANNER_SCRIPT_SRC}
-      />
-      <div id={NATIVE_BANNER_CONTAINER_ID} />
-    </>
+    <aside
+      aria-label="Advertisement"
+      className="mx-auto w-full max-w-7xl px-4 pt-3 lg:px-6"
+    >
+      <div className="relative overflow-hidden rounded-2xl border border-gray-200 bg-white p-2 shadow-sm">
+        <button
+          type="button"
+          aria-label="Close advertisement"
+          onClick={() => setDismissed(true)}
+          className="absolute right-2 top-2 z-20 inline-flex h-7 w-7 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-base font-bold leading-none text-gray-600 shadow-sm transition hover:text-gray-950"
+        >
+          ×
+        </button>
+        <script
+          async
+          data-cfasync="false"
+          src={NATIVE_BANNER_SCRIPT_SRC}
+        />
+        <div id={NATIVE_BANNER_CONTAINER_ID} />
+      </div>
+    </aside>
   );
 }
 
