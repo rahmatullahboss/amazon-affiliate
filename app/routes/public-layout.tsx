@@ -2,7 +2,7 @@ import { Outlet, useLoaderData } from "react-router";
 import type { Route } from "./+types/public-layout";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
-import { PublicAds, PublicAdsBodyEnd } from "../components/PublicAds";
+import { PublicAds } from "../components/PublicAds";
 import {
   getSocialLinksSettings,
   toPublicSocialLinks,
@@ -34,7 +34,6 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <Footer socialLinks={socialLinks} />
-      <PublicAdsBodyEnd />
     </div>
   );
 }

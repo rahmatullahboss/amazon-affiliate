@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
        // This will pull in bindings from wrangler.jsonc including D1 and KV.
+      remoteBindings: false,
       wrangler: { configPath: "./wrangler.jsonc" },
       main: "./test/setup.worker.ts"
     }),

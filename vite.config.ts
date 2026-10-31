@@ -6,7 +6,10 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [
-    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    cloudflare({
+      remoteBindings: false,
+      viteEnvironment: { name: "ssr" },
+    }),
     !process.env.VITEST && reactRouter(),
     tsconfigPaths(),
     tailwindcss(),

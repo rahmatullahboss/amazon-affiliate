@@ -1,30 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
-  BOTTOM_SCRIPT_SRC,
-  NATIVE_BANNER_CONTAINER_ID,
-  NATIVE_BANNER_SCRIPT_SRC,
-  POPUNDER_SCRIPT_SRC,
+  REVBID_CONTAINER_ID,
+  REVBID_PLACEMENT_ID,
+  REVBID_SCRIPT_SRC,
+  isRevBidScriptSource,
   shouldEnablePublicAds,
 } from "../../app/utils/public-ads";
 
 describe("public ad contract", () => {
   it("keeps the publisher-supplied script sources and container exact", () => {
-    expect(POPUNDER_SCRIPT_SRC).toBe(
-      "https://pl30967642.profitableratecpmnetwork.com/8b/f2/cb/8bf2cb651ba536569055a0e78deb5e0c.js"
-    );
-    expect(NATIVE_BANNER_SCRIPT_SRC).toBe(
-      "https://pl30967643.profitableratecpmnetwork.com/c4b4a3c619735916a8b2c83cf2ae6a65/invoke.js"
-    );
-    expect(NATIVE_BANNER_CONTAINER_ID).toBe(
-      "container-c4b4a3c619735916a8b2c83cf2ae6a65"
-    );
-    expect(BOTTOM_SCRIPT_SRC).toBe(
-      "https://pl30967644.profitableratecpmnetwork.com/27/9f/b2/279fb283fc6df4ba2e60428705c80920.js"
-    );
+    expect(REVBID_SCRIPT_SRC).toBe("//prebid.revbid.net/20525/revbid.js");
+    expect(REVBID_PLACEMENT_ID).toBe("revbid-mobile");
+    expect(REVBID_CONTAINER_ID).toBe("revbid-mobile-3617");
   });
 
   it("enables ads for web pages and disables them for Capacitor", () => {
     expect(shouldEnablePublicAds(false)).toBe(true);
     expect(shouldEnablePublicAds(true)).toBe(false);
+  });
+
+  it("recognizes the script after browsers normalize its protocol-relative URL", () => {
+    expect(isRevBidScriptSource(REVBID_SCRIPT_SRC)).toBe(true);
+    expect(isRevBidScriptSource("https://prebid.revbid.net/20525/revbid.js")).toBe(true);
+    expect(isRevBidScriptSource("https://example.com/20525/revbid.js")).toBe(false);
   });
 });
