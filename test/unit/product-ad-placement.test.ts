@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router";
 import ProductDetail from "../../app/routes/product-detail";
 
 describe("product detail marked banner placements", () => {
-  it("renders exactly the four marked 320x50 slots around product content", () => {
+  it("renders only one approved 320x50 banner zone, without duplicate requests", () => {
     const props = {
       loaderData: {
         product: {
@@ -25,19 +25,11 @@ describe("product detail marked banner placements", () => {
     const html = renderToStaticMarkup(
       createElement(MemoryRouter, {}, createElement(ProductDetail, props))
     );
-    const slots = [
-      "product-after-breadcrumbs",
-      "product-before-editorial",
-      "product-before-share",
-      "product-before-footer",
-    ];
-    expect((html.match(/data-ad-placement=/g) ?? [])).toHaveLength(4);
-    const indexes = slots.map(name => html.indexOf(`data-ad-placement="${name}"`));
-    expect(indexes.every(index => index !== -1)).toBe(true);
-    expect(indexes).toEqual([...indexes].sort((a, b) => a - b));
-    expect(indexes[0]).toBeGreaterThan(html.indexOf("Home"));
-    expect(indexes[1]).toBeGreaterThan(html.indexOf("Example product"));
-    expect(indexes[2]).toBeLessThan(html.indexOf("Share this product"));
-    expect(indexes[3]).toBeGreaterThan(html.indexOf("related products"));
+    expect((html.match(/data-ad-placement=/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('data-ad-placement="product-after-breadcrumbs"');
+    expect(html).not.toContain('data-ad-placement="product-before-editorial"');
+    expect(html).not.toContain('data-ad-placement="product-before-share"');
+    expect(html).not.toContain('data-ad-placement="product-before-footer"');
+    expect(html).toContain("www.highrevenueformat.com");
   });
 });

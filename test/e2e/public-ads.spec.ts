@@ -12,42 +12,31 @@ test.beforeEach(async ({ page }) => {
   await page.route(/highrevenueformat\.com|profitableratecpmnetwork\.com/, route => route.abort());
 });
 
-async function assertBanner(page: import("@playwright/test").Page, name: string, lazy: boolean) {
+async function assertBanner(page: import("@playwright/test").Page, name: string) {
   const node = page.locator(`[data-ad-placement="${name}"]`);
   await expect(node).toHaveCount(1);
   await expect(node).toHaveAttribute("data-ad-banner-key", ADSTERRA_BANNER_KEY);
-  const iframe = node.locator("iframe");
-  await expect(iframe).toHaveAttribute("loading", "eager");
-  await expect(iframe).toHaveAttribute("height", "50");
-  await expect(iframe).toHaveAttribute("width", "320");
-  await expect(iframe).toHaveAttribute("sandbox", /allow-scripts.*allow-same-origin/);
-  if (!lazy) await expect(iframe).toHaveAttribute("src", "/adsterra-banner.html");
-  // Deferred banners are activated when scrolled into the viewport.
-  if (lazy) {
-    await node.scrollIntoViewIfNeeded();
-    await expect(iframe).toHaveAttribute("src", "/adsterra-banner.html");
-  }
+  await expect(node.locator(`script[src="${ADSTERRA_BANNER_SCRIPT_SRC}"]`)).toHaveCount(1);
+  await expect(node.locator("iframe")).toHaveCount(0);
+  const size = await node.evaluate(el => ({ width: el.getBoundingClientRect().width, height: el.getBoundingClientRect().height }));
+  expect(size.width).toBe(320);
+  expect(size.height).toBeGreaterThanOrEqual(50);
 }
 
-test("homepage has three screenshot-marked banners and no Social Bar", async ({ page }) => {
+test("homepage uses a single approved body banner code and no Social Bar", async ({ page }) => {
   await page.goto("/?market=US");
-  await assertBanner(page, "home-after-header", false);
-  await assertBanner(page, "home-after-categories", true);
-  await assertBanner(page, "home-after-first-row", true);
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
+  await assertBanner(page, "home-after-header");
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
   await expect(page.locator(`script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(0);
-
   await page.goto("/?market=CA");
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
   await expect(page.locator(`script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(0);
 });
 
-test("collection has three marked banner positions and one Social Bar attempt", async ({ page }) => {
+test("collection uses one approved banner and one frequency-limited Social Bar", async ({ page }) => {
   await page.goto("/collections/trending?market=US");
-  await assertBanner(page, "collection-after-header", false);
-  await assertBanner(page, "collection-before-grid", true);
-  await assertBanner(page, "collection-before-footer", true);
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
+  await assertBanner(page, "collection-after-header");
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
   await expect(page.locator(`body > script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(1);
   expect(await page.evaluate((key) => Number(localStorage.getItem(key)) > 0, LAST_SOCIAL_AT_KEY)).toBe(true);
 });
