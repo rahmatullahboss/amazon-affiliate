@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ShareButtons } from "../components/ShareButtons";
 import { ProductCard } from "../components/home/ProductCard";
+import { AdBanner } from "../components/AdBanner";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
   filterBlogPostsForMarketplace,
@@ -18,13 +19,14 @@ import {
   type PublicMarketplace,
 } from "../utils/marketplace";
 import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
-import { buildAmazonUrl } from "../../server/utils/types";
+import { createAmazonAffiliateHref, getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 import { getHomepageFeedRows } from "../../server/services/homepage-feed";
+import { getAllProductRows, getCollectionRows, type CollectionProductRow } from "../../server/services/collection-feed";
 import {
   buildComparisonGroups,
   buildHomePageSections,
+  buildHomepageProductRows,
   getHomepageKeywordLabel,
-  selectTopDealProducts,
 } from "../utils/homepage";
 import type { BlogPostSummary } from "../utils/blog";
 
@@ -44,7 +46,12 @@ interface ProductRow {
 
 interface HomeLoaderData {
   products: ProductRow[];
+  allProducts: ProductRow[];
   posts: BlogPostSummary[];
+  comparisonPosts: BlogPostSummary[];
+  trendingProducts: ProductRow[];
+  topProducts: ProductRow[];
+  latestProducts: ProductRow[];
   selectedMarketplace: PublicMarketplace;
   selectionSource: MarketplaceSelectionSource;
   detectedMarketplace: PublicMarketplace | null;
@@ -90,8 +97,9 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   });
   const selectedMarketplace = marketplaceContext.marketplace;
 
-  const [productsResult, postsResult] = await Promise.all([
+  const [productsResult, allRows, postsResult, comparisonResult, trendingRows, topRows, latestRows] = await Promise.all([
     getHomepageFeedRows(env.DB, selectedMarketplace, 44),
+    getAllProductRows(env.DB, selectedMarketplace, 6),
     env.DB.prepare(
       `SELECT *
        FROM blog_posts
@@ -103,6 +111,15 @@ export async function loader({ request, context }: Route.LoaderArgs) {
         cover_image_key: string | null;
       }
     >(),
+    env.DB.prepare(
+      `SELECT * FROM blog_posts
+       WHERE is_deleted = 0 AND status = 'published'
+         AND generation_topic = 'automated_comparison' AND generation_marketplace = ?
+       ORDER BY published_at DESC, id DESC LIMIT 2`
+    ).bind(selectedMarketplace).all<BlogPostSummary & { cover_image_key: string | null }>(),
+    getCollectionRows(env.DB, selectedMarketplace, "trending", 6),
+    getCollectionRows(env.DB, selectedMarketplace, "top-10", 10),
+    getCollectionRows(env.DB, selectedMarketplace, "latest", 6),
   ]);
   const siteBranding = await env.DB.prepare(
     `SELECT og_site_name, og_description, og_image_url
@@ -122,17 +139,37 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     selectedMarketplace
   );
 
+  const productAffiliateHrefs = await getPublicProductAffiliateHrefs(
+    env.DB, [...productsResult, ...allRows, ...trendingRows, ...topRows, ...latestRows]
+  );
+
+  function toPublicCollectionRows(rows: CollectionProductRow[]): ProductRow[] {
+    return rows.map((row) => ({
+      ...row, agent_slug: null, source_type: "fallback" as const, created_at: "",
+      public_href: `/deals/${row.asin}`,
+      direct_amazon_url: productAffiliateHrefs.get(row.id) ?? null,
+    }));
+  }
+
   return {
+    allProducts: toPublicCollectionRows(allRows),
+    trendingProducts: toPublicCollectionRows(trendingRows),
+    topProducts: toPublicCollectionRows(topRows),
+    latestProducts: toPublicCollectionRows(latestRows),
     products: productsResult.map((product) => ({
       ...product,
       public_href: product.agent_slug
         ? buildHomepageProductPath(product.agent_slug, product.marketplace, product.asin)
         : `/deals/${product.asin}`,
-      direct_amazon_url: product.tracking_tag
-        ? buildAmazonUrl(product.asin, product.tracking_tag, product.marketplace || "US")
-        : null,
+      direct_amazon_url: createAmazonAffiliateHref(product.asin, product.marketplace, product.tracking_tag) ?? productAffiliateHrefs.get(product.id) ?? null,
     })),
     posts,
+    comparisonPosts: (comparisonResult.results || []).map((row) => ({
+      ...row,
+      cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
+      excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
+      reading_minutes: estimateReadingMinutes(row.content),
+    })),
     selectedMarketplace,
     selectionSource: marketplaceContext.source,
     detectedMarketplace: marketplaceContext.detectedMarketplace,
@@ -160,10 +197,10 @@ const editorialHighlights = [
 const marketplaceLabels = ["US", "CA", "UK", "DE", "IT", "FR", "ES"];
 
 const quickAccessLinks = [
-  { label: "Trending Deals", to: "/deals" },
-  { label: "Latest Deals", to: "/deals" },
-  { label: "Top 10 Deals", to: "/deals" },
-  { label: "About / Contact / Policy", to: "/about" },
+  { label: "Trending Deals", to: "/collections/trending" },
+  { label: "Latest Deals", to: "/collections/latest" },
+  { label: "Top 10 Deals", to: "/collections/top-10" },
+  { label: "Featured", to: "/collections/featured" },
 ];
 
 const HOMEPAGE_GUIDE_SKIP_KEY = "homepage-guide-skipped";
@@ -189,16 +226,22 @@ function getMarketplaceStatusCopy(
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products, posts, selectedMarketplace, selectionSource, detectedMarketplace } =
+  const { products, allProducts, posts, comparisonPosts, selectedMarketplace, selectionSource, detectedMarketplace, trendingProducts, topProducts, latestProducts } =
     loaderData as HomeLoaderData;
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isGuideSkipped, setIsGuideSkipped] = useState(false);
-  const { featuredPost, supportingPosts, primaryProducts, trendingProducts, topDealProducts } =
+  const { featuredPost, supportingPosts, primaryProducts } =
     buildHomePageSections({
       posts,
       products,
     });
-  const randomizedTopDeals = selectTopDealProducts(topDealProducts.length > 0 ? topDealProducts : primaryProducts, selectedMarketplace);
+  const productRows = buildHomepageProductRows({
+    allProducts,
+    trendingProducts,
+    latestProducts,
+    topProducts,
+    marketplace: selectedMarketplace,
+  });
   const comparisonGroups = buildComparisonGroups(primaryProducts);
   const statusCopy = getMarketplaceStatusCopy(
     selectionSource,
@@ -223,145 +266,86 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_34%,#f4f6f6_100%)]">
-      <section className="border-b border-gray-200 bg-white/80">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)] lg:items-center lg:px-6 lg:py-16">
-          <div className="max-w-2xl">
-            <p className="mb-4 text-xs font-bold uppercase tracking-[0.35em] text-primary">
-              Smart picks for everyday buyers
-            </p>
-            <h1 className="max-w-xl text-4xl font-black leading-tight text-gray-950 md:text-6xl">
-              Find useful Amazon products faster and buy with more confidence
-            </h1>
-            <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 md:text-lg">
-              Browse fresh product picks, quick comparisons, and simple buyer-friendly guides built to help shoppers in the US, Canada, and Europe choose better products faster.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/deals"
-                className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
-              >
-                Shop Latest Deals
-              </Link>
-              <Link
-                to="/blog"
-                className="inline-flex items-center justify-center rounded-full border border-gray-300 px-6 py-3 text-sm font-bold text-gray-700 transition-colors hover:border-primary hover:text-primary"
-              >
-                Read Smart Buying Guides
-              </Link>
+      <AdBanner placement="home-after-header" eager />
+      <section className="border-b border-gray-200 bg-white px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h1 className="text-xl font-black text-gray-950 sm:text-3xl">Fresh product picks and comparisons</h1>
+              <p className="mt-1 text-xs text-gray-600 sm:text-sm">Explore genuine product details and check current prices on Amazon.</p>
             </div>
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              {[
-                "Latest picks updated daily",
-                "Buyer-focused product captions",
-                "Quick details before checkout",
-              ].map((item) => (
-                <div key={item} className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-sm font-semibold text-gray-700 shadow-sm">
-                  {item}
-                </div>
-              ))}
-            </div>
+            <Link to="/blog" className="rounded-full border border-gray-200 px-3 py-2 text-xs font-bold text-primary hover:border-primary">Buying guides</Link>
           </div>
-
-          {primaryProducts[0] ? (
-            <HeroFeaturedProduct
-              product={primaryProducts[0]}
-              marketplace={selectedMarketplace}
-            />
-          ) : null}
+          <nav aria-label="Choose country" className="mt-4 flex items-center gap-2 overflow-x-auto whitespace-nowrap border-t border-gray-100 pt-3">
+            <span className="mr-1 text-xs font-bold text-gray-500">Country</span>
+            {marketplaceLabels.map((market) => (
+              <Link key={market} to={`/?market=${market}`}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold ${market === selectedMarketplace ? "bg-primary text-white" : "bg-gray-100 text-gray-700 hover:bg-gray-200"}`}
+              >{market}</Link>
+            ))}
+          </nav>
+          <nav aria-label="Explore collections" className="mt-3 flex gap-2 overflow-x-auto whitespace-nowrap pb-1">
+            {quickAccessLinks.map((link) => (
+              <Link key={link.label} to={`${link.to}?market=${selectedMarketplace}`} className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-primary hover:text-primary">{link.label}</Link>
+            ))}
+          </nav>
         </div>
       </section>
-
-      <section className="mx-auto max-w-7xl px-4 py-8 lg:px-6">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {quickAccessLinks.map((link) => (
-            <Link
-              key={link.label}
-              to={link.to}
-              className="rounded-2xl border border-gray-200 bg-white px-5 py-4 text-sm font-bold text-gray-700 transition hover:border-primary hover:text-primary"
-            >
-              {link.label}
-            </Link>
-          ))}
-        </div>
-      </section>
+      <AdBanner placement="home-after-categories" />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 lg:px-6">
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
           <div>
-            <div className="rounded-[2rem] border border-gray-200 bg-[linear-gradient(135deg,#0f2020_0%,#153f3f_55%,#1b5656_100%)] px-6 py-8 text-white shadow-[0_24px_70px_-40px_rgba(15,64,64,0.6)] md:px-8">
-              <p className="text-xs font-bold uppercase tracking-[0.35em] text-primary/90">
-                Today&apos;s Best Amazon Deals
-              </p>
-              <h2 className="mt-4 max-w-3xl text-3xl font-black leading-tight md:text-5xl">
-                Discover top-rated Amazon finds before everyone else
-              </h2>
-              <p className="mt-5 max-w-2xl text-base leading-7 text-white/75">
-                Fresh picks updated daily for shoppers in the US, Canada, and Europe. Explore trending products, compare smarter, and jump to the best fit when you are ready to buy.
-              </p>
-              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link
-                  to="/deals"
-                  className="inline-flex items-center justify-center rounded-full bg-primary px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
-                >
-                  Shop Latest Deals
-                </Link>
-                <Link
-                  to="/blog"
-                  className="inline-flex items-center justify-center rounded-full border border-white/20 px-6 py-3 text-sm font-bold text-white transition-colors hover:border-white/50"
-                >
-                  See Smart Buying Guides
-                </Link>
-              </div>
+            <div className="mt-8 space-y-8">
+              {productRows.map((row, rowIndex) => (
+                <div key={row.key}>
+                <section aria-labelledby={`home-row-${row.key}`}>
+                  <div className="flex items-center justify-between gap-3 border-b border-gray-200 pb-3">
+                    <div className="min-w-0">
+                      <h2 id={`home-row-${row.key}`} className="text-xl font-black text-gray-950 sm:text-2xl">
+                        {row.title}
+                      </h2>
+                      <p className="mt-1 text-xs text-gray-600 sm:text-sm">{row.description}</p>
+                    </div>
+                    <Link
+                      to={row.seeAllHref}
+                      className="shrink-0 rounded-lg border border-primary/30 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/5 sm:text-sm"
+                      aria-label={`See all ${row.title}`}
+                    >
+                      See all
+                    </Link>
+                  </div>
+                  {row.products.length > 0 ? (
+                    <div
+                      className="mt-4 flex snap-x snap-mandatory gap-2 overflow-x-auto pb-3 sm:gap-3"
+                      aria-label={`Scroll ${row.title} products`}
+                    >
+                      {row.products.map((product) => (
+                        <div
+                          key={`${row.key}-${product.id}`}
+                          className="min-w-0 shrink-0 basis-[calc((100%-1.5rem)/4)] snap-start sm:basis-[calc((100%-2.25rem)/4)] xl:basis-[calc((100%-3.75rem)/6)]"
+                        >
+                          <ProductCard
+                            item={product}
+                            href={`/deals/${product.asin}?market=${selectedMarketplace}`}
+                            primaryHref={product.direct_amazon_url}
+                            variant="homepageCompact"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-600">
+                      {row.emptyMessage}
+                    </p>
+                  )}
+                </section>
+                {rowIndex === 0 ? <AdBanner placement="home-after-first-row" /> : null}
+                </div>
+              ))}
             </div>
 
-            <div className="mt-10 flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                  Latest 30 Products
-                </p>
-                <h2 className="mt-2 text-3xl font-black text-gray-950">
-                  30 fresh product picks worth checking today
-                </h2>
-              </div>
-              <Link
-                to="/deals"
-                className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
-              >
-                View all deals
-              </Link>
-            </div>
-
-            {primaryProducts.length > 0 ? (
-              <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {primaryProducts.map((product, index) => (
-                  <ProductCard
-                    key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-primary`}
-                    item={{
-                      ...product,
-                      title: getHomepageKeywordLabel(product.category, product.title, index),
-                    }}
-                    href={product.public_href}
-                    primaryHref={product.direct_amazon_url || product.public_href}
-                    variant="homepageCompact"
-                    badgeLabel="Popular pick"
-                    description={`Buyer-friendly pick for ${selectedMarketplace} shoppers looking for a smarter option.`}
-                    primaryCtaLabel="Check Price on Amazon"
-                    secondaryCtaLabel="Details Check"
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="mt-8 rounded-3xl border border-dashed border-gray-300 bg-white p-12 text-center">
-                <h3 className="text-lg font-bold text-gray-900">Check back soon for new recommendations</h3>
-                <p className="mt-2 text-sm text-gray-600">
-                  Our editors are reviewing the next batch of product pages and buying guides.
-                  Please check back shortly.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-14 rounded-[2rem] border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+            <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:p-6">
               <div className="flex items-end justify-between gap-4 border-b border-gray-200 pb-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
@@ -372,12 +356,23 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   </h2>
                 </div>
                 <Link
-                  to="/blog"
+                  to="/comparisons"
                   className="text-sm font-bold text-primary transition-colors hover:text-primary-hover"
                 >
-                  View buying guides
+                  View all comparisons
                 </Link>
               </div>
+
+              {comparisonPosts.length > 0 ? (
+                <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                  {comparisonPosts.map((post) => (
+                    <div key={post.id} className="relative">
+                      <BlogCard post={post} />
+                      <Link to={`/blog/${post.slug}`} className="absolute bottom-3 right-4 text-xs font-bold text-primary">Read Comparison</Link>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {comparisonGroups.length > 0 ? (
                 <div className="mt-6 grid gap-6">
@@ -530,34 +525,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
             <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
               <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                Trending Deals
-              </p>
-              <div className="mt-5 grid gap-3">
-                {trendingProducts.length > 0 ? (
-                  trendingProducts.map((product, index) => (
-                    <Link
-                      key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-trending`}
-                      to={product.public_href}
-                      className="rounded-2xl border border-gray-200 px-4 py-4 transition hover:border-primary hover:bg-primary/5"
-                    >
-                      <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-gray-400">
-                        {getHomepageKeywordLabel(product.category, product.title, index)}
-                      </p>
-                      <p className="mt-2 line-clamp-2 text-sm font-semibold text-gray-900">
-                        {product.title}
-                      </p>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
-                    More trending products will show up here as soon as new listings are published.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
                 Email Subscription
               </p>
               <h3 className="mt-3 text-2xl font-bold text-gray-900">
@@ -606,30 +573,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               </p>
             </div>
 
-            <div className="rounded-[1.75rem] border border-gray-200 bg-white p-6 shadow-sm">
-              <p className="text-xs font-bold uppercase tracking-[0.3em] text-primary">
-                Top 10 Deals Today
-              </p>
-              <div className="mt-5 grid gap-3">
-                {randomizedTopDeals.length > 0 ? (
-                  randomizedTopDeals.map((product) => (
-                    <Link
-                      key={`${product.source_type}-${product.id}-${product.agent_slug ?? "default"}-top`}
-                      to={product.public_href}
-                      className="rounded-2xl border border-gray-200 px-4 py-4 transition hover:border-primary hover:bg-primary/5"
-                    >
-                      <p className="line-clamp-2 text-sm font-semibold text-gray-900">
-                        {product.title}
-                      </p>
-                    </Link>
-                  ))
-                ) : (
-                  <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50 p-4 text-sm text-gray-600">
-                    Top deal cards will appear here when more homepage products are available.
-                  </div>
-                )}
-              </div>
-            </div>
           </aside>
         </div>
       </section>

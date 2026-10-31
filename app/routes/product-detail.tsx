@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
 import { ShareButtons } from "../components/ShareButtons";
 import { ImageGallery } from "../components/product/ImageGallery";
+import { AdBanner } from "../components/AdBanner";
 import {
   getInitialPublicMarketplace,
   getProductEditorialSections,
@@ -17,7 +18,7 @@ import {
 } from "../utils/affiliate-copy";
 import { buildSeoMeta } from "../utils/seo";
 import { getZarazAttributionPayload, setZarazContext, trackZaraz } from "../utils/zaraz";
-import { buildAmazonUrl } from "../../server/utils/types";
+import { getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 
 interface ProductRow {
   id: number;
@@ -46,6 +47,7 @@ interface ProductDetailData {
   canonicalPath: string;
   availableMarketplaces: string[];
   amazonUrlsByMarketplace: Record<string, string>;
+  relatedAmazonUrls: Record<number, string>;
 }
 
 function buildEditorialExcerpt(reviewContent: string | null, title: string): string {
@@ -74,7 +76,7 @@ export function meta({ data }: Route.MetaArgs) {
   });
 }
 
-export async function loader({ params, context }: Route.LoaderArgs) {
+export async function loader({ params, context, request }: Route.LoaderArgs) {
   const env = context.cloudflare.env;
   const asin = params.asin;
 
@@ -90,7 +92,9 @@ export async function loader({ params, context }: Route.LoaderArgs) {
     .bind(asin)
     .all<ProductRow>();
 
-  const product = productMatches[0] ?? null;
+  const requestedMarketplace = new URL(request.url).searchParams.get("market")?.toUpperCase();
+  const product = productMatches.find((p) => p.marketplace === requestedMarketplace) ??
+    productMatches[0] ?? null;
 
   if (!product) {
     throw new Response("Not Found", { status: 404 });
@@ -103,38 +107,6 @@ export async function loader({ params, context }: Route.LoaderArgs) {
         .filter((item): item is string => item !== null && item.length > 0)
     )
   ).sort((left, right) => left.localeCompare(right));
-
-  const amazonUrlsByMarketplace: Record<string, string> = {};
-
-  if (availableMarketplaces.length > 0) {
-    const placeholders = availableMarketplaces.map(() => "?").join(", ");
-    const { results: trackingRows } = await env.DB
-      .prepare(
-        `
-          SELECT marketplace, tag
-          FROM tracking_ids
-          WHERE is_active = 1
-            AND is_site_primary = 1
-            AND marketplace IN (${placeholders})
-          ORDER BY marketplace ASC, id DESC
-        `
-      )
-      .bind(...availableMarketplaces)
-      .all<{ marketplace: string | null; tag: string }>();
-
-    for (const trackingRow of trackingRows ?? []) {
-      const marketplace = trackingRow.marketplace?.trim().toUpperCase() || null;
-      if (!marketplace || amazonUrlsByMarketplace[marketplace]) {
-        continue;
-      }
-
-      amazonUrlsByMarketplace[marketplace] = buildAmazonUrl(
-        asin,
-        trackingRow.tag,
-        marketplace
-      );
-    }
-  }
 
   const relatedQuery =
     product.category && product.category.trim().length > 0
@@ -159,12 +131,30 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
   const { results: related } = await relatedQuery.all<RelatedProductRow>();
 
+  const affiliateLinks = await getPublicProductAffiliateHrefs(
+    env.DB, [...productMatches, ...(related ?? [])]
+  );
+  const amazonUrlsByMarketplace: Record<string, string> = {};
+  for (const match of productMatches) {
+    if (match.marketplace) {
+      const href = affiliateLinks.get(match.id);
+      if (href) amazonUrlsByMarketplace[match.marketplace] = href;
+    }
+  }
+  const relatedAmazonUrls = Object.fromEntries(
+    (related ?? []).flatMap((p) => {
+      const href = affiliateLinks.get(p.id);
+      return href ? [[p.id, href]] : [];
+    })
+  ) as Record<number, string>;
+
   return {
     product,
     relatedProducts: related || [],
     canonicalPath: `/deals/${asin}`,
     availableMarketplaces,
     amazonUrlsByMarketplace,
+    relatedAmazonUrls,
   } satisfies ProductDetailData;
 }
 
@@ -190,7 +180,8 @@ function ProductAffiliateDisclosureNote() {
 }
 
 export default function ProductDetail({ loaderData }: Route.ComponentProps) {
-  const { product, relatedProducts, availableMarketplaces, amazonUrlsByMarketplace } = loaderData as ProductDetailData;
+  const { product, relatedProducts, availableMarketplaces, amazonUrlsByMarketplace, relatedAmazonUrls } = loaderData as ProductDetailData;
+  const [copiedDetails, setCopiedDetails] = useState(false);
   const galleryImages = parseJsonArray(product.product_images);
   const publicProductCallout = getPublicProductPageCallout();
   const editorialSections = getProductEditorialSections(product.review_content);
@@ -220,6 +211,18 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_25%,#f4f6f6_100%)]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: product.title,
+          sku: product.asin,
+          image: [product.image_url, ...galleryImages].filter(Boolean),
+          category: product.category || undefined,
+          url: `https://dealsrky.com/deals/${product.asin}`,
+        }).replace(/</g, "\\u003c") }}
+      />
       <div className="border-b border-gray-200 bg-white/70">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-4 py-4 text-sm text-gray-500 lg:px-6">
           <Link to="/" className="hover:text-primary">
@@ -237,6 +240,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
           ) : null}
         </div>
       </div>
+      <AdBanner placement="product-after-breadcrumbs" eager />
 
       <div className="mx-auto max-w-7xl px-4 py-10 pb-28 lg:px-6 lg:pb-10">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:items-start">
@@ -261,6 +265,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
             <h1 className={getProductDetailTitleClass(product.title)}>
               {product.title}
             </h1>
+            <AdBanner placement="product-before-editorial" />
 
             {product.review_content ? (
               <div className="mt-4 rounded-[1.5rem] border border-gray-200 bg-gray-50/80 p-5 md:mt-5">
@@ -312,6 +317,17 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
               <ProductAffiliateDisclosureNote />
             </div>
 
+            <button type="button" onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(`${product.title}\nASIN: ${product.asin}\nhttps://dealsrky.com/deals/${product.asin}`);
+                setCopiedDetails(true);
+              } catch {
+                setCopiedDetails(false);
+              }
+            }} className="mt-4 rounded-lg border border-gray-200 px-4 py-2 text-sm font-bold text-gray-700 hover:border-primary hover:text-primary">
+              {copiedDetails ? "Details copied" : "Copy details"}
+            </button>
+
             {availableMarketplaces.length > 0 ? (
               <div className="mt-6">
                 {availableMarketplaces.length > 1 ? (
@@ -354,6 +370,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                     <p className="mt-3 text-sm leading-6 text-gray-600">
                       {AMAZON_DESTINATION_NOTE}
                     </p>
+                    <AdBanner placement="product-before-share" />
                     <div className="mt-5">
                       <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
                         Share this product
@@ -368,7 +385,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                   </div>
                 ) : selectedMarketplace ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-                    No active site-primary Amazon tag is configured for the selected {selectedMarketplace} marketplace yet.
+                    No approved product-specific Amazon tracking is available for {selectedMarketplace}.
                   </div>
                 ) : null}
               </div>
@@ -393,7 +410,13 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
             {filteredRelatedProducts.length > 0 ? (
               <div className="mt-8 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
                 {filteredRelatedProducts.map((relatedProduct) => (
-                  <ProductCard key={relatedProduct.id} item={relatedProduct} />
+                  <ProductCard
+                    key={relatedProduct.id}
+                    item={relatedProduct}
+                    primaryHref={relatedAmazonUrls[relatedProduct.id] ?? null}
+                    href={`/deals/${relatedProduct.asin}?market=${selectedMarketplace}`}
+                    variant="homepageCompact"
+                  />
                 ))}
               </div>
             ) : (
@@ -403,8 +426,22 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
             )}
           </section>
         ) : null}
+        <AdBanner placement="product-before-footer" />
       </div>
-
+      {selectedAmazonUrl ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-2 shadow-[0_-8px_32px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
+            <div className="min-w-0">
+              <p className="truncate text-xs font-bold text-gray-900 sm:text-sm">{product.title}</p>
+              <p className="text-[10px] text-gray-500">ASIN: {product.asin} · {selectedMarketplace}</p>
+            </div>
+            <a href={selectedAmazonUrl} target="_blank" rel="nofollow sponsored noopener noreferrer"
+               className="shrink-0 rounded-full bg-primary px-4 py-2.5 text-xs font-bold text-white hover:bg-primary-hover sm:text-sm">
+              Continue to Amazon
+            </a>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

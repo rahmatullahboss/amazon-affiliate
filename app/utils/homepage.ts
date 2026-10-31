@@ -31,6 +31,57 @@ export function buildHomePageSections<
   };
 }
 
+/** A short preview for each independently navigable homepage section. */
+export function buildHomepageProductRows<TProduct>({
+  allProducts,
+  trendingProducts,
+  latestProducts,
+  topProducts,
+  marketplace,
+}: {
+  allProducts: TProduct[];
+  trendingProducts: TProduct[];
+  latestProducts: TProduct[];
+  topProducts: TProduct[];
+  marketplace: string;
+}) {
+  const market = encodeURIComponent(marketplace);
+  return [
+    {
+      key: "all",
+      title: "All Products",
+      description: "Recently updated products",
+      seeAllHref: `/deals?market=${market}`,
+      products: allProducts.slice(0, 6),
+      emptyMessage: "No products available for this country yet.",
+    },
+    {
+      key: "trending",
+      title: "Trending Deals",
+      description: "Popular by site clicks in the past 7 days",
+      seeAllHref: `/collections/trending?market=${market}`,
+      products: trendingProducts.slice(0, 6),
+      emptyMessage: "Trending products will appear after shoppers visit product pages.",
+    },
+    {
+      key: "latest",
+      title: "Latest Deals",
+      description: "New or updated listings from the last 72 hours",
+      seeAllHref: `/collections/latest?market=${market}`,
+      products: latestProducts.slice(0, 6),
+      emptyMessage: "No new or updated products in the last 72 hours.",
+    },
+    {
+      key: "top-10",
+      title: "Top 10 Deals",
+      description: "Top products by site clicks in the past 7 days",
+      seeAllHref: `/collections/top-10?market=${market}`,
+      products: topProducts.slice(0, 6),
+      emptyMessage: "Top products will appear once there is enough recent click activity.",
+    },
+  ] as const;
+}
+
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   electronics: [
     "Cool tech gadgets",

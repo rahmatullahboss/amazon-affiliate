@@ -2,11 +2,42 @@ import { describe, expect, it } from "vitest";
 import {
   buildComparisonGroups,
   buildHomePageSections,
+  buildHomepageProductRows,
   getHomepageKeywordLabel,
   selectTopDealProducts,
 } from "../../app/utils/homepage";
 
 describe("homepage sections", () => {
+  it("previews exactly four separate market-aware rows with matching See all destinations", () => {
+    const products = Array.from({ length: 10 }, (_, index) => ({ id: index + 1 }));
+    const rows = buildHomepageProductRows({
+      allProducts: products,
+      trendingProducts: products,
+      latestProducts: products.slice(0, 3),
+      topProducts: products,
+      marketplace: "UK",
+    });
+    expect(rows.map((row) => row.title)).toEqual([
+      "All Products", "Trending Deals", "Latest Deals", "Top 10 Deals",
+    ]);
+    expect(rows.map((row) => row.seeAllHref)).toEqual([
+      "/deals?market=UK",
+      "/collections/trending?market=UK",
+      "/collections/latest?market=UK",
+      "/collections/top-10?market=UK",
+    ]);
+    expect(rows.map((row) => row.products.length)).toEqual([6, 6, 3, 6]);
+  });
+
+  it("retains empty collection sections instead of mislabeling unrelated products", () => {
+    const rows = buildHomepageProductRows({
+      allProducts: [{ id: 1 }], trendingProducts: [], latestProducts: [],
+      topProducts: [], marketplace: "US",
+    });
+    expect(rows).toHaveLength(4);
+    expect(rows[0].products).toHaveLength(1);
+    expect(rows.slice(1).every((row) => row.products.length === 0 && row.emptyMessage.length > 0)).toBe(true);
+  });
   it("builds a 30-product homepage grid and supporting sidebar slices", () => {
     const sections = buildHomePageSections({
       posts: [

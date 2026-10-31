@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Storefront Disclosures & UI', () => {
+  test('homepage shows four compact product rows with country-aware See all destinations', async ({ page }) => {
+    await page.goto('/?market=CA');
+    const rowNames = [
+      ['all', 'All Products', '/deals?market=CA'],
+      ['trending', 'Trending Deals', '/collections/trending?market=CA'],
+      ['latest', 'Latest Deals', '/collections/latest?market=CA'],
+      ['top-10', 'Top 10 Deals', '/collections/top-10?market=CA'],
+    ] as const;
+    await expect(page.locator('section[aria-labelledby^="home-row-"]')).toHaveCount(4);
+    for (const [key, name, destination] of rowNames) {
+      await expect(page.locator(`#home-row-${key}`)).toHaveText(name);
+      await expect(page.getByRole('link', { name: `See all ${name}` })).toHaveAttribute('href', destination);
+    }
+    await page.getByRole('link', { name: 'See all Latest Deals' }).click();
+    await expect(page).toHaveURL('http://localhost:5173/collections/latest?market=CA');
+  });
 
   test('P0-004: Renders Amazon Disclosure exactly as required by TOS', async ({ page }) => {
     await page.goto('/');
