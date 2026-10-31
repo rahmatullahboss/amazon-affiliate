@@ -17,12 +17,16 @@ async function assertBanner(page: import("@playwright/test").Page, name: string,
   await expect(node).toHaveCount(1);
   await expect(node).toHaveAttribute("data-ad-banner-key", ADSTERRA_BANNER_KEY);
   const iframe = node.locator("iframe");
-  await expect(iframe).toHaveAttribute("loading", lazy ? "lazy" : "eager");
+  await expect(iframe).toHaveAttribute("loading", "eager");
   await expect(iframe).toHaveAttribute("height", "50");
   await expect(iframe).toHaveAttribute("width", "320");
-  const srcDoc = await iframe.getAttribute("srcdoc");
-  expect(srcDoc).toContain(ADSTERRA_BANNER_SCRIPT_SRC);
-  expect(srcDoc).toContain(JSON.stringify(ADSTERRA_BANNER_OPTIONS));
+  await expect(iframe).toHaveAttribute("sandbox", /allow-scripts.*allow-same-origin/);
+  if (!lazy) await expect(iframe).toHaveAttribute("src", "/adsterra-banner.html");
+  // Deferred banners are activated when scrolled into the viewport.
+  if (lazy) {
+    await node.scrollIntoViewIfNeeded();
+    await expect(iframe).toHaveAttribute("src", "/adsterra-banner.html");
+  }
 }
 
 test("homepage has three screenshot-marked banners and no Social Bar", async ({ page }) => {

@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData } from "react-router";
+import { Outlet, useLoaderData, useLocation } from "react-router";
 import type { Route } from "./+types/public-layout";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -25,9 +25,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 export default function PublicLayout() {
   const data = (useLoaderData() ?? {}) as Partial<PublicLayoutLoaderData>;
-  const socialLinks = data.socialLinks ?? null;
+  const isHomepage = useLocation().pathname === "/";
+  const socialLinks = isHomepage ? null : data.socialLinks ?? null;
   return (
     <div className="flex flex-col min-h-screen">
+      <link rel="preconnect" href="https://www.highrevenueformat.com" crossOrigin="anonymous" />
+      <link rel="dns-prefetch" href="https://www.highrevenueformat.com" />
       <Header />
       <PublicAds />
       <main className="flex-grow">

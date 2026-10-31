@@ -1,14 +1,9 @@
-import {
-  ADSTERRA_BANNER_KEY,
-  ADSTERRA_BANNER_OPTIONS,
-  ADSTERRA_BANNER_SCRIPT_SRC,
-} from "../utils/public-ads";
+import { useEffect, useRef, useState } from "react";
+import { ADSTERRA_BANNER_KEY } from "../utils/public-ads";
 
-// A separate frame per slot avoids competing global atOptions and
-// document.write calls when the same publisher tag appears multiple times.
-const BANNER_DOCUMENT = `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;width:320px;height:50px;overflow:hidden">
-<script>var atOptions = ${JSON.stringify(ADSTERRA_BANNER_OPTIONS)};</script>
-<script src="${ADSTERRA_BANNER_SCRIPT_SRC}"></script></body></html>`;
+// Real first-party URL preserves the DealsRky Referer for publisher verification.
+// The old about:srcdoc frames sent no Referer and received empty ad scripts.
+export const BANNER_FRAME_URL = "/adsterra-banner.html";
 
 export function AdBanner({
   placement,
@@ -19,8 +14,31 @@ export function AdBanner({
   eager?: boolean;
   className?: string;
 }) {
+  const container = useRef<HTMLDivElement>(null);
+  const [isNearViewport, setIsNearViewport] = useState(eager);
+
+  useEffect(() => {
+    if (isNearViewport) return;
+    const node = container.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setIsNearViewport(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        setIsNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isNearViewport]);
+
   return (
     <div
+      ref={container}
       data-ad-placement={placement}
       data-ad-banner-key={ADSTERRA_BANNER_KEY}
       role="complementary"
@@ -29,13 +47,14 @@ export function AdBanner({
     >
       <iframe
         title={`Advertisement — ${placement}`}
-        srcDoc={BANNER_DOCUMENT}
+        src={isNearViewport ? BANNER_FRAME_URL : undefined}
+        data-ad-ready={isNearViewport ? "true" : "false"}
         width={320}
         height={50}
-        loading={eager ? "eager" : "lazy"}
+        loading="eager"
         scrolling="no"
-        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
-        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        referrerPolicy="origin"
         className="block h-[50px] w-[320px] max-w-full border-0"
       />
     </div>
