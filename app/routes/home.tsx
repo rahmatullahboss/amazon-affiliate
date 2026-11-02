@@ -30,6 +30,8 @@ import {
 } from "../utils/homepage";
 import type { BlogPostSummary } from "../utils/blog";
 
+export const HOMEPAGE_CONTENT_GRID_CLASS = "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,1fr)_320px]";
+
 interface ProductRow {
   id: number;
   asin: string;
@@ -293,9 +295,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <AdBanner placement="home-after-categories" />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 lg:px-6">
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
-          <div>
-            <div className="mt-8 space-y-8">
+        <div className={HOMEPAGE_CONTENT_GRID_CLASS}>
+          <div className="min-w-0">
+            <div className="mt-8 min-w-0 space-y-8">
               {productRows.map((row, rowIndex) => (
                 <div key={row.key}>
                 <section aria-labelledby={`home-row-${row.key}`}>

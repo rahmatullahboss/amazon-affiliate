@@ -126,15 +126,15 @@ export default function DealsPage({ loaderData }: Route.ComponentProps) {
             </div>
 
             {/* Product Grid Area */}
-            <div className="w-full md:w-3/4">
+            <div className="min-w-0 w-full md:w-3/4">
                <div className="flex justify-between items-center mb-6 bg-white border border-gray-200 p-3 rounded-lg shadow-sm">
                   <span className="text-sm font-medium text-gray-600">Showing {data.products.length} results in {data.selectedMarketplace}</span>
                   <div className="text-sm text-gray-500">Sorted by: <strong className="text-gray-800">Latest</strong></div>
                </div>
 
                 {data.products.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {data.products.map((p) => <ProductCard key={p.id} item={p} />)}
+                  <div className="grid grid-cols-4 gap-2 sm:gap-3 xl:grid-cols-4">
+                    {data.products.map((p) => <ProductCard key={p.id} item={p} variant="homepageCompact" />)}
                   </div>
                 ) : (
                   <div className="text-center py-20 bg-white border border-gray-200 rounded-lg shadow-sm">
