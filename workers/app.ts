@@ -1,4 +1,9 @@
 import { createRequestHandler } from "react-router";
+import type { Bindings } from "../server/utils/types";
+
+// Wrangler-generated bindings omit deployment secrets; the API still needs
+// the complete declared application binding contract for typed handler calls.
+type Env = Cloudflare.Env & Bindings;
 import { apiApp } from "../server/api";
 import { createBlogImageResponse } from "../server/services/blog";
 import { generateScheduledBlogDraft, publishDueScheduledBlogPosts } from "../server/services/blog-generation";

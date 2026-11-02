@@ -3,6 +3,7 @@ import type { Route } from "./+types/public-layout";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { PublicAds } from "../components/PublicAds";
+import { AdBanner } from "../components/AdBanner";
 import {
   getSocialLinksSettings,
   toPublicSocialLinks,
@@ -32,6 +33,7 @@ export default function PublicLayout() {
       <link rel="preconnect" href="https://www.highrevenueformat.com" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="https://www.highrevenueformat.com" />
       <Header />
+      <AdBanner placement="public-under-header" />
       <PublicAds />
       <main className="flex-grow">
         <Outlet />

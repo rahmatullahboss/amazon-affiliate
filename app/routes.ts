@@ -17,6 +17,7 @@ export default [
 
     // Dynamic Content Routes
     route("deals", "routes/deals.tsx"),
+    route("collections/:kind", "routes/collection.tsx"),
     route("deals/:asin", "routes/product-detail.tsx"),
     route("category/:slug", "routes/category.tsx"),
     route("t/:trackingTag/:asin", "routes/tracking-shortcut.tsx"),

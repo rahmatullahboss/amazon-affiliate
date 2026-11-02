@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ShareButtons } from "../components/ShareButtons";
 import { ProductCard } from "../components/home/ProductCard";
-import { AdBanner } from "../components/AdBanner";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
   filterBlogPostsForMarketplace,
@@ -266,7 +265,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f6f8f8_0%,#ffffff_34%,#f4f6f6_100%)]">
-      <AdBanner placement="home-after-header" eager />
       <section className="border-b border-gray-200 bg-white px-3 py-4 sm:px-6 sm:py-6">
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -291,7 +289,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </nav>
         </div>
       </section>
-      <AdBanner placement="home-after-categories" />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 lg:px-6">
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -328,7 +325,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                           <ProductCard
                             item={product}
                             href={`/deals/${product.asin}?market=${selectedMarketplace}`}
-                            primaryHref={product.direct_amazon_url}
+                            primaryHref={product.direct_amazon_url ?? undefined}
                             variant="homepageCompact"
                           />
                         </div>
@@ -340,7 +337,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     </p>
                   )}
                 </section>
-                {rowIndex === 0 ? <AdBanner placement="home-after-first-row" /> : null}
                 </div>
               ))}
             </div>

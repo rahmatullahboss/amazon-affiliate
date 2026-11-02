@@ -3,7 +3,6 @@ import {
   ADSTERRA_BANNER_KEY,
   ADSTERRA_BANNER_SCRIPT_SRC,
   ADSTERRA_SOCIAL_BAR_SCRIPT_SRC,
-  ADSTERRA_BANNER_OPTIONS,
 } from "../../app/utils/public-ads";
 
 const LAST_SOCIAL_AT_KEY = "dealsrky:adsterra:social-bar:last-shown-v2";
@@ -25,7 +24,7 @@ async function assertBanner(page: import("@playwright/test").Page, name: string)
 
 test("homepage uses a single approved body banner code and no Social Bar", async ({ page }) => {
   await page.goto("/?market=US");
-  await assertBanner(page, "home-after-header");
+  await assertBanner(page, "public-under-header");
   await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
   await expect(page.locator(`script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(0);
   await page.goto("/?market=CA");
@@ -35,7 +34,7 @@ test("homepage uses a single approved body banner code and no Social Bar", async
 
 test("collection uses one approved banner and one frequency-limited Social Bar", async ({ page }) => {
   await page.goto("/collections/trending?market=US");
-  await assertBanner(page, "collection-after-header");
+  await assertBanner(page, "public-under-header");
   await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
   await expect(page.locator(`body > script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(1);
   expect(await page.evaluate((key) => Number(localStorage.getItem(key)) > 0, LAST_SOCIAL_AT_KEY)).toBe(true);
