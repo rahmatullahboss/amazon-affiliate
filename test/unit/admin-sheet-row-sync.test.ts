@@ -3,11 +3,13 @@ import { env } from "cloudflare:test";
 import * as productIngestionService from "../../server/services/product-ingestion";
 import {
   syncAdminSheetRows,
+  ADMIN_SHEET_RATE_LIMIT_KEY,
   type AdminSheetSyncRowInput,
 } from "../../server/services/admin-sheet-row-sync";
 
 describe("admin sheet row sync", () => {
   beforeEach(async () => {
+    await env.KV.delete(ADMIN_SHEET_RATE_LIMIT_KEY);
     await env.DB.prepare("DELETE FROM agent_products").run();
     await env.DB.prepare("DELETE FROM tracking_ids").run();
     await env.DB.prepare("DELETE FROM products").run();
@@ -679,6 +681,65 @@ describe("admin sheet row sync", () => {
       productTitle: "Fresh Product",
       resolvedTrackingTag: "admin-us-20",
     });
+  });
+
+  it("pauses further new-product API calls after provider 429 but preserves saved rows", async () => {
+    await env.DB.prepare(
+      `INSERT INTO products (id, asin, title, image_url, marketplace, status, is_active)
+       VALUES (6101, 'B0SAVED001', 'Already Saved', 'https://img.test/saved.jpg', 'US', 'active', 1)`
+    ).run();
+
+    const ensureSpy = vi.spyOn(productIngestionService, "ensureProductRecord")
+      .mockRejectedValue(new productIngestionService.AmazonProductFetchError({
+        asin: "B0RATELIM1",
+        marketplace: "US",
+        code: "rate_limited",
+        message: "Provider 429",
+        status: 429,
+      }));
+
+    const rows = ["B0RATELIM1", "B0RATELIM2", "B0RATELIM3", "B0SAVED001"].map(
+      (asin, index) => ({ rowNumber: index + 2, asin, marketplace: "US" })
+    );
+    const response = await syncAdminSheetRows({ db: env.DB, kv: env.KV, rows });
+
+    expect(ensureSpy.mock.calls.length).toBeLessThanOrEqual(2);
+    expect(await env.KV.get(ADMIN_SHEET_RATE_LIMIT_KEY)).toBe("1");
+    expect(response.results.map((row) => row.status)).toEqual([
+      "failed", "failed", "failed", "existing",
+    ]);
+    expect(response.results[2].errorMessage).toContain("temporarily rate limited");
+    expect(response.results[3].productTitle).toBe("Already Saved");
+    expect(await env.DB.prepare("SELECT COUNT(*) AS count FROM products")
+      .first<{ count: number }>()).toEqual({ count: 1 });
+  });
+
+  it("honors cross-request cooldown without resetting it and recovers when it expires", async () => {
+    await env.KV.put(ADMIN_SHEET_RATE_LIMIT_KEY, "1", { expirationTtl: 900 });
+    const ensureSpy = vi.spyOn(productIngestionService, "ensureProductRecord");
+
+    const row = { rowNumber: 2, asin: "B0RETRY001", marketplace: "US" };
+    const first = await syncAdminSheetRows({ db: env.DB, kv: env.KV, rows: [row] });
+    expect(first.results[0]).toMatchObject({ status: "failed" });
+    expect(first.results[0].errorMessage).toContain("paused briefly");
+    expect(ensureSpy).not.toHaveBeenCalled();
+
+    await env.KV.delete(ADMIN_SHEET_RATE_LIMIT_KEY);
+    ensureSpy.mockImplementation(async (input) => {
+      const inserted = await input.db.prepare(
+        "INSERT INTO products (asin, title, image_url, marketplace, status, is_active) VALUES (?, 'Recovered', 'https://img.test/recovered.jpg', ?, 'active', 1)"
+      ).bind(input.asin, input.marketplace).run();
+      return {
+        id: Number(inserted.meta.last_row_id),
+        asin: input.asin, title: "Recovered", image_url: "https://img.test/recovered.jpg",
+        marketplace: input.marketplace, category: null, status: "active",
+        description: null, features: null, review_content: null,
+        product_images: null, aplus_images: null,
+      };
+    });
+    const second = await syncAdminSheetRows({ db: env.DB, kv: env.KV, rows: [row] });
+    expect(second.results[0]).toMatchObject({ status: "live", productTitle: "Recovered" });
+    expect(ensureSpy).toHaveBeenCalledTimes(1);
   });
 
   it("rejects batches larger than 100 rows", async () => {

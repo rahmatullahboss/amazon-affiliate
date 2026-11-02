@@ -62,7 +62,7 @@ describe("admin Google Apps Script safety", () => {
   });
 
   it("includes a versioned system check for key, headers, triggers, and blank tags", () => {
-    expect(script).toContain('const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v3";');
+    expect(script).toContain('const SCRIPT_VERSION = "2026.11.02-rate-limit-recovery-v4";');
     expect(script).toContain("function runSystemCheck()");
     expect(script).toContain("SHEET_SYNC_KEY is missing from Script Properties.");
     expect(script).toContain("Header mismatch: ");
@@ -75,6 +75,57 @@ describe("admin Google Apps Script safety", () => {
       "Duplicate marketplace/ASIN products with conflicting tracking tags: "
     );
     expect(script).toContain("Duplicate submitted rows: ");
+  });
+
+  it("retries only pending/transient failures after cooldown, not successful or invalid rows", () => {
+    const column = {
+      ASIN: 1, SUBMIT: 5, SYNC_STATUS: 6, ERROR_MESSAGE: 13, SYNCED_AT: 14,
+    };
+    const eligible = new Function(
+      "COLUMN",
+      extractFunctionSource("isAutoRetryEligible_") + "\nreturn isAutoRetryEligible_;"
+    )(column) as (row: string[], now: number, failedOnly: boolean) => boolean;
+    const now = Date.parse("2026-11-02T12:00:00.000Z");
+    const row = (status: string, error = "", agoHours = 0) => {
+      const cells = Array<string>(14).fill("");
+      cells[0] = "B0SAMPLE01";
+      cells[4] = "YES";
+      cells[5] = status;
+      cells[12] = error;
+      cells[13] = new Date(now - agoHours * 3_600_000).toISOString();
+      return cells;
+    };
+    expect(eligible(row(""), now, false)).toBe(true);
+    expect(eligible(row("Existing"), now, false)).toBe(false);
+    expect(eligible(row("Live"), now, false)).toBe(false);
+    expect(eligible(row("Failed", "temporarily rate limited", 1), now, false)).toBe(false);
+    expect(eligible(row("Failed", "temporarily rate limited", 7), now, false)).toBe(true);
+    expect(eligible(row("Failed", "no live product data", 7), now, false)).toBe(false);
+    expect(eligible(row("Failed", "no live product data", 25), now, false)).toBe(true);
+    expect(eligible(row("Failed", "Provide a valid 10-character ASIN", 72), now, false)).toBe(false);
+    expect(eligible(row("Failed", "Invalid webhook secret", 72), now, false)).toBe(false);
+    expect(eligible(row("Failed", "HTTP 503: server error", 7), now, false)).toBe(true);
+    expect(eligible(row("Processing", "", 0.1), now, false)).toBe(false);
+    expect(eligible(row("Processing", "", 1), now, false)).toBe(true);
+    expect(eligible(row(""), now, true)).toBe(false);
+    expect(eligible(row("Failed", "rate limited", 7), now, true)).toBe(true);
+  });
+
+  it("does not force-refresh or erase successful link fields when retrying failures", () => {
+    const current = script.slice(
+      script.indexOf("function retryFailedRowsCurrentTab()"),
+      script.indexOf("function retryFailedRowsAllCountryTabs()")
+    );
+    const all = script.slice(
+      script.indexOf("function retryFailedRowsAllCountryTabs()"),
+      script.indexOf("function clearFailedStatus")
+    );
+    expect(current).not.toContain("clearResultForRows_");
+    expect(all).not.toContain("clearResultForRows_");
+    expect(current).toContain("forceUpdateExisting: false");
+    expect(all).toContain("forceUpdateExisting: false");
+    expect(script).toContain("const HOURLY_RECONCILE_LIMIT = 12;");
+    expect(script).toContain("getAutoRetryRows_(sheet, Date.now(), false)");
   });
 
   it("recovers the agent slug from both public and tracked redirect URLs", () => {
