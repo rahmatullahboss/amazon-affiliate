@@ -2,6 +2,7 @@ import type { Route } from "./+types/collection";
 import { Link } from "react-router";
 import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import { ProductCard } from "../components/home/ProductCard";
+import { AdBanner } from "../components/AdBanner";
 import { isCollectionKind, getCollectionRows, type CollectionKind, type CollectionProductRow } from "../../server/services/collection-feed";
 import { getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
@@ -77,6 +78,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         </div>
         <MarketplaceSelector selectedMarketplace={marketplace} label="Country" />
       </div>
+      <AdBanner placement="collection-before-grid" />
       {products.length ? (
         <div className="grid grid-cols-4 gap-2 sm:gap-3 xl:grid-cols-6">
           {products.map((p) => <ProductCard key={p.id} item={p} href={`/deals/${p.asin}?market=${marketplace}`} primaryHref={p.amazonHref ?? undefined} variant="homepageCompact" />)}
@@ -88,6 +90,7 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
           <Link to={`/deals?market=${marketplace}`} className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-bold text-white">Browse all deals</Link>
         </div>
       )}
+      <AdBanner placement="collection-before-footer" />
     </main>
   );
 }

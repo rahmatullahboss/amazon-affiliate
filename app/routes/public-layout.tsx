@@ -4,7 +4,7 @@ import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
 import { PublicAds } from "../components/PublicAds";
 import { AdBanner } from "../components/AdBanner";
-import { isEligiblePublicAdPath } from "../utils/public-ads";
+import { isEligiblePublicAdPath, isProductDetailAdPath } from "../utils/public-ads";
 import {
   getSocialLinksSettings,
   toPublicSocialLinks,
@@ -29,13 +29,15 @@ export default function PublicLayout() {
   const data = (useLoaderData() ?? {}) as Partial<PublicLayoutLoaderData>;
   const pathname = useLocation().pathname;
   const isHomepage = pathname === "/";
+  // On details pages the same primary zone belongs just below the breadcrumb.
+  const isProductDetail = isProductDetailAdPath(pathname);
   const socialLinks = isHomepage ? null : data.socialLinks ?? null;
   return (
     <div className="flex flex-col min-h-screen">
       <link rel="preconnect" href="https://www.highrevenueformat.com" crossOrigin="anonymous" />
       <link rel="dns-prefetch" href="https://www.highrevenueformat.com" />
       <Header />
-      {isEligiblePublicAdPath(pathname) ? <AdBanner placement="public-under-header" /> : null}
+      {isEligiblePublicAdPath(pathname) && !isProductDetail ? <AdBanner placement="public-under-header" /> : null}
       <PublicAds />
       <main className="flex-grow">
         <Outlet />

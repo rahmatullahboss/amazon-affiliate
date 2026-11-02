@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ProductCard } from "../components/home/ProductCard";
 import { ShareButtons } from "../components/ShareButtons";
 import { ImageGallery } from "../components/product/ImageGallery";
+import { AdBanner } from "../components/AdBanner";
 import {
   getInitialPublicMarketplace,
   getProductEditorialSections,
@@ -239,6 +240,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
           ) : null}
         </div>
       </div>
+      <AdBanner placement="product-after-breadcrumbs" />
 
       <div className="mx-auto max-w-7xl px-4 py-10 pb-28 lg:px-6 lg:pb-10">
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)] xl:items-start">
@@ -264,6 +266,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
               {product.title}
             </h1>
 
+            <AdBanner placement="product-before-editorial" />
             {product.review_content ? (
               <div className="mt-4 rounded-[1.5rem] border border-gray-200 bg-gray-50/80 p-5 md:mt-5">
                 <p className="text-xs font-bold uppercase tracking-[0.25em] text-primary">
@@ -367,6 +370,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
                     <p className="mt-3 text-sm leading-6 text-gray-600">
                       {AMAZON_DESTINATION_NOTE}
                     </p>
+                    <AdBanner placement="product-before-share" />
                     <div className="mt-5">
                       <p className="text-xs font-bold uppercase tracking-[0.25em] text-gray-500">
                         Share this product
@@ -422,6 +426,7 @@ export default function ProductDetail({ loaderData }: Route.ComponentProps) {
             )}
           </section>
         ) : null}
+        <AdBanner placement="product-before-footer" />
       </div>
       {selectedAmazonUrl ? (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-gray-200 bg-white/95 px-3 py-2 shadow-[0_-8px_32px_rgba(0,0,0,0.08)] backdrop-blur sm:px-6">

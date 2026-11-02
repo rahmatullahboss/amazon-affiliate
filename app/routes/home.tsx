@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { ShareButtons } from "../components/ShareButtons";
 import { ProductCard } from "../components/home/ProductCard";
+import { AdBanner } from "../components/AdBanner";
 import { BlogCard } from "../components/blog/BlogCard";
 import {
   filterBlogPostsForMarketplace,
@@ -289,6 +290,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </nav>
         </div>
       </section>
+      <AdBanner placement="home-after-categories" />
 
       <section className="mx-auto max-w-7xl px-4 pb-14 lg:px-6">
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -337,6 +339,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     </p>
                   )}
                 </section>
+                {rowIndex === 0 ? <AdBanner placement="home-after-first-row" /> : null}
                 </div>
               ))}
             </div>

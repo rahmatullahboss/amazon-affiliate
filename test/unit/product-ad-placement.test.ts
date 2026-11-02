@@ -19,12 +19,14 @@ describe("single inline publisher banner in the shared public layout", () => {
     expect((html.match(/highrevenueformat\.com/g) ?? [])).toHaveLength(1);
   });
 
-  it("ignores legacy route-specific slots to prevent duplicate publisher requests", () => {
+  it("renders the one primary zone on the marked product breadcrumb slot", () => {
+    const html = renderToStaticMarkup(createElement(AdBanner, { placement: "product-after-breadcrumbs" }));
+    expect(html).toContain(ADSTERRA_BANNER_SCRIPT_SRC);
+    expect(html).not.toContain("<iframe");
     expect(renderToStaticMarkup(createElement(AdBanner, { placement: "home-after-header" }))).toBe("");
-    expect(renderToStaticMarkup(createElement(AdBanner, { placement: "product-after-breadcrumbs" }))).toBe("");
   });
 
-  it("does not duplicate the banner inside the nested product detail page", () => {
+  it("renders exactly one primary product banner and hides extra unapproved positions", () => {
     const props = {
       loaderData: {
         product: {
@@ -44,7 +46,11 @@ describe("single inline publisher banner in the shared public layout", () => {
     const html = renderToStaticMarkup(
       createElement(MemoryRouter, {}, createElement(ProductDetail, props))
     );
-    expect(html).not.toContain("data-ad-placement=");
-    expect(html).not.toContain("www.highrevenueformat.com");
+    expect((html.match(/data-ad-placement=/g) ?? [])).toHaveLength(1);
+    expect(html).toContain('data-ad-placement="product-after-breadcrumbs"');
+    expect(html).toContain("www.highrevenueformat.com");
+    expect(html).not.toContain('data-ad-placement="product-before-editorial"');
+    expect(html).not.toContain('data-ad-placement="product-before-share"');
+    expect(html).not.toContain('data-ad-placement="product-before-footer"');
   });
 });
