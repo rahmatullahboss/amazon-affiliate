@@ -7,12 +7,18 @@ import {
   refreshProductRecord,
   extractAsinFromInput,
   getAmazonProductFetchErrorMessage,
+  AmazonProductFetchError,
   type ProductRecord,
 } from "./product-ingestion";
 
 const SUPPORTED_MARKETPLACES = new Set(["US", "CA", "UK", "DE", "FR", "IT", "ES"]);
 const MAX_ROWS_PER_REQUEST = 100;
-const CONCURRENCY = 5;
+// Keep concurrent new-product calls low so bulk Sheet edits do not exhaust provider quotas.
+const CONCURRENCY = 2;
+export const ADMIN_SHEET_RATE_LIMIT_KEY = "admin-sheet-row-sync:amazon-provider-cooldown:v1";
+const RATE_LIMIT_COOLDOWN_SECONDS = 15 * 60;
+const RATE_LIMIT_COOLDOWN_MESSAGE =
+  "Amazon data provider is temporarily rate limited. New product requests are paused briefly; retry later.";
 
 export interface AdminSheetSyncRowInput {
   rowNumber: number;
@@ -179,6 +185,15 @@ async function syncAdminSheetRow(input: {
     const shouldRefreshExisting = existed && Boolean(input.row.forceUpdateExisting);
 
     if (!product || shouldRefreshExisting) {
+      // A shared cooldown prevents repeated provider calls across Sheet requests.
+      // Existing saved products are still mapped normally without a product fetch.
+      try {
+        if (await input.kv.get(ADMIN_SHEET_RATE_LIMIT_KEY)) {
+          return failedResult(input.row, asin, marketplace, RATE_LIMIT_COOLDOWN_MESSAGE, syncedAt);
+        }
+      } catch (error) {
+        console.warn("[Sheet sync] Provider cooldown lookup unavailable", error);
+      }
       const refreshedOrCreated = shouldRefreshExisting
         ? await refreshProductRecord({ ...input, asin, marketplace, status: "active" })
         : await ensureProductRecord({
@@ -253,6 +268,15 @@ async function syncAdminSheetRow(input: {
       syncedAt,
     };
   } catch (error) {
+    if (error instanceof AmazonProductFetchError && error.code === "rate_limited") {
+      try {
+        await input.kv.put(ADMIN_SHEET_RATE_LIMIT_KEY, "1", {
+          expirationTtl: RATE_LIMIT_COOLDOWN_SECONDS,
+        });
+      } catch (kvError) {
+        console.warn("[Sheet sync] Could not record provider cooldown", kvError);
+      }
+    }
     return failedResult(
       input.row,
       asin,
