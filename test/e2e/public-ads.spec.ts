@@ -22,20 +22,24 @@ async function assertBanner(page: import("@playwright/test").Page, name: string)
   expect(size.height).toBeGreaterThanOrEqual(50);
 }
 
-test("homepage uses a single approved body banner code and no Social Bar", async ({ page }) => {
+test("homepage renders the same approved banner code in three marked positions and no Social Bar", async ({ page }) => {
   await page.goto("/?market=US");
   await assertBanner(page, "public-under-header");
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement="home-after-categories"]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement="home-after-first-row"]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
   await expect(page.locator(`script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(0);
   await page.goto("/?market=CA");
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
   await expect(page.locator(`script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(0);
 });
 
-test("collection uses one approved banner and one frequency-limited Social Bar", async ({ page }) => {
+test("collection renders three marked inline banners and one frequency-limited Social Bar", async ({ page }) => {
   await page.goto("/collections/trending?market=US");
   await assertBanner(page, "public-under-header");
-  await expect(page.locator('[data-ad-placement]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement="collection-before-grid"]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement="collection-before-footer"]')).toHaveCount(1);
+  await expect(page.locator('[data-ad-placement]')).toHaveCount(3);
   await expect(page.locator(`body > script[src="${ADSTERRA_SOCIAL_BAR_SCRIPT_SRC}"]`)).toHaveCount(1);
   expect(await page.evaluate((key) => Number(localStorage.getItem(key)) > 0, LAST_SOCIAL_AT_KEY)).toBe(true);
 });

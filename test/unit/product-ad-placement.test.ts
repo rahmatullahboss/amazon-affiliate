@@ -26,7 +26,7 @@ describe("single inline publisher banner in the shared public layout", () => {
     expect(renderToStaticMarkup(createElement(AdBanner, { placement: "home-after-header" }))).toBe("");
   });
 
-  it("renders exactly one primary product banner and hides extra unapproved positions", () => {
+  it("renders all four screenshot-marked product placements with the existing inline code", () => {
     const props = {
       loaderData: {
         product: {
@@ -46,11 +46,12 @@ describe("single inline publisher banner in the shared public layout", () => {
     const html = renderToStaticMarkup(
       createElement(MemoryRouter, {}, createElement(ProductDetail, props))
     );
-    expect((html.match(/data-ad-placement=/g) ?? [])).toHaveLength(1);
+    expect((html.match(/data-ad-placement=/g) ?? [])).toHaveLength(4);
+    expect((html.match(/highrevenueformat\.com/g) ?? [])).toHaveLength(4);
     expect(html).toContain('data-ad-placement="product-after-breadcrumbs"');
-    expect(html).toContain("www.highrevenueformat.com");
-    expect(html).not.toContain('data-ad-placement="product-before-editorial"');
-    expect(html).not.toContain('data-ad-placement="product-before-share"');
-    expect(html).not.toContain('data-ad-placement="product-before-footer"');
+    expect(html).toContain('data-ad-placement="product-before-editorial"');
+    expect(html).toContain('data-ad-placement="product-before-share"');
+    expect(html).toContain('data-ad-placement="product-before-footer"');
+    expect(html).not.toContain("<iframe");
   });
 });

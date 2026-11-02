@@ -13,53 +13,35 @@ export const ADSTERRA_BANNER_OPTIONS = {
   params: {},
 } as const;
 
-// The publisher requires a DIFFERENT approved code for each banner on one page.
-// Insert the keys from Adsterra's GET CODE for three extra 320x50 zones here.
-// Never copy the primary key into these slots. Until supplied they stay invisible
-// (no empty box / request). Zone names can be reused on *different* pages.
-export type AdditionalBannerZone = "secondary" | "tertiary" | "quaternary";
-export const ADSTERRA_ADDITIONAL_BANNER_KEYS: Record<AdditionalBannerZone, string> = {
-  secondary: "",
-  tertiary: "",
-  quaternary: "",
-};
-
+// Owner-requested multi-placement mode: reuse the existing publisher code
+// at the marked in-page locations. Adsterra recommends separate codes per
+// banner on a single page (statistics and CPM may be affected). Keep the
+// repeated requests explicit, never substitute an app-created iframe or
+// change the publisher-provided script/configuration.
 export const BANNER_PLACEMENTS = {
-  "public-under-header": "primary",
-  "product-after-breadcrumbs": "primary",
-  "home-after-categories": "secondary",
-  "home-after-first-row": "tertiary",
-  "collection-before-grid": "secondary",
-  "collection-before-footer": "tertiary",
-  "product-before-editorial": "secondary",
-  "product-before-share": "tertiary",
-  "product-before-footer": "quaternary",
+  "public-under-header": true,
+  "product-after-breadcrumbs": true,
+  "home-after-categories": true,
+  "home-after-first-row": true,
+  "collection-before-grid": true,
+  "collection-before-footer": true,
+  "product-before-editorial": true,
+  "product-before-share": true,
+  "product-before-footer": true,
 } as const;
-
-export type BannerPlacement = keyof typeof BANNER_PLACEMENTS;
 
 export function isProductDetailAdPath(pathname: string): boolean {
   return /^\/deals\/[a-z0-9]{10}\/?$/i.test(pathname);
 }
+
 export function resolveApprovedBannerZone(
   placement: string,
-  extraKeys: Readonly<Record<AdditionalBannerZone, string>> = ADSTERRA_ADDITIONAL_BANNER_KEYS,
-): { key: string; src: string; options: Omit<typeof ADSTERRA_BANNER_OPTIONS, "key"> & { key: string } } | null {
+): { key: string; src: string; options: typeof ADSTERRA_BANNER_OPTIONS } | null {
   if (!Object.prototype.hasOwnProperty.call(BANNER_PLACEMENTS, placement)) return null;
-  const slot = BANNER_PLACEMENTS[placement as BannerPlacement];
-  const key = slot === "primary" ? ADSTERRA_BANNER_KEY : extraKeys[slot].trim();
-  if (!/^[a-f0-9]{32}$/.test(key)) return null;
-  // A supplied zone must not duplicate another zone's key on the same page.
-  const otherKeys = slot === "primary"
-    ? Object.values(extraKeys)
-    : [ADSTERRA_BANNER_KEY, ...Object.entries(extraKeys)
-      .filter(([otherSlot]) => otherSlot !== slot)
-      .map(([, otherKey]) => otherKey.trim())];
-  if (slot !== "primary" && otherKeys.includes(key)) return null;
   return {
-    key,
-    src: `https://www.highrevenueformat.com/${key}/invoke.js`,
-    options: { ...ADSTERRA_BANNER_OPTIONS, key },
+    key: ADSTERRA_BANNER_KEY,
+    src: ADSTERRA_BANNER_SCRIPT_SRC,
+    options: ADSTERRA_BANNER_OPTIONS,
   };
 }
 

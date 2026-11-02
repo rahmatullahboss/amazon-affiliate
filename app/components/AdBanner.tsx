@@ -1,8 +1,9 @@
 import { resolveApprovedBannerZone } from "../utils/public-ads";
 
-// Each extra placement needs its own approved 320×50 zone code. Missing keys
-// render nothing; the current working primary zone is preserved unchanged.
-// Adsterra may create an iframe for its creative; our app adds no iframe.
+// The same owner-supplied 320×50 tag is intentionally reused at marked spots.
+// Adsterra advises different codes on one page for reliable CPM/statistics;
+// this is an owner-requested experiment, not a publisher-recommended setup.
+// No application iframe is added; Adsterra may create a creative iframe.
 
 export function AdBanner({
   placement,
