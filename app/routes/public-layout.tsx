@@ -1,4 +1,4 @@
-import { Outlet, useLoaderData, useLocation } from "react-router";
+import { Outlet, useLoaderData, useLocation, type ShouldRevalidateFunctionArgs } from "react-router";
 import type { Route } from "./+types/public-layout";
 import { Header } from "../components/Header";
 import { Footer } from "../components/Footer";
@@ -11,7 +11,12 @@ import {
 } from "../../server/services/social-links";
 import type { PublicLayoutLoaderData } from "../utils/social-links";
 
-export async function loader({ context }: Route.LoaderArgs) {
+export async function loader({ context, request }: Route.LoaderArgs) {
+  // The homepage intentionally hides footer social links. Avoid that D1
+  // read there; crossing the homepage boundary must revalidate the layout.
+  if (new URL(request.url).pathname === "/") {
+    return { socialLinks: null } satisfies PublicLayoutLoaderData;
+  }
   const env = context.cloudflare.env;
   if (!env?.DB) {
     return { socialLinks: null } satisfies PublicLayoutLoaderData;
@@ -23,6 +28,10 @@ export async function loader({ context }: Route.LoaderArgs) {
   } catch {
     return { socialLinks: null } satisfies PublicLayoutLoaderData;
   }
+}
+
+export function shouldRevalidate({ currentUrl, nextUrl, defaultShouldRevalidate }: ShouldRevalidateFunctionArgs) {
+  return (currentUrl.pathname === "/") !== (nextUrl.pathname === "/") || defaultShouldRevalidate;
 }
 
 export default function PublicLayout() {

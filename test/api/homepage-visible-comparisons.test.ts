@@ -31,5 +31,9 @@ describe("homepage visible comparison projection",()=>{
     expect(result.topProducts).toEqual(result.trendingProducts);
     expect(result.topProducts.length).toBeLessThanOrEqual(6);
     expect(JSON.stringify(result.comparisonGroups).length).toBeLessThan(JSON.stringify(oldFeed).length);
+    // Verify the shorter read even when the original ordering fields tie.
+    await db.prepare("UPDATE agent_products SET homepage_rank=1,created_at='2026-11-24' WHERE agent_id=89601").run();
+    const tiedOriginal=await getHomepageFeedRows(db,"US",44);
+    expect(await getHomepageFeedRows(db,"US",30)).toEqual(tiedOriginal.slice(0,30));
   });
 });
