@@ -99,31 +99,39 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   });
   const selectedMarketplace = marketplaceContext.marketplace;
 
-  const [productsResult, allRows, postsResult, comparisonResult, { trendingRows, topRows }, { rows: latestRows, available: latestAvailable }, siteBranding] = await Promise.all([
-    getHomepageFeedRows(env.DB, selectedMarketplace, 44),
-    getAllProductRows(env.DB, selectedMarketplace, 6),
+  // Batch the mandatory metadata reads without mixing in the optional
+  // provenance query, whose missing-table behavior must remain independent.
+  const metadata = env.DB.batch([
     env.DB.prepare(
       `SELECT ${PUBLIC_BLOG_CARD_COLUMNS}
        FROM blog_posts
        WHERE is_deleted = 0 AND status = 'published'
        ORDER BY is_featured DESC, published_at DESC, updated_at DESC
        LIMIT 7`
-    ).all<PublicBlogCardRow>(),
+    ),
     env.DB.prepare(
       `SELECT ${PUBLIC_BLOG_CARD_COLUMNS} FROM blog_posts
        WHERE is_deleted = 0 AND status = 'published'
          AND generation_topic = 'automated_comparison' AND generation_marketplace = ?
        ORDER BY published_at DESC, id DESC LIMIT 2`
-    ).bind(selectedMarketplace).all<PublicBlogCardRow>(),
-    getHomepageRankingRows(env.DB, selectedMarketplace),
-    getLatestCollectionResult(env.DB, selectedMarketplace, 6),
+    ).bind(selectedMarketplace),
     env.DB.prepare(
       `SELECT og_site_name, og_description, og_image_url
        FROM site_branding_settings
        WHERE id = 1
        LIMIT 1`
-    ).first<HomeLoaderData["siteBranding"]>(),
+    ),
   ]);
+  const [productsResult, allRows, metadataResults, { trendingRows, topRows }, { rows: latestRows, available: latestAvailable }] = await Promise.all([
+    getHomepageFeedRows(env.DB, selectedMarketplace, 44),
+    getAllProductRows(env.DB, selectedMarketplace, 6),
+    metadata,
+    getHomepageRankingRows(env.DB, selectedMarketplace),
+    getLatestCollectionResult(env.DB, selectedMarketplace, 6),
+  ]);
+  const postsResult = metadataResults[0] as D1Result<PublicBlogCardRow>;
+  const comparisonResult = metadataResults[1] as D1Result<PublicBlogCardRow>;
+  const siteBranding = (metadataResults[2]?.results?.[0] ?? null) as HomeLoaderData["siteBranding"];
 
   const allPosts = (postsResult.results || []).map((row) => toPublicBlogCard(env, row));
   const posts = orderBlogPostsForMarketplace(
