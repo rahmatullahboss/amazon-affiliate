@@ -78,6 +78,36 @@ describe("admin sheet row sync", () => {
     });
   });
 
+  it("skips unchanged mapping writes but applies real title and activation changes", async () => {
+    await env.DB.prepare("INSERT INTO products(id,asin,title,image_url,marketplace,status,is_active) VALUES(6090,'B0NOOP0001','No-op fixture','https://img.test/noop.jpg','US','active',1)").run();
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS qa_mapping_update_count (n INTEGER NOT NULL)").run();
+    await env.DB.prepare("DELETE FROM qa_mapping_update_count").run();
+    await env.DB.prepare("INSERT INTO qa_mapping_update_count VALUES(0)").run();
+    await env.DB.prepare("CREATE TRIGGER IF NOT EXISTS qa_mapping_update AFTER UPDATE ON agent_products BEGIN UPDATE qa_mapping_update_count SET n=n+1; END").run();
+    const sync = (customTitle: string | null) => syncAdminSheetRows({
+      db: env.DB, kv: env.KV, publicAppUrl: "https://dealsrky.com",
+      rows: [{rowNumber: 2, asin: "B0NOOP0001", marketplace: "US", trackingTag: null, customTitle}],
+    });
+    const count = () => env.DB.prepare("SELECT n FROM qa_mapping_update_count").first<number>("n");
+    const first = await sync(null);
+    // syncedAt is intentionally refreshed for each successful import.
+    const stableResult = (result: Awaited<ReturnType<typeof sync>>) => result.results.map(({syncedAt, ...rest}) => rest);
+    for (let i=0; i<20; i++) expect(stableResult(await sync(null))).toEqual(stableResult(first));
+    expect(await count()).toBe(0);
+    await sync("Updated title");
+    expect(await count()).toBe(1);
+    await sync("Updated title");
+    expect(await count()).toBe(1);
+    await env.DB.prepare("UPDATE agent_products SET is_active=0 WHERE product_id=6090").run();
+    await sync("Updated title");
+    expect(await count()).toBe(3);
+    expect(await env.DB.prepare("SELECT custom_title,is_active FROM agent_products WHERE product_id=6090").first()).toEqual({custom_title:"Updated title",is_active:1});
+    await sync(null);
+    expect(await count()).toBe(4);
+    expect(await env.DB.prepare("SELECT custom_title FROM agent_products WHERE product_id=6090").first()).toEqual({custom_title:null});
+    await env.DB.prepare("DROP TRIGGER qa_mapping_update").run();
+  });
+
   it("preserves the existing mapping when the editable sheet tag is blank", async () => {
     await env.DB.prepare(
       `INSERT INTO agents (id, slug, name, is_active)
