@@ -35,6 +35,29 @@ export async function getAllProductRows(
   return result.results ?? [];
 }
 
+/** Both homepage click-based sections share the same ranking and tie-breaker. */
+export async function getHomepageRankingRows(db: D1Database, marketplace: string) {
+  const topRows = await getCollectionRows(db, marketplace, "top-10", 10);
+  return { trendingRows: topRows.slice(0, 6), topRows };
+}
+
+export const LATEST_UNAVAILABLE_MESSAGE = "Latest listings are temporarily unavailable. Please check back later.";
+
+/** A missing optional provenance schema must not bring down the whole storefront.
+ * Never substitute unverified listing dates for missing provenance.
+ */
+export async function getLatestCollectionResult(db: D1Database, marketplace: string, limit = 30) {
+  try {
+    return { rows: await getCollectionRows(db, marketplace, "latest", limit), available: true };
+  } catch (error) {
+    if (!(error instanceof Error) || !/no such table:\s*(?:main\.)?sheet_listing_activity\b/i.test(error.message)) {
+      throw error;
+    }
+    console.warn("[LATEST_COLLECTION] Missing sheet_listing_activity schema; latest listings unavailable");
+    return { rows: [] as CollectionProductRow[], available: false };
+  }
+}
+
 export async function getCollectionRows(
   db: D1Database,
   marketplace: string,

@@ -12,6 +12,7 @@
     "typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
     "test": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:catalog": "node scripts/qa-clean-build.mjs && node scripts/qa-catalog-browser.mjs",
     "test:coverage": "vitest run --coverage --coverage.provider=istanbul"
   },
   "dependencies": {

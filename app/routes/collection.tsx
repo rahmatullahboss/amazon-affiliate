@@ -3,7 +3,7 @@ import { Link } from "react-router";
 import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import { ProductCard } from "../components/home/ProductCard";
 import { AdBanner } from "../components/AdBanner";
-import { isCollectionKind, getCollectionRows, type CollectionKind, type CollectionProductRow } from "../../server/services/collection-feed";
+import { isCollectionKind, getCollectionRows, getLatestCollectionResult, LATEST_UNAVAILABLE_MESSAGE, type CollectionKind, type CollectionProductRow } from "../../server/services/collection-feed";
 import { getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildSeoMeta } from "../utils/seo";
@@ -17,6 +17,7 @@ const LABELS: Record<CollectionKind, string> = {
 interface CollectionData {
   kind: CollectionKind;
   marketplace: PublicMarketplace;
+  available: boolean;
   products: Array<CollectionProductRow & { amazonHref: string | null }>;
 }
 
@@ -41,11 +42,14 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
     countryHeader: request.headers.get("cf-ipcountry"),
   });
   const db = context.cloudflare.env.DB;
-  const products = await getCollectionRows(db, marketplace, params.kind);
+  const { rows: products, available } = params.kind === "latest"
+    ? await getLatestCollectionResult(db, marketplace)
+    : { rows: await getCollectionRows(db, marketplace, params.kind), available: true };
   const affiliateLinks = await getPublicProductAffiliateHrefs(db, products);
   return {
     kind: params.kind,
     marketplace,
+    available,
     products: products.map((product) => ({
       ...product,
       amazonHref: affiliateLinks.get(product.id) ?? null,
@@ -54,7 +58,7 @@ export async function loader({ request, params, context }: Route.LoaderArgs) {
 }
 
 export default function CollectionPage({ loaderData }: Route.ComponentProps) {
-  const { kind, marketplace, products } = loaderData as CollectionData;
+  const { kind, marketplace, products, available } = loaderData as CollectionData;
   return (
     <main className="mx-auto max-w-7xl px-3 py-6 sm:px-6">
       <nav className="mb-4 flex flex-wrap gap-2 text-xs font-semibold text-gray-600" aria-label="Collections">
@@ -85,8 +89,8 @@ export default function CollectionPage({ loaderData }: Route.ComponentProps) {
         </div>
       ) : (
         <div className="rounded-2xl border border-gray-200 bg-white p-8 text-center">
-          <h2 className="font-bold text-gray-900">No qualifying products yet</h2>
-          <p className="mt-2 text-sm text-gray-600">This collection will update as eligible products or tracked activity become available.</p>
+          <h2 className="font-bold text-gray-900">{available ? "No qualifying products yet" : "Latest listings unavailable"}</h2>
+          <p className="mt-2 text-sm text-gray-600">{available ? "This collection will update as eligible products or tracked activity become available." : LATEST_UNAVAILABLE_MESSAGE}</p>
           <Link to={`/deals?market=${marketplace}`} className="mt-4 inline-flex rounded-full bg-primary px-4 py-2 text-sm font-bold text-white">Browse all deals</Link>
         </div>
       )}

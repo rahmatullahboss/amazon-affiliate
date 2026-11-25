@@ -46,12 +46,7 @@ test.describe('Storefront Disclosures & UI', () => {
     await expect(appError).not.toBeVisible();
   });
 
-  test('P1-003: Shows a mobile floating Amazon CTA on product pages', async ({ page, isMobile }) => {
-    test.skip(!isMobile, 'Floating CTA is mobile-only');
-
-    await page.goto('/deals/B0DJ3JBT19');
-
-    const floatingCta = page.getByRole('link', { name: /view on amazon/i }).last();
-    await expect(floatingCta).toBeVisible();
-  });
+  // P1-003 is now covered by catalog-cpu.spec.ts against an isolated seeded
+  // D1 database with exact tracking href and viewport-position assertions.
+  // Run npm run test:e2e:catalog to exercise the deterministic acceptance test.
 });

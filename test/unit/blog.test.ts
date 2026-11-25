@@ -86,6 +86,23 @@ describe("blog utils", () => {
     ).toBe("<p>A practical buying paragraph.</p><p>Another useful paragraph.</p>");
   });
 
+  it("preserves original CTA lookahead across empty lines and repeated prompts", () => {
+    expect(buildBlogContentHtml([
+      "Intro paragraph.",
+      "Check this now",
+      "View details here",
+      "",
+      "https://www.amazon.com/dp/B012345678",
+      "Closing paragraph.",
+    ].join("\n"))).toBe("<p>Intro paragraph.</p><h2>Check this now</h2><p>Closing paragraph.</p>");
+  });
+
+  it("keeps long articles in order while removing legacy CTA lines", () => {
+    const paragraphs = Array.from({ length: 2000 }, (_, i) => `Paragraph number ${i}.`);
+    expect(buildBlogContentHtml([...paragraphs, "Check this now", "", "https://www.amazon.com/dp/B012345678"].join("\n")))
+      .toBe(paragraphs.map((line) => `<p>${line}</p>`).join(""));
+  });
+
   it("removes inline buy now labels that already include a deals or amazon url", () => {
     expect(
       buildBlogContentHtml(

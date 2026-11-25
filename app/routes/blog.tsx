@@ -5,13 +5,13 @@ import {
   selectBlogPostsForMarketplace,
 } from "../utils/blog-personalization";
 import { buildSeoMeta } from "../utils/seo";
-import type { BlogPostSummary } from "../utils/blog";
-import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import type { BlogCardSummary } from "../utils/blog";
+import { PUBLIC_BLOG_CARD_COLUMNS, toPublicBlogCard, type PublicBlogCardRow } from "../../server/services/public-blog-card";
 import { resolvePreferredMarketplace } from "../utils/marketplace";
 
 interface BlogPageData {
-  featuredPost: BlogPostSummary | null;
-  posts: BlogPostSummary[];
+  featuredPost: BlogCardSummary | null;
+  posts: BlogCardSummary[];
   preferredMarketplace: string;
 }
 
@@ -34,19 +34,14 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   });
 
   const { results } = await env.DB.prepare(
-    `SELECT *
+    `SELECT ${PUBLIC_BLOG_CARD_COLUMNS}
      FROM blog_posts
      WHERE is_deleted = 0 AND status = 'published'
      ORDER BY is_featured DESC, published_at DESC, updated_at DESC
      LIMIT 24`
-  ).all<BlogPostSummary & { cover_image_key: string | null }>();
+  ).all<PublicBlogCardRow>();
 
-  const posts = (results ?? []).map((row) => ({
-    ...row,
-    cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
-    excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
-    reading_minutes: estimateReadingMinutes(row.content),
-  }));
+  const posts = (results ?? []).map((row) => toPublicBlogCard(env, row));
   const orderedPosts = selectBlogPostsForMarketplace(posts, preferredMarketplace);
 
   return {

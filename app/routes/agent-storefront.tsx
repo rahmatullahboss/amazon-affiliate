@@ -5,6 +5,8 @@ import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import { ProductCard } from "../components/home/ProductCard";
 import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildSeoMeta } from "../utils/seo";
+import { catalogPagination, catalogPageHref } from "../utils/catalog-pagination";
+import { CatalogPagination } from "../components/CatalogPagination";
 
 interface StorefrontProduct {
   id: number;
@@ -23,6 +25,7 @@ interface AgentStorefrontData {
   };
   selectedMarketplace: PublicMarketplace;
   products: StorefrontProduct[];
+  pagination: ReturnType<typeof catalogPagination>;
 }
 
 export function meta({ data, params }: Route.MetaArgs) {
@@ -33,7 +36,9 @@ export function meta({ data, params }: Route.MetaArgs) {
   return buildSeoMeta({
     title: `${agentName} Storefront — DealsRky`,
     description: `Browse curated Amazon products shared by ${agentName} on DealsRky.`,
-    path: `/${agentSlug}`,
+    path: storefront && storefront.pagination.page > 1
+      ? catalogPageHref(`/${agentSlug}`, storefront.selectedMarketplace, storefront.pagination.page)
+      : `/${agentSlug}`,
   });
 }
 
@@ -72,15 +77,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     throw new Response("Agent storefront not found", { status: 404 });
   }
 
-  const { results } = await env.DB.prepare(
-    `SELECT DISTINCT
-        p.id,
-        p.asin,
-        COALESCE(ap.custom_title, p.title) as title,
-        p.image_url,
-        p.category,
-        t.marketplace
-     FROM agent_products ap
+  const filter = `FROM agent_products ap
      JOIN products p ON p.id = ap.product_id
      JOIN tracking_ids t ON t.id = ap.tracking_id
      WHERE ap.agent_id = ?
@@ -89,10 +86,23 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
        AND p.is_active = 1
        AND p.status = 'active'
        AND p.is_adult = 0
-       AND t.is_active = 1
-     ORDER BY ap.updated_at DESC, ap.id DESC`
+       AND t.is_active = 1`;
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS total ${filter}`)
+    .bind(agent.id, effectiveMarketplace).first<{ total: number }>();
+  const pagination = catalogPagination(url.searchParams, count?.total ?? 0);
+  // Each agent/product mapping is unique in the original schema.
+  const { results } = await env.DB.prepare(
+    `SELECT
+        p.id,
+        p.asin,
+        COALESCE(ap.custom_title, p.title) as title,
+        p.image_url,
+        p.category,
+        t.marketplace
+     ${filter}
+     ORDER BY ap.updated_at DESC, ap.id DESC LIMIT ? OFFSET ?`
   )
-    .bind(agent.id, effectiveMarketplace)
+    .bind(agent.id, effectiveMarketplace, pagination.limit, pagination.offset)
     .all<StorefrontProduct>();
 
   return {
@@ -103,6 +113,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     },
     selectedMarketplace: effectiveMarketplace as PublicMarketplace,
     products: results || [],
+    pagination,
   } satisfies AgentStorefrontData;
 }
 
@@ -129,7 +140,7 @@ export default function AgentStorefrontPage({ loaderData }: Route.ComponentProps
             its tracked landing page before going to Amazon.
           </p>
           <p className="mt-4 text-sm font-medium text-primary">
-            {data.products.length} product{data.products.length !== 1 ? "s" : ""} available in {data.selectedMarketplace}
+            {data.pagination.total} product{data.pagination.total !== 1 ? "s" : ""} available in {data.selectedMarketplace}
           </p>
           <div className="mt-5 flex justify-center">
             <MarketplaceSelector selectedMarketplace={data.selectedMarketplace} label="Showing only" />
@@ -157,6 +168,7 @@ export default function AgentStorefrontPage({ loaderData }: Route.ComponentProps
             </p>
           </div>
         )}
+        <CatalogPagination path={`/${data.agent.publicSlug}`} market={data.selectedMarketplace} {...data.pagination} />
       </div>
     </div>
   );

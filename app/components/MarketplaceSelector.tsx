@@ -26,6 +26,7 @@ export function MarketplaceSelector({
           const nextMarketplace = event.target.value as PublicMarketplace;
           const nextUrl = new URL(window.location.href);
           nextUrl.searchParams.set("market", nextMarketplace);
+          nextUrl.searchParams.delete("page");
           document.cookie = `preferred_marketplace=${encodeURIComponent(nextMarketplace)}; Path=/; Max-Age=31536000; SameSite=Lax`;
           window.location.assign(`${basePath}${nextUrl.search}`);
         }}

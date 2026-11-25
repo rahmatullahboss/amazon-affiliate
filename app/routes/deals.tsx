@@ -49,7 +49,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
 
   const [productsResult, countResult, categoriesResult] = await Promise.all([
     env.DB.prepare(`
-      SELECT * FROM products
+      SELECT id, asin, title, image_url, category, marketplace FROM products
       WHERE is_active = 1 AND status = 'active' AND is_adult = 0 AND marketplace = ?
       ORDER BY created_at DESC LIMIT ? OFFSET ?
     `).bind(selectedMarketplace, limit, offset).all<DealsProduct>(),
