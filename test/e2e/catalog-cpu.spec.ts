@@ -44,10 +44,18 @@ test("agent alias preserves marketplace and exact original tracked product paths
   await expect(page.getByRole("link",{name:/QA Product 01/})).toHaveAttribute("href","/qa-catalog-us/us/Q000000001");
 });
 
-test("homepage hides social links; client navigation restores the original footer channels", async ({page}) => {
+test("homepage keeps header channels and hides only footer channels across client navigation", async ({page,isMobile}) => {
   await page.goto("/");
   const footer=page.locator("footer");
   await expect(footer.getByRole("link",{name:"Telegram"})).toHaveCount(0);
+  // Header links must remain available on the homepage on both layouts.
+  if (isMobile) {
+    await page.getByRole("button",{name:"Toggle menu"}).click();
+    await expect(page.locator("header").getByRole("link",{name:"Join us on Telegram"})).toHaveAttribute("href","https://t.me/qa_fixture");
+    await page.getByRole("button",{name:"Toggle menu"}).click();
+  } else {
+    await expect(page.locator("header").getByRole("link",{name:"Telegram"})).toHaveAttribute("href","https://t.me/qa_fixture");
+  }
   // Verify client navigation rather than another full document load.
   await page.evaluate(()=>{(window as Window & {qaNavigation?:boolean}).qaNavigation=true});
   await footer.getByRole("link",{name:"Blog",exact:true}).click();
