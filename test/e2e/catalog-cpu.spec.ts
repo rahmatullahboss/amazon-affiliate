@@ -2,11 +2,11 @@ import { test, expect } from "@playwright/test";
 
 test.skip(!process.env.DEALSRKY_QA_PERSIST, "Requires the isolated catalog browser QA runner");
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, baseURL }) => {
   // No external ad, analytics, Amazon or image traffic in synthetic QA.
   await page.route("**/*", route => {
     const url = new URL(route.request().url());
-    return url.origin === "http://127.0.0.1:5174" ? route.continue() : route.abort();
+    return url.origin === new URL(baseURL!).origin ? route.continue() : route.abort();
   });
 });
 
@@ -42,6 +42,23 @@ test("agent alias preserves marketplace and exact original tracked product paths
   await expect(page).toHaveURL(/market=US&page=2$/);
   await expect(page.locator('a[href^="/qa-catalog-us/us/Q"]')).toHaveCount(3);
   await expect(page.getByRole("link",{name:/QA Product 01/})).toHaveAttribute("href","/qa-catalog-us/us/Q000000001");
+});
+
+test("homepage hides social links; client navigation restores the original footer channels", async ({page}) => {
+  await page.goto("/");
+  const footer=page.locator("footer");
+  await expect(footer.getByRole("link",{name:"Telegram"})).toHaveCount(0);
+  // Verify client navigation rather than another full document load.
+  await page.evaluate(()=>{(window as Window & {qaNavigation?:boolean}).qaNavigation=true});
+  await footer.getByRole("link",{name:"Blog",exact:true}).click();
+  await expect(page).toHaveURL(/\/blog$/);
+  expect(await page.evaluate(()=>(window as Window & {qaNavigation?:boolean}).qaNavigation)).toBe(true);
+  await expect(footer.getByRole("link",{name:"Telegram"})).toHaveAttribute("href","https://t.me/qa_fixture");
+  await footer.getByRole("link",{name:"Home",exact:true}).click();
+  await expect(page).toHaveURL(/\/$/);
+  await expect(footer.getByRole("link",{name:"Telegram"})).toHaveCount(0);
+  await footer.getByRole("link",{name:"Blog",exact:true}).click();
+  await expect(footer.getByRole("link",{name:"Telegram"})).toHaveAttribute("href","https://t.me/qa_fixture");
 });
 
 test("mobile floating CTA renders the fixture product's original tracking tag", async ({ page,isMobile }) => {

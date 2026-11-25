@@ -125,7 +125,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     prepareCollectionRows(env.DB, selectedMarketplace, "top-10", 6),
   ]);
   const [productsResult, metadataResults, { rows: latestRows, available: latestAvailable }] = await Promise.all([
-    getHomepageFeedRows(env.DB, selectedMarketplace, 44),
+    getHomepageFeedRows(env.DB, selectedMarketplace, 30),
     metadata,
     getLatestCollectionResult(env.DB, selectedMarketplace, 6),
   ]);

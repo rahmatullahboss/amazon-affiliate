@@ -1,4 +1,5 @@
 -- Synthetic QA data. Apply only to disposable local D1.
+UPDATE social_links_settings SET telegram_url='https://t.me/qa_fixture', telegram_enabled=1 WHERE id=1;
 INSERT INTO categories(name,slug) VALUES ('QA Catalog','qa-catalog');
 INSERT INTO agents(id,slug,name) VALUES (82001,'qa-catalog-agent','QA Catalog Agent');
 INSERT INTO tracking_ids(id,agent_id,tag,marketplace) VALUES (82001,82001,'qa-fixture-us-20','US'),(82002,82001,'qa-fixture-ca-20','CA');
