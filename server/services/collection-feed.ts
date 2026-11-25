@@ -81,25 +81,39 @@ export async function getCollectionRows(
       ORDER BY MIN(COALESCE(ap.homepage_rank, 999999)), MAX(ap.created_at) DESC
       LIMIT ?`;
   } else if (kind === "latest") {
-    sql = `WITH sheet_provenance AS (
-        SELECT asin, marketplace,
-          MAX(CASE
-            WHEN is_present = 1 AND row_status = 'active'
-              AND published_revision = revision
-              THEN published_at ELSE NULL END
-          ) AS last_published
-        FROM sheet_listing_activity
+    // These branches are disjoint: any provenance row (including pending,
+    // inactive, removed, or stale rows) excludes the product-updated fallback.
+    // Each branch needs at most the requested top N before the final merge.
+    sql = `WITH sheet_recent AS MATERIALIZED (
+        SELECT asin, marketplace, MAX(published_at) AS fresh_at
+        FROM sheet_listing_activity INDEXED BY idx_sheet_listing_activity_latest
+        WHERE marketplace = ?1 AND is_present = 1 AND row_status = 'active'
+          AND published_revision = revision
+          AND published_at >= datetime('now', '-72 hours')
         GROUP BY asin, marketplace
+      ), sheet_top AS (
+        SELECT p.id, s.fresh_at FROM sheet_recent s
+        CROSS JOIN products p INDEXED BY idx_products_asin
+          ON p.asin = s.asin AND p.marketplace = s.marketplace
+        WHERE p.is_active = 1 AND p.status = 'active' AND p.is_adult = 0
+        ORDER BY s.fresh_at DESC, p.id DESC LIMIT ?2
+      ), fallback_top AS (
+        SELECT p.id, p.updated_at AS fresh_at
+        FROM products p INDEXED BY idx_products_public_updated
+        WHERE p.is_active = 1 AND p.status = 'active' AND p.is_adult = 0
+          AND p.marketplace = ?1 AND p.updated_at >= datetime('now', '-72 hours')
+          AND NOT EXISTS (
+            SELECT 1 FROM sheet_listing_activity s
+            WHERE s.asin = p.asin AND s.marketplace = p.marketplace
+          )
+        ORDER BY p.updated_at DESC, p.id DESC LIMIT ?2
+      ), combined AS (
+        SELECT id, fresh_at FROM sheet_top UNION ALL SELECT id, fresh_at FROM fallback_top
+        ORDER BY fresh_at DESC, id DESC LIMIT ?2
       )
-      SELECT ${select}
-      FROM products p
-      LEFT JOIN sheet_provenance sa ON sa.asin = p.asin AND sa.marketplace = p.marketplace
-      WHERE ${ACTIVE_FILTER} AND (
-        (sa.asin IS NOT NULL AND sa.last_published >= datetime('now', '-72 hours'))
-        OR (sa.asin IS NULL AND p.updated_at >= datetime('now', '-72 hours'))
-      )
-      ORDER BY COALESCE(sa.last_published, p.updated_at) DESC, p.id DESC
-      LIMIT ?`;
+      SELECT ${select} FROM combined c
+      CROSS JOIN products p ON p.id = c.id
+      ORDER BY c.fresh_at DESC, p.id DESC`;
   } else {
     // Aggregate only the recent click window, then look up the matching products.
     // The existing date index and join order avoid scanning the entire catalog
