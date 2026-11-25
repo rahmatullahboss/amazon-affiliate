@@ -1,4 +1,5 @@
 import { createRequestHandler } from "react-router";
+import { createImmutableBuildHandler } from "../server/utils/immutable-build-handler";
 import type { Bindings } from "../server/utils/types";
 
 // Wrangler-generated bindings omit deployment secrets; the API still needs
@@ -15,10 +16,13 @@ declare module "react-router" {
   }
 }
 
-const requestHandler = createRequestHandler(
-  () => import("virtual:react-router/server-build"),
-  import.meta.env.MODE,
-);
+// React Router re-derives its route tree for every request when it receives
+// a build loader function. The deployed build is immutable; keep one handler
+// per isolate, while retaining the dynamic loader for development/HMR.
+const loadServerBuild = () => import("virtual:react-router/server-build");
+const requestHandler = import.meta.env.DEV
+  ? createRequestHandler(loadServerBuild, import.meta.env.MODE)
+  : createImmutableBuildHandler(loadServerBuild, build => createRequestHandler(build, import.meta.env.MODE));
 
 const PUBLIC_SITE_URL = "https://dealsrky.com";
 const XML_ESCAPE_MAP: Record<string, string> = {
