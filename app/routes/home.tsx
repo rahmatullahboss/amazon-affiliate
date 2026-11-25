@@ -21,7 +21,7 @@ import {
 import { PUBLIC_BLOG_CARD_COLUMNS, toPublicBlogCard, type PublicBlogCardRow } from "../../server/services/public-blog-card";
 import { createAmazonAffiliateHref, getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 import { getHomepageFeedRows } from "../../server/services/homepage-feed";
-import { getAllProductRows, getLatestCollectionResult, getHomepageRankingRows, LATEST_UNAVAILABLE_MESSAGE, type CollectionProductRow } from "../../server/services/collection-feed";
+import { prepareAllProductRows, getLatestCollectionResult, prepareCollectionRows, LATEST_UNAVAILABLE_MESSAGE, type CollectionProductRow } from "../../server/services/collection-feed";
 import {
   buildComparisonGroups,
   buildHomepageProductRows,
@@ -99,7 +99,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   });
   const selectedMarketplace = marketplaceContext.marketplace;
 
-  // Batch the mandatory metadata reads without mixing in the optional
+  // Batch mandatory metadata and collection previews without mixing in the optional
   // provenance query, whose missing-table behavior must remain independent.
   const metadata = env.DB.batch([
     env.DB.prepare(
@@ -121,23 +121,25 @@ export async function loader({ request, context }: Route.LoaderArgs) {
        WHERE id = 1
        LIMIT 1`
     ),
+    prepareAllProductRows(env.DB, selectedMarketplace, 6),
+    prepareCollectionRows(env.DB, selectedMarketplace, "top-10", 6),
   ]);
-  const [productsResult, allRows, metadataResults, { trendingRows, topRows }, { rows: latestRows, available: latestAvailable }] = await Promise.all([
+  const [productsResult, metadataResults, { rows: latestRows, available: latestAvailable }] = await Promise.all([
     getHomepageFeedRows(env.DB, selectedMarketplace, 44),
-    getAllProductRows(env.DB, selectedMarketplace, 6),
     metadata,
-    getHomepageRankingRows(env.DB, selectedMarketplace),
     getLatestCollectionResult(env.DB, selectedMarketplace, 6),
   ]);
+  const allRows = (metadataResults[3] as D1Result<CollectionProductRow>).results ?? [];
+  const topRows = (metadataResults[4] as D1Result<CollectionProductRow>).results ?? [];
+  const trendingRows = topRows;
   const postsResult = metadataResults[0] as D1Result<PublicBlogCardRow>;
   const comparisonResult = metadataResults[1] as D1Result<PublicBlogCardRow>;
   const siteBranding = (metadataResults[2]?.results?.[0] ?? null) as HomeLoaderData["siteBranding"];
 
-  const allPosts = (postsResult.results || []).map((row) => toPublicBlogCard(env, row));
   const posts = orderBlogPostsForMarketplace(
-    filterBlogPostsForMarketplace(allPosts, selectedMarketplace),
+    filterBlogPostsForMarketplace(postsResult.results ?? [], selectedMarketplace),
     selectedMarketplace
-  );
+  ).map(row => toPublicBlogCard(env, row));
 
   // Preserve the existing first-30 comparison selection. The other feed rows
   // are not rendered anywhere; avoid resolving or serializing those products.
