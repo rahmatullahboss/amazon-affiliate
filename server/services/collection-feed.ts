@@ -19,19 +19,23 @@ export function isCollectionKind(value: string | undefined): value is Collection
 const ACTIVE_FILTER =
   "p.is_active = 1 AND p.status = 'active' AND p.is_adult = 0 AND p.marketplace = ?";
 
-export async function getAllProductRows(
+export function prepareAllProductRows(
   db: D1Database,
   marketplace: string,
   limit = 6
-): Promise<CollectionProductRow[]> {
+): D1PreparedStatement {
   const safeLimit = Math.max(1, Math.min(60, Math.trunc(limit)));
-  const result = await db.prepare(
+  return db.prepare(
     `SELECT p.id, p.asin, p.title, p.image_url, p.category, p.marketplace
      FROM products p
      WHERE ${ACTIVE_FILTER}
      ORDER BY p.updated_at DESC, p.id DESC
      LIMIT ?`
-  ).bind(marketplace, safeLimit).all<CollectionProductRow>();
+  ).bind(marketplace, safeLimit);
+}
+
+export async function getAllProductRows(db: D1Database, marketplace: string, limit = 6): Promise<CollectionProductRow[]> {
+  const result = await prepareAllProductRows(db, marketplace, limit).all<CollectionProductRow>();
   return result.results ?? [];
 }
 
@@ -58,12 +62,12 @@ export async function getLatestCollectionResult(db: D1Database, marketplace: str
   }
 }
 
-export async function getCollectionRows(
+export function prepareCollectionRows(
   db: D1Database,
   marketplace: string,
   kind: CollectionKind,
   limit = 30
-): Promise<CollectionProductRow[]> {
+): D1PreparedStatement {
   const safeLimit = Math.max(1, Math.min(60, Math.trunc(limit)));
   const select =
     "p.id, p.asin, p.title, p.image_url, p.category, p.marketplace";
@@ -131,6 +135,10 @@ export async function getCollectionRows(
       LIMIT ?`;
   }
 
-  const result = await db.prepare(sql).bind(marketplace, kind === "top-10" ? Math.min(10, safeLimit) : safeLimit).all<CollectionProductRow>();
+  return db.prepare(sql).bind(marketplace, kind === "top-10" ? Math.min(10, safeLimit) : safeLimit);
+}
+
+export async function getCollectionRows(db: D1Database, marketplace: string, kind: CollectionKind, limit = 30): Promise<CollectionProductRow[]> {
+  const result = await prepareCollectionRows(db, marketplace, kind, limit).all<CollectionProductRow>();
   return result.results ?? [];
 }

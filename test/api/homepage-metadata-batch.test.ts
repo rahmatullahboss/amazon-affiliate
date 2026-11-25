@@ -1,6 +1,7 @@
 import { describe,it,expect } from "vitest";
 import { env } from "cloudflare:workers";
 import { loader } from "../../app/routes/home";
+import { getAllProductRows,getHomepageRankingRows } from "../../server/services/collection-feed";
 import { PUBLIC_BLOG_CARD_COLUMNS,toPublicBlogCard,type PublicBlogCardRow } from "../../server/services/public-blog-card";
 import { filterBlogPostsForMarketplace,orderBlogPostsForMarketplace } from "../../app/utils/blog-personalization";
 
@@ -11,6 +12,14 @@ describe("homepage metadata read batch",()=>{
    db.prepare("INSERT OR REPLACE INTO site_branding_settings(id,og_site_name,og_description,og_image_url) VALUES(1,'QA brand','QA description','https://example.com/brand.webp')"),
    db.prepare("INSERT INTO blog_posts(title,slug,content,status,is_deleted,is_featured,generation_source,generation_topic,generation_marketplace,published_at) VALUES ('QA general','qa-home-general','General body','published',0,1,'manual',NULL,NULL,'2026-11-24'),('QA US','qa-home-us','US body','published',0,0,'ai','automated_comparison','US','2026-11-23'),('QA CA','qa-home-ca','CA body','published',0,0,'ai','automated_comparison','CA','2026-11-22'),('QA draft','qa-home-draft','Draft body','draft',0,1,'manual',NULL,NULL,'2026-11-25'),('QA deleted','qa-home-deleted','Deleted body','published',1,1,'manual',NULL,NULL,'2026-11-25')")
   ]);
+  await db.prepare("INSERT INTO agents(id,slug,name) VALUES(92501,'home-batch-qa','Home batch QA')").run();
+  const products:D1PreparedStatement[]=[];
+  for(let i=1;i<=22;i++){
+   const market=i<=11?"US":"CA";
+   products.push(db.prepare("INSERT INTO products(id,asin,title,image_url,marketplace,status,is_active,is_adult) VALUES(?,?,?,'/favicon.svg',?,'active',1,0)").bind(92600+i,"H"+String(i).padStart(9,"0"),"Home batch "+i,market));
+   products.push(db.prepare("INSERT INTO clicks(agent_id,product_id,tracking_tag,clicked_at) VALUES(92501,?,'qa-home-20',datetime('now','-1 day'))").bind(92600+i));
+  }
+  await db.batch(products);
   for(const marketplace of ["US","CA"] as const){
    const original=await db.prepare(`SELECT ${PUBLIC_BLOG_CARD_COLUMNS} FROM blog_posts WHERE is_deleted=0 AND status='published' ORDER BY is_featured DESC,published_at DESC,updated_at DESC LIMIT 7`).all<PublicBlogCardRow>();
    const comparisons=await db.prepare(`SELECT ${PUBLIC_BLOG_CARD_COLUMNS} FROM blog_posts WHERE is_deleted=0 AND status='published' AND generation_topic='automated_comparison' AND generation_marketplace=? ORDER BY published_at DESC,id DESC LIMIT 2`).bind(marketplace).all<PublicBlogCardRow>();
@@ -19,6 +28,12 @@ describe("homepage metadata read batch",()=>{
    expect(result.posts).toEqual(orderBlogPostsForMarketplace(filterBlogPostsForMarketplace(original.results.map(r=>toPublicBlogCard(env,r)),marketplace),marketplace));
    expect(result.comparisonPosts).toEqual(comparisons.results.map(r=>toPublicBlogCard(env,r)));
    expect(result.siteBranding).toEqual(branding);
+   const oldCatalog=await getAllProductRows(db,marketplace,6);
+   const oldRanking=await getHomepageRankingRows(db,marketplace);
+   expect(oldRanking.topRows).toHaveLength(10);
+   expect(result.allProducts.map(row=>row.id)).toEqual(oldCatalog.map(row=>row.id));
+   expect(result.topProducts.map(row=>row.id)).toEqual(oldRanking.topRows.slice(0,6).map(row=>row.id));
+   expect(result.trendingProducts).toEqual(result.topProducts);
   }
  });
 });
