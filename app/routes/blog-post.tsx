@@ -111,7 +111,9 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
   });
 
   const row = await env.DB.prepare(
-    `SELECT *
+    `SELECT id, title, slug, excerpt, content, cover_image_key, cover_image_alt,
+            cta_label, cta_url, cta_disclosure, seo_title, seo_description,
+            published_at, updated_at, generation_source, generation_focus_asin, generation_marketplace
      FROM blog_posts
      WHERE slug = ? AND is_deleted = 0 AND status = 'published'
      LIMIT 1`
@@ -189,7 +191,22 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     : null;
 
   return {
-    ...row,
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    excerpt: row.excerpt,
+    content: row.content,
+    cover_image_alt: row.cover_image_alt,
+    cta_label: row.cta_label,
+    cta_url: row.cta_url,
+    cta_disclosure: row.cta_disclosure,
+    seo_title: row.seo_title,
+    seo_description: row.seo_description,
+    published_at: row.published_at,
+    updated_at: row.updated_at,
+    generation_source: row.generation_source,
+    generation_focus_asin: row.generation_focus_asin,
+    generation_marketplace: row.generation_marketplace,
     cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
     excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
     reading_minutes: estimateReadingMinutes(row.content),
