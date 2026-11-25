@@ -203,7 +203,10 @@ async function syncAdminSheetRow(input: {
          ON CONFLICT(agent_id, product_id) DO UPDATE SET
            tracking_id = excluded.tracking_id,
            custom_title = excluded.custom_title,
-           is_active = 1`
+           is_active = 1
+         WHERE agent_products.tracking_id IS NOT excluded.tracking_id
+            OR agent_products.custom_title IS NOT excluded.custom_title
+            OR agent_products.is_active IS NOT 1`
       )
       .bind(
         tracking.agent_id,
