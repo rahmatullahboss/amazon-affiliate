@@ -24,7 +24,6 @@ import { getHomepageFeedRows } from "../../server/services/homepage-feed";
 import { getAllProductRows, getLatestCollectionResult, getHomepageRankingRows, LATEST_UNAVAILABLE_MESSAGE, type CollectionProductRow } from "../../server/services/collection-feed";
 import {
   buildComparisonGroups,
-  buildHomePageSections,
   buildHomepageProductRows,
   getHomepageKeywordLabel,
 } from "../utils/homepage";
@@ -47,7 +46,7 @@ interface ProductRow {
 }
 
 interface HomeLoaderData {
-  products: ProductRow[];
+  comparisonGroups: { category: string; products: ProductRow[] }[];
   allProducts: ProductRow[];
   posts: BlogCardSummary[];
   comparisonPosts: BlogCardSummary[];
@@ -132,8 +131,13 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     selectedMarketplace
   );
 
+  // Preserve the existing first-30 comparison selection. The other feed rows
+  // are not rendered anywhere; avoid resolving or serializing those products.
+  const comparisonGroups = buildComparisonGroups(productsResult.slice(0, 30));
+  const comparisonProducts = comparisonGroups.flatMap(group => group.products);
+  const visibleTopRows = topRows.slice(0, 6);
   const productAffiliateHrefs = await getPublicProductAffiliateHrefs(
-    env.DB, [...productsResult, ...allRows, ...trendingRows, ...topRows, ...latestRows]
+    env.DB, [...comparisonProducts, ...allRows, ...trendingRows, ...visibleTopRows, ...latestRows]
   );
 
   function toPublicCollectionRows(rows: CollectionProductRow[]): ProductRow[] {
@@ -147,15 +151,18 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   return {
     allProducts: toPublicCollectionRows(allRows),
     trendingProducts: toPublicCollectionRows(trendingRows),
-    topProducts: toPublicCollectionRows(topRows),
+    topProducts: toPublicCollectionRows(visibleTopRows),
     latestProducts: toPublicCollectionRows(latestRows),
     latestAvailable,
-    products: productsResult.map((product) => ({
-      ...product,
-      public_href: product.agent_slug
-        ? buildHomepageProductPath(product.agent_slug, product.marketplace, product.asin)
-        : `/deals/${product.asin}`,
-      direct_amazon_url: createAmazonAffiliateHref(product.asin, product.marketplace, product.tracking_tag) ?? productAffiliateHrefs.get(product.id) ?? null,
+    comparisonGroups: comparisonGroups.map(group => ({
+      category: group.category,
+      products: group.products.map(product => ({
+        ...product,
+        public_href: product.agent_slug
+          ? buildHomepageProductPath(product.agent_slug, product.marketplace, product.asin)
+          : `/deals/${product.asin}`,
+        direct_amazon_url: createAmazonAffiliateHref(product.asin, product.marketplace, product.tracking_tag) ?? productAffiliateHrefs.get(product.id) ?? null,
+      })),
     })),
     posts,
     comparisonPosts: (comparisonResult.results || []).map((row) => toPublicBlogCard(env, row)),
@@ -215,15 +222,12 @@ function getMarketplaceStatusCopy(
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products, allProducts, posts, comparisonPosts, selectedMarketplace, selectionSource, detectedMarketplace, trendingProducts, topProducts, latestProducts, latestAvailable } =
+  const { comparisonGroups, allProducts, posts, comparisonPosts, selectedMarketplace, selectionSource, detectedMarketplace, trendingProducts, topProducts, latestProducts, latestAvailable } =
     loaderData as HomeLoaderData;
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isGuideSkipped, setIsGuideSkipped] = useState(false);
-  const { featuredPost, supportingPosts, primaryProducts } =
-    buildHomePageSections({
-      posts,
-      products,
-    });
+  const featuredPost = posts[0] ?? null;
+  const supportingPosts = posts.slice(1, 4);
   const productRows = buildHomepageProductRows({
     allProducts,
     trendingProducts,
@@ -231,7 +235,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     topProducts,
     marketplace: selectedMarketplace,
   });
-  const comparisonGroups = buildComparisonGroups(primaryProducts);
   const statusCopy = getMarketplaceStatusCopy(
     selectionSource,
     selectedMarketplace,

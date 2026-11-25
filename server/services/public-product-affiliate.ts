@@ -40,9 +40,11 @@ export async function getPublicProductAffiliateHrefs(
   const productsById = new Map(candidates.map((p) => [p.id, p]));
   const links = new Map<number, string>();
 
-  // Bound IDs, no string interpolation of untrusted values.
-  for (let offset = 0; offset < candidates.length; offset += 80) {
-    const ids = Array.from(new Set(candidates.slice(offset, offset + 80).map((p) => p.id)));
+  // Deduplicate before batching: repeated IDs across sections must not issue
+  // additional D1 queries. Keep original candidate order for primary fallback.
+  const uniqueIds = [...productsById.keys()];
+  for (let offset = 0; offset < uniqueIds.length; offset += 80) {
+    const ids = uniqueIds.slice(offset, offset + 80);
     const placeholders = ids.map(() => "?").join(", ");
     const { results } = await db.prepare(`
       SELECT ap.product_id, t.marketplace, t.tag AS tracking_tag
