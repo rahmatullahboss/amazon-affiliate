@@ -101,11 +101,18 @@ export async function getCollectionRows(
       ORDER BY COALESCE(sa.last_published, p.updated_at) DESC, p.id DESC
       LIMIT ?`;
   } else {
-    sql = `SELECT ${select}, COUNT(c.id) AS activity_count
-      FROM clicks c JOIN products p ON p.id = c.product_id
-      WHERE ${ACTIVE_FILTER} AND c.clicked_at >= datetime('now', '-7 days')
-      GROUP BY p.id
-      HAVING COUNT(c.id) > 0
+    // Aggregate only the recent click window, then look up the matching products.
+    // The existing date index and join order avoid scanning the entire catalog
+    // when click activity is sparse. Visibility and deterministic ties are unchanged.
+    sql = `WITH recent AS MATERIALIZED (
+        SELECT product_id, COUNT(*) AS activity_count
+        FROM clicks INDEXED BY idx_clicks_date
+        WHERE clicked_at >= datetime('now', '-7 days')
+        GROUP BY product_id
+      )
+      SELECT ${select}, r.activity_count AS activity_count
+      FROM recent r CROSS JOIN products p ON p.id = r.product_id
+      WHERE ${ACTIVE_FILTER}
       ORDER BY activity_count DESC, p.id DESC
       LIMIT ?`;
   }

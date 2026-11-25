@@ -66,7 +66,9 @@ describe("independent product collections", () => {
     const fixture = mockDb();
     await getCollectionRows(fixture.database, "US", "trending", 30);
     await getCollectionRows(fixture.database, "US", "top-10", 30);
-    expect(fixture.statements[0]).toContain("COUNT(c.id)");
+    expect(fixture.statements[0]).toContain("COUNT(*) AS activity_count");
+    expect(fixture.statements[0]).toContain("clicks INDEXED BY idx_clicks_date");
+    expect(fixture.statements[0]).toContain("recent r CROSS JOIN products p");
     expect(fixture.statements[0]).toContain("ORDER BY activity_count DESC");
     expect(fixture.statements[1]).toContain("clicked_at >= datetime('now', '-7 days')");
     expect(fixture.binds[1]).toEqual(["US", 10]);
