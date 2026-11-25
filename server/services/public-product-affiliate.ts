@@ -46,10 +46,10 @@ export async function getPublicProductAffiliateHrefs(
     const placeholders = ids.map(() => "?").join(", ");
     const { results } = await db.prepare(`
       SELECT ap.product_id, t.marketplace, t.tag AS tracking_tag
-      FROM agent_products ap
-      JOIN tracking_ids t ON t.id = ap.tracking_id
-      JOIN agents a ON a.id = ap.agent_id
-      JOIN products p ON p.id = ap.product_id
+      FROM agent_products ap INDEXED BY idx_ap_product_active
+      CROSS JOIN tracking_ids t ON t.id = ap.tracking_id
+      CROSS JOIN agents a ON a.id = ap.agent_id
+      CROSS JOIN products p ON p.id = ap.product_id
       WHERE ap.product_id IN (${placeholders})
         AND ap.is_active = 1 AND a.is_active = 1 AND t.is_active = 1
         AND p.is_active = 1 AND p.status = 'active' AND p.is_adult = 0
