@@ -143,7 +143,7 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     throw new Response("Article not found", { status: 404 });
   }
 
-  const { results: relatedRows } = await env.DB.prepare(
+  const relatedQuery = env.DB.prepare(
     `SELECT id, title, slug, generation_source, generation_marketplace, is_featured, published_at, updated_at
      FROM blog_posts
      WHERE is_deleted = 0
@@ -151,44 +151,47 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
        AND slug != ?
      ORDER BY published_at DESC, updated_at DESC
      LIMIT 12`
-  )
-    .bind(slug)
-    .all<BlogPostData["relatedPosts"][number]>();
+  ).bind(slug);
 
-  const featuredProduct =
-    row.generation_focus_asin && row.generation_marketplace
-      ? await env.DB.prepare(
-          `SELECT asin, title, image_url, marketplace
-           FROM products
-           WHERE asin = ?
-             AND marketplace = ?
-             AND is_active = 1
-             AND status = 'active'
-             AND is_adult = 0
-           LIMIT 1`
-        )
-          .bind(row.generation_focus_asin, row.generation_marketplace)
-          .first<{
-            asin: string;
-            title: string;
-            image_url: string | null;
-            marketplace: string;
-          }>()
-      : null;
+  // Preserve the featured product projection, but share the D1 round trip.
+  const featuredQuery = row.generation_focus_asin && row.generation_marketplace
+    ? env.DB.prepare(
+        `SELECT asin, title, image_url, marketplace
+         FROM products
+         WHERE asin = ?
+           AND marketplace = ?
+           AND is_active = 1
+           AND status = 'active'
+           AND is_adult = 0
+         LIMIT 1`
+      ).bind(row.generation_focus_asin, row.generation_marketplace)
+    : null;
 
   const isMarketplaceAligned =
     !row.generation_marketplace ||
     row.generation_marketplace.trim().toUpperCase() === preferredMarketplace;
 
-  const directAmazonUrl = isMarketplaceAligned
-    ? await resolveBlogAmazonCtaUrl({
-        db: env.DB,
-        ctaUrl: row.cta_url,
-        preferredMarketplace,
-        generationFocusAsin: row.generation_focus_asin,
-        generationMarketplace: row.generation_marketplace,
-      })
-    : null;
+  const [readResults, directAmazonUrl] = await Promise.all([
+    featuredQuery
+      ? env.DB.batch([relatedQuery, featuredQuery])
+      : relatedQuery.all<BlogPostData["relatedPosts"][number]>().then(result => [result]),
+    isMarketplaceAligned
+      ? resolveBlogAmazonCtaUrl({
+          db: env.DB,
+          ctaUrl: row.cta_url,
+          preferredMarketplace,
+          generationFocusAsin: row.generation_focus_asin,
+          generationMarketplace: row.generation_marketplace,
+        })
+      : Promise.resolve(null),
+  ]);
+  const relatedRows = readResults[0].results as BlogPostData["relatedPosts"];
+  const featuredProduct = (readResults[1]?.results?.[0] ?? null) as {
+    asin: string;
+    title: string;
+    image_url: string | null;
+    marketplace: string;
+  } | null;
 
   return {
     id: row.id,

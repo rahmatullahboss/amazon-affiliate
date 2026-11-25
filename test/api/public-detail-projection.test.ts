@@ -29,4 +29,25 @@ describe("public detail projections",()=>{
     await db.prepare("UPDATE blog_posts SET is_deleted=1 WHERE id=90201").run();
     await expect(blogLoader(args)).rejects.toMatchObject({status:404});
   });
+  it("preserves related article order, visible featured products and marketplace CTA in the batched read",async()=>{
+    const db=env.DB;
+    await db.batch([
+      db.prepare("INSERT INTO agents(id,slug,name,is_active) VALUES(93001,'article-batch','Article batch',1)"),
+      db.prepare("INSERT INTO tracking_ids(id,agent_id,tag,marketplace,is_active,is_site_primary) VALUES(93002,93001,'qa-article-20','US',1,1)"),
+      db.prepare("INSERT INTO products(id,asin,title,image_url,marketplace,status,is_active,is_adult) VALUES(93003,'ARTICLEQA1','Featured original','/favicon.svg','US','active',1,0)"),
+      db.prepare("INSERT INTO blog_posts(title,slug,content,status,is_deleted,generation_source,generation_focus_asin,generation_marketplace,published_at) VALUES('Article batch','qa-article-batch','Original body','published',0,'ai','ARTICLEQA1','US','2026-11-25')"),
+      db.prepare("INSERT INTO blog_posts(title,slug,content,status,is_deleted,generation_source,generation_marketplace,published_at) VALUES('US related','qa-related-us','Related','published',0,'ai','US','2026-11-24'),('CA related','qa-related-ca','Related','published',0,'ai','CA','2026-11-23'),('Global related','qa-related-global','Related','published',0,'manual',NULL,'2026-11-22'),('Deleted related','qa-related-deleted','Related','published',1,'manual',NULL,'2026-11-25')")
+    ]);
+    const load=(market:string)=>blogLoader({request:new Request("https://dealsrky.com/blog/qa-article-batch?market="+market),params:{slug:"qa-article-batch"},context:{cloudflare:{env,ctx:{}}}} as Parameters<typeof blogLoader>[0]);
+    const us=await load("US");
+    expect(us.featuredProduct).toEqual({asin:"ARTICLEQA1",title:"Featured original",imageUrl:"/favicon.svg",marketplace:"US"});
+    expect(new URL(us.directAmazonUrl!).searchParams.get("tag")).toBe("qa-article-20");
+    expect(us.relatedPosts.map(p=>p.slug)).toEqual(["qa-related-us","qa-related-global"]);
+    const ca=await load("CA");
+    expect(ca.featuredProduct).toEqual(us.featuredProduct);
+    expect(ca.directAmazonUrl).toBeNull();
+    expect(ca.relatedPosts.map(p=>p.slug)).toEqual(["qa-related-ca","qa-related-global"]);
+    await db.prepare("UPDATE products SET is_adult=1 WHERE id=93003").run();
+    expect((await load("US")).featuredProduct).toBeNull();
+  });
 });
