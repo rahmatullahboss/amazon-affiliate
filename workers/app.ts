@@ -4,9 +4,6 @@ import type { Bindings } from "../server/utils/types";
 // Wrangler-generated bindings omit deployment secrets; the API still needs
 // the complete declared application binding contract for typed handler calls.
 type Env = Cloudflare.Env & Bindings;
-import { apiApp } from "../server/api";
-import { createBlogImageResponse } from "../server/services/blog";
-import { generateScheduledBlogDraft, publishDueScheduledBlogPosts } from "../server/services/blog-generation";
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
 
 declare module "react-router" {
@@ -101,26 +98,31 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
     { path: "/privacy" },
   ];
 
-  const { results: categoryResults } = await env.DB.prepare(
-    `SELECT slug, created_at
-     FROM categories
-     WHERE is_active = 1
-     ORDER BY display_order ASC, id ASC`
-  ).all<{ slug: string; created_at: string | null }>();
-
-  const { results: productResults } = await env.DB.prepare(
-    `SELECT asin, COALESCE(updated_at, created_at) AS last_modified
-     FROM products
-     WHERE is_active = 1 AND status = 'active'
-     ORDER BY created_at DESC`
-  ).all<{ asin: string; last_modified: string | null }>();
-
-  const { results: blogResults } = await env.DB.prepare(
-    `SELECT slug, COALESCE(updated_at, published_at, created_at) AS last_modified
-     FROM blog_posts
-     WHERE is_deleted = 0 AND status = 'published'
-     ORDER BY published_at DESC, created_at DESC`
-  ).all<{ slug: string; last_modified: string | null }>();
+  // Independent read-only queries; preserve freshness after any publication/reset.
+  const [
+    { results: categoryResults },
+    { results: productResults },
+    { results: blogResults },
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT slug, created_at
+       FROM categories
+       WHERE is_active = 1
+       ORDER BY display_order ASC, id ASC`
+    ).all<{ slug: string; created_at: string | null }>(),
+    env.DB.prepare(
+      `SELECT asin, COALESCE(updated_at, created_at) AS last_modified
+       FROM products
+       WHERE is_active = 1 AND status = 'active'
+       ORDER BY created_at DESC`
+    ).all<{ asin: string; last_modified: string | null }>(),
+    env.DB.prepare(
+      `SELECT slug, COALESCE(updated_at, published_at, created_at) AS last_modified
+       FROM blog_posts
+       WHERE is_deleted = 0 AND status = 'published'
+       ORDER BY published_at DESC, created_at DESC`
+    ).all<{ slug: string; last_modified: string | null }>(),
+  ]);
 
   const dynamicEntries: SitemapEntry[] = [
     ...(categoryResults ?? []).map((category) => ({
@@ -197,16 +199,17 @@ export default {
     }
 
     // Fast-path: Redirect engine (/go/:agentSlug/:asin) — sub-ms with KV
-    if (url.pathname.startsWith("/go/")) {
-      return apiApp.fetch(request, env, ctx);
-    }
-
     if (url.pathname.startsWith("/api/public/blog-images/")) {
-      return createBlogImageResponse(env, url.pathname);
+      const { serveCachedPublicImage } = await import("../server/services/public-image-cache");
+      return serveCachedPublicImage(request, ctx, async () => {
+        const { createBlogImageResponse } = await import("../server/services/blog");
+        return createBlogImageResponse(env, url.pathname);
+      });
     }
 
-    // API routes → Hono (/api/*) — admin panel + public endpoints
-    if (url.pathname.startsWith("/api/")) {
+    // Load Hono only for API and tracked redirects, not document/robots requests.
+    if (url.pathname.startsWith("/go/") || url.pathname.startsWith("/api/")) {
+      const { apiApp } = await import("../server/api");
       return apiApp.fetch(request, env, ctx);
     }
 
@@ -246,6 +249,7 @@ export default {
   },
   async scheduled(_event, env, ctx) {
     try {
+      const { generateScheduledBlogDraft, publishDueScheduledBlogPosts } = await import("../server/services/blog-generation");
       await publishDueScheduledBlogPosts(env.DB);
       ctx.waitUntil(generateScheduledBlogDraft(env).catch((error) => {
         const message = error instanceof Error ? error.message : "Unknown scheduled blog error";

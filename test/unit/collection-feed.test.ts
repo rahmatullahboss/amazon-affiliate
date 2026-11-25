@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { getAllProductRows, getCollectionRows, isCollectionKind } from "../../server/services/collection-feed";
+import { getAllProductRows, getCollectionRows, getHomepageRankingRows, isCollectionKind } from "../../server/services/collection-feed";
 
 describe("independent product collections", () => {
-  function mockDb() {
+  function mockDb(rows: unknown[] = []) {
     const statements: string[] = [];
     const binds: unknown[][] = [];
     const database = {
@@ -12,7 +12,7 @@ describe("independent product collections", () => {
           bind(...args: unknown[]) {
             binds.push(args);
             return {
-              async all() { return { results: [] }; },
+              async all() { return { results: rows }; },
             };
           },
         };
@@ -48,6 +48,18 @@ describe("independent product collections", () => {
     expect(fixture.statements[1]).toContain("p.updated_at >= datetime('now', '-72 hours')");
     expect(fixture.statements.every((sql) => sql.includes("p.is_adult = 0"))).toBe(true);
     expect(fixture.binds).toEqual([["US", 60], ["UK", 20]]);
+  });
+
+  it("shares a single ranked snapshot for both homepage click-based rows", async () => {
+    const rows = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, activity_count: 10 - i }));
+    const fixture = mockDb(rows);
+    const result = await getHomepageRankingRows(fixture.database, "CA");
+    expect(fixture.statements).toHaveLength(1);
+    expect(fixture.binds).toEqual([["CA", 10]]);
+    expect(result.topRows).toEqual(rows);
+    expect(result.trendingRows).toEqual(rows.slice(0, 6));
+    const empty = mockDb();
+    expect(await getHomepageRankingRows(empty.database, "US")).toEqual({ topRows: [], trendingRows: [] });
   });
 
   it("ranks Trending and Top 10 by real tracked clicks, never random order or invented sales", async () => {

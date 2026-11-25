@@ -1,9 +1,9 @@
 import { Link } from "react-router";
-import type { BlogPostSummary } from "../../utils/blog";
+import type { BlogCardSummary } from "../../utils/blog";
 import { formatBlogDate } from "../../utils/blog";
 import { getBlogMarketplaceBadge } from "../../utils/blog-personalization";
 
-export function BlogCard({ post }: { post: BlogPostSummary }) {
+export function BlogCard({ post }: { post: BlogCardSummary }) {
   const marketplaceBadge = getBlogMarketplaceBadge(
     post.generation_source,
     post.generation_marketplace

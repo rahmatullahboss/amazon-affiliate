@@ -4,6 +4,8 @@ import { ProductCard } from "../components/home/ProductCard";
 import { MarketplaceSelector } from "../components/MarketplaceSelector";
 import { resolvePreferredMarketplace, type PublicMarketplace } from "../utils/marketplace";
 import { buildSeoMeta } from "../utils/seo";
+import { catalogPagination, catalogPageHref } from "../utils/catalog-pagination";
+import { CatalogPagination } from "../components/CatalogPagination";
 
 interface CategoryProduct {
   id: number;
@@ -11,10 +13,7 @@ interface CategoryProduct {
   title: string;
   image_url: string;
   category: string | null;
-  description?: string | null;
-  price?: string | null;
-  original_price?: string | null;
-  rating?: number | null;
+  marketplace: string;
 }
 
 interface CategoryPageData {
@@ -22,6 +21,7 @@ interface CategoryPageData {
   categorySlug: string;
   selectedMarketplace: PublicMarketplace;
   products: CategoryProduct[];
+  pagination: ReturnType<typeof catalogPagination>;
 }
 
 export function meta({ data }: Route.MetaArgs) {
@@ -32,7 +32,9 @@ export function meta({ data }: Route.MetaArgs) {
   return buildSeoMeta({
     title: `${categoryName} Picks — DealsRky`,
     description: `Browse curated ${categoryName} product picks and research pages on DealsRky.`,
-    path: `/category/${categorySlug}`,
+    path: categoryData && categoryData.pagination.page > 1
+      ? catalogPageHref(`/category/${categorySlug}`, categoryData.selectedMarketplace, categoryData.pagination.page)
+      : `/category/${categorySlug}`,
   });
 }
 
@@ -55,18 +57,22 @@ export async function loader({ params, request, context }: Route.LoaderArgs) {
     throw new Response("Category Not Found", { status: 404 });
   }
 
+  const filter = "category = ? AND marketplace = ? AND is_active = 1 AND status = 'active' AND is_adult = 0";
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS total FROM products WHERE ${filter}`)
+    .bind(category.name, selectedMarketplace).first<{ total: number }>();
+  const pagination = catalogPagination(url.searchParams, count?.total ?? 0);
   const { results: products } = await env.DB.prepare(`
-    SELECT id, asin, title, image_url, category, description, price, original_price, rating
-    FROM products
-    WHERE category = ? AND marketplace = ? AND is_active = 1 AND status = 'active' AND is_adult = 0
-    ORDER BY created_at DESC
-  `).bind(category.name, selectedMarketplace).all<CategoryProduct>();
+    SELECT id, asin, title, image_url, category, marketplace
+    FROM products WHERE ${filter}
+    ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?
+  `).bind(category.name, selectedMarketplace, pagination.limit, pagination.offset).all<CategoryProduct>();
 
   return {
     categoryName: category.name,
     categorySlug: category.slug,
     selectedMarketplace,
-    products: products || []
+    products: products || [],
+    pagination
   } satisfies CategoryPageData;
 }
 
@@ -88,7 +94,7 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
           </nav>
 
           <h1 className="text-3xl md:text-5xl font-black text-gray-800 mb-2">{data.categoryName} Picks</h1>
-          <p className="text-primary font-medium text-sm">{data.products.length} product{data.products.length !== 1 ? 's' : ''} available in {data.selectedMarketplace}</p>
+          <p className="text-primary font-medium text-sm">{data.pagination.total} product{data.pagination.total !== 1 ? 's' : ''} available in {data.selectedMarketplace}</p>
           <div className="mt-5 flex justify-center">
             <MarketplaceSelector selectedMarketplace={data.selectedMarketplace} label="Showing only" />
           </div>
@@ -113,6 +119,7 @@ export default function CategoryPage({ loaderData }: Route.ComponentProps) {
             </Link>
           </div>
         )}
+        <CatalogPagination path={`/category/${data.categorySlug}`} market={data.selectedMarketplace} {...data.pagination} />
       </div>
     </div>
   );

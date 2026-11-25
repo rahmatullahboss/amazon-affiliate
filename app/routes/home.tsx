@@ -18,17 +18,17 @@ import {
   type MarketplaceSelectionSource,
   type PublicMarketplace,
 } from "../utils/marketplace";
-import { buildBlogExcerpt, buildBlogImageUrl, estimateReadingMinutes } from "../../server/services/blog";
+import { PUBLIC_BLOG_CARD_COLUMNS, toPublicBlogCard, type PublicBlogCardRow } from "../../server/services/public-blog-card";
 import { createAmazonAffiliateHref, getPublicProductAffiliateHrefs } from "../../server/services/public-product-affiliate";
 import { getHomepageFeedRows } from "../../server/services/homepage-feed";
-import { getAllProductRows, getCollectionRows, type CollectionProductRow } from "../../server/services/collection-feed";
+import { getAllProductRows, getLatestCollectionResult, getHomepageRankingRows, LATEST_UNAVAILABLE_MESSAGE, type CollectionProductRow } from "../../server/services/collection-feed";
 import {
   buildComparisonGroups,
   buildHomePageSections,
   buildHomepageProductRows,
   getHomepageKeywordLabel,
 } from "../utils/homepage";
-import type { BlogPostSummary } from "../utils/blog";
+import type { BlogCardSummary } from "../utils/blog";
 
 export const HOMEPAGE_CONTENT_GRID_CLASS = "grid min-w-0 grid-cols-[minmax(0,1fr)] gap-8 xl:grid-cols-[minmax(0,1fr)_320px]";
 
@@ -49,11 +49,12 @@ interface ProductRow {
 interface HomeLoaderData {
   products: ProductRow[];
   allProducts: ProductRow[];
-  posts: BlogPostSummary[];
-  comparisonPosts: BlogPostSummary[];
+  posts: BlogCardSummary[];
+  comparisonPosts: BlogCardSummary[];
   trendingProducts: ProductRow[];
   topProducts: ProductRow[];
   latestProducts: ProductRow[];
+  latestAvailable: boolean;
   selectedMarketplace: PublicMarketplace;
   selectionSource: MarketplaceSelectionSource;
   detectedMarketplace: PublicMarketplace | null;
@@ -99,43 +100,33 @@ export async function loader({ request, context }: Route.LoaderArgs) {
   });
   const selectedMarketplace = marketplaceContext.marketplace;
 
-  const [productsResult, allRows, postsResult, comparisonResult, trendingRows, topRows, latestRows] = await Promise.all([
+  const [productsResult, allRows, postsResult, comparisonResult, { trendingRows, topRows }, { rows: latestRows, available: latestAvailable }, siteBranding] = await Promise.all([
     getHomepageFeedRows(env.DB, selectedMarketplace, 44),
     getAllProductRows(env.DB, selectedMarketplace, 6),
     env.DB.prepare(
-      `SELECT *
+      `SELECT ${PUBLIC_BLOG_CARD_COLUMNS}
        FROM blog_posts
        WHERE is_deleted = 0 AND status = 'published'
        ORDER BY is_featured DESC, published_at DESC, updated_at DESC
        LIMIT 7`
-    ).all<
-      BlogPostSummary & {
-        cover_image_key: string | null;
-      }
-    >(),
+    ).all<PublicBlogCardRow>(),
     env.DB.prepare(
-      `SELECT * FROM blog_posts
+      `SELECT ${PUBLIC_BLOG_CARD_COLUMNS} FROM blog_posts
        WHERE is_deleted = 0 AND status = 'published'
          AND generation_topic = 'automated_comparison' AND generation_marketplace = ?
        ORDER BY published_at DESC, id DESC LIMIT 2`
-    ).bind(selectedMarketplace).all<BlogPostSummary & { cover_image_key: string | null }>(),
-    getCollectionRows(env.DB, selectedMarketplace, "trending", 6),
-    getCollectionRows(env.DB, selectedMarketplace, "top-10", 10),
-    getCollectionRows(env.DB, selectedMarketplace, "latest", 6),
+    ).bind(selectedMarketplace).all<PublicBlogCardRow>(),
+    getHomepageRankingRows(env.DB, selectedMarketplace),
+    getLatestCollectionResult(env.DB, selectedMarketplace, 6),
+    env.DB.prepare(
+      `SELECT og_site_name, og_description, og_image_url
+       FROM site_branding_settings
+       WHERE id = 1
+       LIMIT 1`
+    ).first<HomeLoaderData["siteBranding"]>(),
   ]);
-  const siteBranding = await env.DB.prepare(
-    `SELECT og_site_name, og_description, og_image_url
-     FROM site_branding_settings
-     WHERE id = 1
-     LIMIT 1`
-  ).first<HomeLoaderData["siteBranding"]>();
 
-  const allPosts = (postsResult.results || []).map((row) => ({
-    ...row,
-    cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
-    excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
-    reading_minutes: estimateReadingMinutes(row.content),
-  }));
+  const allPosts = (postsResult.results || []).map((row) => toPublicBlogCard(env, row));
   const posts = orderBlogPostsForMarketplace(
     filterBlogPostsForMarketplace(allPosts, selectedMarketplace),
     selectedMarketplace
@@ -158,6 +149,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
     trendingProducts: toPublicCollectionRows(trendingRows),
     topProducts: toPublicCollectionRows(topRows),
     latestProducts: toPublicCollectionRows(latestRows),
+    latestAvailable,
     products: productsResult.map((product) => ({
       ...product,
       public_href: product.agent_slug
@@ -166,12 +158,7 @@ export async function loader({ request, context }: Route.LoaderArgs) {
       direct_amazon_url: createAmazonAffiliateHref(product.asin, product.marketplace, product.tracking_tag) ?? productAffiliateHrefs.get(product.id) ?? null,
     })),
     posts,
-    comparisonPosts: (comparisonResult.results || []).map((row) => ({
-      ...row,
-      cover_image_url: buildBlogImageUrl(env, row.cover_image_key),
-      excerpt_text: buildBlogExcerpt(row.content, row.excerpt),
-      reading_minutes: estimateReadingMinutes(row.content),
-    })),
+    comparisonPosts: (comparisonResult.results || []).map((row) => toPublicBlogCard(env, row)),
     selectedMarketplace,
     selectionSource: marketplaceContext.source,
     detectedMarketplace: marketplaceContext.detectedMarketplace,
@@ -228,7 +215,7 @@ function getMarketplaceStatusCopy(
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {
-  const { products, allProducts, posts, comparisonPosts, selectedMarketplace, selectionSource, detectedMarketplace, trendingProducts, topProducts, latestProducts } =
+  const { products, allProducts, posts, comparisonPosts, selectedMarketplace, selectionSource, detectedMarketplace, trendingProducts, topProducts, latestProducts, latestAvailable } =
     loaderData as HomeLoaderData;
   const [isGuideOpen, setIsGuideOpen] = useState(false);
   const [isGuideSkipped, setIsGuideSkipped] = useState(false);
@@ -337,7 +324,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                     </div>
                   ) : (
                     <p className="mt-4 rounded-xl border border-dashed border-gray-200 bg-white p-5 text-sm text-gray-600">
-                      {row.emptyMessage}
+                      {row.key === "latest" && !latestAvailable ? LATEST_UNAVAILABLE_MESSAGE : row.emptyMessage}
                     </p>
                   )}
                 </section>

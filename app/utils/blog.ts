@@ -28,6 +28,13 @@ export interface BlogPostSummary {
   reading_minutes: number;
 }
 
+// List views need metadata and a short excerpt, never the full article body.
+export type BlogCardSummary = Pick<BlogPostSummary,
+  "id" | "title" | "slug" | "excerpt" | "excerpt_text" | "cover_image_url" |
+  "cover_image_alt" | "generation_source" | "generation_marketplace" |
+  "is_featured" | "published_at" | "updated_at" | "reading_minutes"
+>;
+
 export function slugifyClientTitle(value: string): string {
   return value
     .toLowerCase()
@@ -99,29 +106,22 @@ function stripLegacyInlineCtaLines(content: string): string {
   const lines = content.split(/\r?\n/);
   const cleaned: string[] = [];
 
-  for (let index = 0; index < lines.length; index += 1) {
+  // Track the next original nonempty line in one reverse pass rather than
+  // allocating and scanning the remaining suffix for every line.
+  let nextNonEmptyLine = "";
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
     const currentLine = lines[index]?.trim() || "";
-    const nextNonEmptyLine = lines
-      .slice(index + 1)
-      .map((line) => line.trim())
-      .find(Boolean);
+    const remove =
+      (isLegacyCtaPromptLine(currentLine) && isAmazonUrlOnlyLine(nextNonEmptyLine)) ||
+      isAmazonUrlOnlyLine(currentLine) ||
+      isLegacyInlineCtaUrlLine(currentLine);
 
-    if (isLegacyCtaPromptLine(currentLine) && nextNonEmptyLine && isAmazonUrlOnlyLine(nextNonEmptyLine)) {
-      continue;
-    }
-
-    if (isAmazonUrlOnlyLine(currentLine)) {
-      continue;
-    }
-
-    if (isLegacyInlineCtaUrlLine(currentLine)) {
-      continue;
-    }
-
-    cleaned.push(lines[index] || "");
+    // Removed lines still participate in lookahead, matching the original input.
+    if (currentLine) nextNonEmptyLine = currentLine;
+    if (!remove) cleaned.push(lines[index] || "");
   }
 
-  return cleaned.join("\n");
+  return cleaned.reverse().join("\n");
 }
 
 function splitColonSectionLine(line: string): { heading: string; body: string } | null {
