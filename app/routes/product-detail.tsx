@@ -29,7 +29,6 @@ interface ProductRow {
   marketplace: string | null;
   review_content: string | null;
   product_images: string | null;
-  aplus_images: string | null;
 }
 
 interface RelatedProductRow {
@@ -83,7 +82,7 @@ export async function loader({ params, context, request }: Route.LoaderArgs) {
   const { results: productMatches } = await env.DB
     .prepare(
       `
-        SELECT id, asin, title, image_url, category, marketplace, review_content, product_images, aplus_images
+        SELECT id, asin, title, image_url, category, marketplace, review_content, product_images
         FROM products
         WHERE asin = ? AND is_active = 1 AND status = 'active' AND is_adult = 0
         ORDER BY created_at DESC, id DESC
