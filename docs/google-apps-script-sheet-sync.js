@@ -14,7 +14,7 @@
 // Country-tab preparation never clears existing product rows.
 // =============================================================
 
-const SCRIPT_VERSION = "2026.07.14-safe-reconcile-v3";
+const SCRIPT_VERSION = "2026.11.02-rate-limit-recovery-v4";
 const WEBHOOK_URL = "https://dealsrky.com/api/webhooks/sheet-row-sync";
 const AUTH_VALUE = PropertiesService.getScriptProperties().getProperty(
   ["SHEET", "SYNC", "KEY"].join("_")
@@ -24,7 +24,8 @@ const INPUT_SHEET_NAME = "New ASINs";
 const SEARCH_RESULTS_SHEET_NAME = "Search Results";
 const MAX_ROWS_PER_REQUEST = 25;
 const CHUNK_SLEEP_MS = 800;
-const HOURLY_RECONCILE_LIMIT = 100;
+// Avoid exhausting provider quota by reprocessing successful rows hourly.
+const HOURLY_RECONCILE_LIMIT = 12;
 const HOURLY_RECONCILE_CURSOR_KEY = "HOURLY_RECONCILE_CURSOR";
 
 const COUNTRY_SHEET_MARKETPLACE = {
@@ -387,7 +388,7 @@ function hourlyReconcile() {
   const candidates = [];
 
   getAllSearchableSheets_().forEach((sheet) => {
-    getSubmittedRows_(sheet).forEach((rowNumber) => {
+    getAutoRetryRows_(sheet, Date.now(), false).forEach((rowNumber) => {
       candidates.push({ sheet, rowNumber });
     });
   });
@@ -526,36 +527,36 @@ function retryFailedRowsCurrentTab() {
     return;
   }
 
-  const failedRows = getRowsByStatus_(sheet, "Failed");
+  const failedRows = getAutoRetryRows_(sheet, Date.now(), true).slice(0, HOURLY_RECONCILE_LIMIT);
 
   if (!failedRows.length) {
-    SpreadsheetApp.getUi().alert("No failed rows found in this tab.");
+    SpreadsheetApp.getUi().alert("No failed rows are eligible to retry yet.");
     return;
   }
 
-  setSubmitForRows_(sheet, failedRows, "YES");
-  clearResultForRows_(sheet, failedRows);
-  syncSelectedRows_(sheet, failedRows, { forceUpdateExisting: true });
+  // Do not clear previously verified product titles or tracked links on retries.
+  syncSelectedRows_(sheet, failedRows, { forceUpdateExisting: false });
 
-  SpreadsheetApp.getUi().alert("Retry started for " + failedRows.length + " failed rows.");
+  SpreadsheetApp.getUi().alert("Retry started for " + failedRows.length + " eligible failed rows.");
 }
 
 function retryFailedRowsAllCountryTabs() {
   let total = 0;
+  let remaining = HOURLY_RECONCILE_LIMIT;
 
   getCountryInputSheets_().forEach((sheet) => {
-    const failedRows = getRowsByStatus_(sheet, "Failed");
+    if (remaining <= 0) return;
+    const failedRows = getAutoRetryRows_(sheet, Date.now(), true).slice(0, remaining);
+    remaining -= failedRows.length;
     total += failedRows.length;
-
     if (failedRows.length) {
-      setSubmitForRows_(sheet, failedRows, "YES");
-      clearResultForRows_(sheet, failedRows);
-      syncSelectedRows_(sheet, failedRows, { forceUpdateExisting: true });
+      // Never force-refresh existing catalog records during quota recovery.
+      syncSelectedRows_(sheet, failedRows, { forceUpdateExisting: false });
     }
   });
 
   SpreadsheetApp.getUi().alert(
-    total ? "Retry started for " + total + " failed rows." : "No failed rows found."
+    total ? "Retry started for " + total + " eligible failed rows." : "No failed rows are eligible to retry yet."
   );
 }
 
@@ -1086,6 +1087,49 @@ function getRowsWithAsin_(sheet) {
     if (asin && asin !== "#REF!") rows.push(index + 2);
   });
 
+  return rows;
+}
+
+// Only new rows and transient failures should be retried automatically.
+// Failed rows keep their prior title, links, and tracking tag during recovery.
+function isAutoRetryEligible_(row, nowMs, failedOnly) {
+  const asin = String(row[COLUMN.ASIN - 1] || "").trim();
+  const submit = String(row[COLUMN.SUBMIT - 1] || "").trim().toUpperCase();
+  const status = String(row[COLUMN.SYNC_STATUS - 1] || "").trim().toLowerCase();
+  const error = String(row[COLUMN.ERROR_MESSAGE - 1] || "");
+  const timestamp = Date.parse(String(row[COLUMN.SYNCED_AT - 1] || ""));
+  const elapsed = nowMs - timestamp;
+
+  if (!asin || asin === "#REF!" || submit !== "YES") return false;
+  if (failedOnly && status !== "failed") return false;
+  if (!status || status === "pending") return !failedOnly;
+  if (status === "processing") {
+    return !failedOnly && Number.isFinite(elapsed) && elapsed >= 30 * 60 * 1000;
+  }
+  if (status !== "failed" || !Number.isFinite(elapsed) || elapsed < 0) return false;
+
+  if (/429|rate[- ]?limit(?:ed)?/i.test(error)) {
+    return elapsed >= 6 * 60 * 60 * 1000;
+  }
+  if (/no live product data|incomplete response/i.test(error)) {
+    return elapsed >= 24 * 60 * 60 * 1000;
+  }
+  // Credentials, ASIN validation, or tracking errors need a human fix,
+  // rather than more requests. Network/5xx errors may recover on their own.
+  return /could not reach|unexpected server error|HTTP 5\d\d|timed out|webhook request failed/i.test(error) &&
+    elapsed >= 6 * 60 * 60 * 1000;
+}
+
+function getAutoRetryRows_(sheet, nowMs, failedOnly) {
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  const values = sheet.getRange(2, 1, lastRow - 1, COLUMN.SYNCED_AT).getDisplayValues();
+  const rows = [];
+  values.forEach((row, index) => {
+    if (isAutoRetryEligible_(row, nowMs, failedOnly)) {
+      rows.push(index + 2);
+    }
+  });
   return rows;
 }
 
