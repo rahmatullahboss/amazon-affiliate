@@ -1,5 +1,3 @@
-import { createRequestHandler } from "react-router";
-import { createImmutableBuildHandler } from "../server/utils/immutable-build-handler";
 import type { Bindings } from "../server/utils/types";
 
 // Wrangler-generated bindings omit deployment secrets; the API still needs
@@ -16,13 +14,16 @@ declare module "react-router" {
   }
 }
 
-// React Router re-derives its route tree for every request when it receives
-// a build loader function. The deployed build is immutable; keep one handler
-// per isolate, while retaining the dynamic loader for development/HMR.
-const loadServerBuild = () => import("virtual:react-router/server-build");
-const requestHandler = import.meta.env.DEV
-  ? createRequestHandler(loadServerBuild, import.meta.env.MODE)
-  : createImmutableBuildHandler(loadServerBuild, build => createRequestHandler(build, import.meta.env.MODE));
+// API and tracked redirects do not import the React Router framework.
+// Cache the immutable document handler per isolate, never per-request context.
+let documentRenderer: typeof import("./document-renderer").renderDocument | undefined;
+async function requestHandler(request: Request, context: import("react-router").AppLoadContext) {
+  if (!documentRenderer) {
+    const module = await import("./document-renderer");
+    documentRenderer ??= module.renderDocument;
+  }
+  return documentRenderer(request, context);
+}
 
 const PUBLIC_SITE_URL = "https://dealsrky.com";
 const XML_ESCAPE_MAP: Record<string, string> = {
@@ -255,10 +256,15 @@ export default {
     try {
       const { generateScheduledBlogDraft, publishDueScheduledBlogPosts } = await import("../server/services/blog-generation");
       await publishDueScheduledBlogPosts(env.DB);
-      ctx.waitUntil(generateScheduledBlogDraft(env).catch((error) => {
-        const message = error instanceof Error ? error.message : "Unknown scheduled blog error";
-        console.error(`[BLOG_SCHEDULE] Scheduled blog generation failed: ${message}`, error);
-      }));
+      // Owner-approved pause: only an explicit release flag can resume AI
+      // draft generation. Existing Admin scheduled publication remains active.
+      const blogEnv: { BLOG_AUTO_GENERATION?: string } = env;
+      if (blogEnv.BLOG_AUTO_GENERATION === "on") {
+        ctx.waitUntil(generateScheduledBlogDraft(env).catch((error) => {
+          const message = error instanceof Error ? error.message : "Unknown scheduled blog error";
+          console.error(`[BLOG_SCHEDULE] Scheduled blog generation failed: ${message}`, error);
+        }));
+      }
 
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown scheduled task error";
