@@ -2,7 +2,12 @@ import type { Bindings } from "../server/utils/types";
 
 // Wrangler-generated bindings omit deployment secrets; the API still needs
 // the complete declared application binding contract for typed handler calls.
-type Env = Cloudflare.Env & Bindings;
+type PublicationBindings = {
+  PUBLIC_RENDER_PUBLICATION?: string;
+  PUBLICATION_SNAPSHOTS?: R2Bucket;
+  PUBLICATION_VERSION?: { id: string };
+};
+type Env = Cloudflare.Env & Bindings & PublicationBindings;
 import { shouldRedirectToPublicAppUrl } from "../server/utils/url";
 
 declare module "react-router" {
@@ -10,6 +15,7 @@ declare module "react-router" {
     cloudflare: {
       env: Env;
       ctx: ExecutionContext;
+      publicRenderFill?: boolean;
     };
   }
 }
@@ -153,6 +159,17 @@ async function buildSitemapResponse(env: Env): Promise<Response> {
   });
 }
 
+// Optional prototype bindings; no production resources are provisioned here.
+function publicationConfig(env: Env) {
+  const options: PublicationBindings = env;
+  if (options.PUBLIC_RENDER_PUBLICATION !== "on" ||
+      !options.PUBLICATION_SNAPSHOTS || !options.PUBLICATION_VERSION?.id) return null;
+  try {
+    const origin = new URL(env.PUBLIC_APP_URL || PUBLIC_SITE_URL).origin;
+    return { db: env.DB, bucket: options.PUBLICATION_SNAPSHOTS, version: options.PUBLICATION_VERSION.id, origin };
+  } catch { return null; }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -218,8 +235,15 @@ export default {
       return apiApp.fetch(request, env, ctx);
     }
 
-    // Everything else → React Router SSR (static assets auto-served via asset binding)
-    const response = await requestHandler(request, {
+    // Publication mode is opt-in; request handling never generates or writes HTML.
+    const publication = publicationConfig(env);
+    let published: Response | undefined;
+    if (publication && /^\/deals\/[A-Z0-9]{10}$/.test(url.pathname)) {
+      const { readPublishedProduct } = await import("../server/services/public-render-publication");
+      published = await readPublishedProduct({ ...publication, request });
+    }
+    // Both paths must pass through the same document response policy below.
+    const response = published ?? await requestHandler(request, {
       cloudflare: { env, ctx },
     });
 
@@ -252,7 +276,20 @@ export default {
 
     return response;
   },
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
+    if (event.cron === "*/5 * * * *") {
+      const publication = publicationConfig(env);
+      if (publication) {
+        const { publishProductBatch } = await import("../server/services/public-render-publication");
+        const result = await publishProductBatch({
+          ...publication,
+          render: request => requestHandler(request, { cloudflare: { env, ctx, publicRenderFill: true } }),
+        });
+        console.log("[PUBLICATION_RENDER]", JSON.stringify(result));
+      }
+      return;
+    }
+    if (event.cron !== "0 * * * *") return;
     try {
       const { generateScheduledBlogDraft, publishDueScheduledBlogPosts } = await import("../server/services/blog-generation");
       await publishDueScheduledBlogPosts(env.DB);

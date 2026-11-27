@@ -1,0 +1,64 @@
+{
+  "name": "dealsrky-publication-local-cron-qa",
+  "main": "../../build/server/index.js",
+  "compatibility_date": "2025-04-04",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "no_bundle": true,
+  "find_additional_modules": true,
+  "base_dir": "../../build/server",
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": [
+        "**/*.js"
+      ],
+      "fallthrough": true
+    }
+  ],
+  "workers_dev": false,
+  "version_metadata": {
+    "binding": "PUBLICATION_VERSION"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "dealsrky-db",
+      "database_id": "00000000-0000-4000-8000-000000000071",
+      "migrations_dir": "../../migrations"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "KV",
+      "id": "00000000000000000000000000000071"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "BLOG_IMAGES",
+      "bucket_name": "local-qa-blog-images"
+    },
+    {
+      "binding": "PUBLICATION_SNAPSHOTS",
+      "bucket_name": "local-qa-publication"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
+  "vars": {
+    "ENVIRONMENT": "test",
+    "PUBLIC_APP_URL": "http://127.0.0.1:5177",
+    "PUBLIC_RENDER_PUBLICATION": "on",
+    "BLOG_AUTO_GENERATION": "off",
+    "SUPPORTED_MARKETPLACES": "US,CA,UK,DE,IT,FR,ES"
+  },
+  "assets": {
+    "directory": "../../build/client",
+    "not_found_handling": "none"
+  }
+}
