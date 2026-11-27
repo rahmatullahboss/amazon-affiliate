@@ -22,7 +22,8 @@ export async function loader({ context }: Route.LoaderArgs) {
   try {
     const settings = await getSocialLinksSettings(env.DB);
     return { socialLinks: toPublicSocialLinks(settings) } satisfies PublicLayoutLoaderData;
-  } catch {
+  } catch (error) {
+    if (context.cloudflare.publicRenderFill) throw error;
     return { socialLinks: null } satisfies PublicLayoutLoaderData;
   }
 }
