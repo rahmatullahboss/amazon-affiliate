@@ -35,6 +35,18 @@ describe("product detail helpers", () => {
     expect(getInitialPublicMarketplace(["DE", "UK"], "US")).toBe("DE");
   });
 
+  it("preserves whitespace, bullet order, and multiline editorial sections", () => {
+    expect(getProductEditorialSections(null)).toEqual([]);
+    expect(getProductEditorialSections(" \n\n\t ")).toEqual([]);
+    expect(getProductEditorialSections("Overview: \n First line \n •  First bullet \n • \n Second line \n\nUnlabeled text\n • Second bullet\n Body text")).toEqual([
+      { heading: "Overview", body: "First line Second line", bullets: ["First bullet"] },
+      { heading: "Editorial Summary", body: "Unlabeled text Body text", bullets: ["Second bullet"] },
+    ]);
+    expect(getProductEditorialSections("Heading: first: extra\r\n\r\nnext paragraph")).toEqual([
+      { heading: "Heading", body: "first: extra next paragraph", bullets: [] },
+    ]);
+  });
+
   it("parses labeled editorial content into structured sections", () => {
     const sections = getProductEditorialSections(
       [
