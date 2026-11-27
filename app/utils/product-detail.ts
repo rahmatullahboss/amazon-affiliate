@@ -34,41 +34,35 @@ export function getProductEditorialSections(
     return [];
   }
 
-  return reviewContent
-    .split(/\n{2,}/)
-    .map((section) => section.trim())
-    .filter((section) => section.length > 0)
-    .map((section) => {
-      const [firstLine, ...restLines] = section.split("\n");
-      const bulletLines = restLines
-        .map((line) => line.trim())
-        .filter((line) => line.startsWith("•"))
-        .map((line) => line.replace(/^•\s*/, "").trim())
-        .filter((line) => line.length > 0);
-
-      const nonBulletLines = restLines
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0 && !line.startsWith("•"));
-
-      const separatorIndex = firstLine.indexOf(":");
-      if (separatorIndex > 0) {
-        const heading = firstLine.slice(0, separatorIndex).trim();
-        const firstBodyLine = firstLine.slice(separatorIndex + 1).trim();
-        const body = [firstBodyLine, ...nonBulletLines]
-          .filter((line) => line.length > 0)
-          .join(" ")
-          .trim();
-
-        return { heading, body, bullets: bulletLines };
+  const sections: ProductEditorialSection[] = [];
+  for (const rawSection of reviewContent.split(/\n{2,}/)) {
+    const section = rawSection.trim();
+    if (!section) continue;
+    const lines = section.split("\n");
+    const firstLine = lines[0];
+    const separatorIndex = firstLine.indexOf(":");
+    const heading = separatorIndex > 0
+      ? firstLine.slice(0, separatorIndex).trim()
+      : "Editorial Summary";
+    const firstBodyLine = (separatorIndex > 0
+      ? firstLine.slice(separatorIndex + 1)
+      : firstLine).trim();
+    const bodyLines: string[] = [];
+    const bullets: string[] = [];
+    if (firstBodyLine) bodyLines.push(firstBodyLine);
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+      if (line.startsWith("•")) {
+        const bullet = line.slice(1).trim();
+        if (bullet) bullets.push(bullet);
+      } else {
+        bodyLines.push(line);
       }
-
-      const body = [firstLine.trim(), ...nonBulletLines].join(" ").trim();
-      return {
-        heading: "Editorial Summary",
-        body,
-        bullets: bulletLines,
-      };
-    });
+    }
+    sections.push({ heading, body: bodyLines.join(" "), bullets });
+  }
+  return sections;
 }
 
 export function getPublicProductPageCallout(): {
