@@ -29,7 +29,9 @@ describe("mobile storefront four-card and viewport contracts", () => {
     expect(html).toContain("grid grid-cols-4 gap-2");
     expect(html).not.toContain("grid-cols-1 sm:grid-cols-2");
     expect((html.match(/<article\b/g) || [])).toHaveLength(4);
-    expect((html.match(/min-w-0 flex-col/g) || [])).toHaveLength(4);
+    // Compact card base layout is now in the shared CSS class; browser QA
+    // independently verifies flex-column and min-width parity at both sizes.
+    expect((html.match(/class="group pc-compact-outer/g) || [])).toHaveLength(4);
   });
 
   it("uses compact mobile CTA text without changing the existing destination URL", () => {
