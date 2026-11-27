@@ -50,6 +50,7 @@
     "DEFAULT_AMAZON_TAG_ES": "rky3004-21",
     "DEFAULT_AMAZON_TAG_IT": "rky3005-21",
     "BLOG_IMAGES_PUBLIC_BASE_URL": "",
+    "BLOG_AUTO_GENERATION": "off",
     "BLOG_AI_PRIMARY_MODEL": "",
     "BLOG_AI_NEURON_DAILY_LIMIT": "10000",
     "OLLAMA_CLOUD_BASE_URL": "https://api.ollama.com",
