@@ -103,12 +103,10 @@ export function buildBlogExcerpt(content: string, explicitExcerpt?: string | nul
 }
 
 export function estimateReadingMinutes(content: string): number {
-  const words = content
-    .replace(/<[^>]+>/g, " ")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
-
+  // Match non-whitespace groups directly; avoid allocating both a split array
+  // and a second filtered array for each complete article on public pages.
+  // HTML tag handling and the original 220-word rounding remain unchanged.
+  const words = content.replace(/<[^>]+>/g, " ").match(/\S+/g)?.length ?? 0;
   return Math.max(1, Math.ceil(words / 220));
 }
 
