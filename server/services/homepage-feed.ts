@@ -33,7 +33,7 @@ export async function getHomepageFeedRows(
          t.tag as tracking_tag,
          ap.show_on_homepage,
          'mapping' as source_type
-       FROM agent_products ap
+       FROM agent_products ap INDEXED BY idx_agent_products_homepage_rank
        JOIN products p ON p.id = ap.product_id
        JOIN agents a ON a.id = ap.agent_id
        JOIN tracking_ids t ON t.id = ap.tracking_id
