@@ -9,7 +9,6 @@ import {
   useNavigate,
 } from "react-router";
 import { useEffect } from "react";
-import { App as CapacitorApp } from "@capacitor/app";
 import type { PluginListenerHandle } from "@capacitor/core";
 import type { Route } from "./+types/root";
 import { clearAuthSession, persistAuthSession } from "./utils/auth-session";
@@ -59,6 +58,7 @@ function NativeAuthListener() {
     }
 
     let listenerHandle: PluginListenerHandle | null = null;
+    let disposed = false;
 
     const handleAuthUrl = async (value?: string | null) => {
       if (!value) {
@@ -81,20 +81,32 @@ function NativeAuthListener() {
     };
 
     const bindListener = async () => {
+      // The native plugin is unnecessary for public SSR and regular web users.
+      const { App: CapacitorApp } = await import("@capacitor/app");
+      if (disposed) return;
       const launchUrl = await CapacitorApp.getLaunchUrl();
 
-      if (launchUrl?.url) {
+      if (!disposed && launchUrl?.url) {
         await handleAuthUrl(launchUrl.url);
       }
 
-      listenerHandle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      if (disposed) return;
+      const handle = await CapacitorApp.addListener("appUrlOpen", ({ url }) => {
         void handleAuthUrl(url);
       });
+      if (disposed) {
+        void handle.remove();
+      } else {
+        listenerHandle = handle;
+      }
     };
 
-    void bindListener();
+    void bindListener().catch((error: unknown) => {
+      console.error("Could not register native auth callback listener", error);
+    });
 
     return () => {
+      disposed = true;
       if (listenerHandle) {
         void listenerHandle.remove();
       }

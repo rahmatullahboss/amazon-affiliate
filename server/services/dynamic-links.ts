@@ -133,9 +133,9 @@ const AGENT_PRODUCT_SELECT = `SELECT
   p.product_images, p.aplus_images, p.id as product_id, p.is_adult,
   t.tag as tracking_tag, t.marketplace,
   ap.custom_title
-FROM agent_products ap
+FROM products p INDEXED BY idx_products_asin
+CROSS JOIN agent_products ap INDEXED BY idx_ap_product_active ON ap.product_id = p.id
 JOIN agents a ON a.id = ap.agent_id
-JOIN products p ON p.id = ap.product_id
 JOIN tracking_ids t ON t.id = ap.tracking_id`;
 
 async function loadAgentProductRow(
