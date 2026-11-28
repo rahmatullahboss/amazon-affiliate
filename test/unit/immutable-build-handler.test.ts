@@ -10,8 +10,30 @@ describe("immutable production route handler",()=>{
     expect(await Promise.all(results.map(r=>r.text()))).toEqual(["fixed /a a","fixed /b b"]);
     expect(await (await handle(new Request("https://example.test/c"),{id:"c"})).text()).toBe("fixed /c c");
     expect(factory).toHaveBeenCalledTimes(1);
-    expect(load).toHaveBeenCalledTimes(2);
+    expect(load).toHaveBeenCalledTimes(1);
   });
+  it("shares a failed cold initialization across concurrent requests and retries later", async()=>{
+    let attempts=0;
+    const load=vi.fn(async()=>{
+      attempts++;
+      if(attempts===1) throw Error("cold import unavailable");
+      return {release:"recovered"};
+    });
+    const factory=vi.fn((build:{release:string})=>async(request:Request)=>
+      new Response(build.release+" "+new URL(request.url).pathname));
+    const handler=createImmutableBuildHandler(load,factory);
+    const results=await Promise.allSettled([
+      handler(new Request("https://example.test/a")),
+      handler(new Request("https://example.test/b")),
+    ]);
+    expect(results.map(result=>result.status)).toEqual(["rejected","rejected"]);
+    expect(load).toHaveBeenCalledTimes(1);
+    expect(factory).not.toHaveBeenCalled();
+    expect(await (await handler(new Request("https://example.test/retry"))).text()).toBe("recovered /retry");
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(factory).toHaveBeenCalledTimes(1);
+  });
+
   it("retries failed initialization and does not cache response failures",async()=>{
     let attempts=0;
     const handle=createImmutableBuildHandler(async()=>{if(++attempts===1)throw Error("load");return "build"},build=>async(fail:boolean)=>{if(fail)throw Error("request");return build});
