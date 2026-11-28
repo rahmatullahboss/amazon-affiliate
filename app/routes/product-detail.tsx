@@ -10,6 +10,7 @@ import {
   getProductEditorialSections,
   getProductDetailTitleClass,
   getPublicProductPageCallout,
+  filterRenderableRelatedProducts,
 } from "../utils/product-detail";
 import {
   AMAZON_DESTINATION_NOTE,
@@ -129,9 +130,15 @@ export async function loader({ params, context, request }: Route.LoaderArgs) {
         ).bind(asin);
 
   const { results: related } = await relatedQuery.all<RelatedProductRow>();
+  // The related query deliberately retains its original LIMIT and ordering.
+  // Filter only after that selection, so visible cards remain identical while
+  // hidden marketplaces no longer cause tracking lookups or loader payload.
+  const renderableRelated = filterRenderableRelatedProducts(
+    related ?? [], availableMarketplaces
+  );
 
   const affiliateLinks = await getPublicProductAffiliateHrefs(
-    env.DB, [...productMatches, ...(related ?? [])]
+    env.DB, [...productMatches, ...renderableRelated]
   );
   const amazonUrlsByMarketplace: Record<string, string> = {};
   for (const match of productMatches) {
@@ -141,7 +148,7 @@ export async function loader({ params, context, request }: Route.LoaderArgs) {
     }
   }
   const relatedAmazonUrls = Object.fromEntries(
-    (related ?? []).flatMap((p) => {
+    renderableRelated.flatMap((p) => {
       const href = affiliateLinks.get(p.id);
       return href ? [[p.id, href]] : [];
     })
@@ -149,7 +156,7 @@ export async function loader({ params, context, request }: Route.LoaderArgs) {
 
   return {
     product,
-    relatedProducts: related || [],
+    relatedProducts: renderableRelated,
     canonicalPath: `/deals/${asin}`,
     availableMarketplaces,
     amazonUrlsByMarketplace,

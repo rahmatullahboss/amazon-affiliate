@@ -14,6 +14,24 @@ export function getProductDetailTitleClass(title: string): string {
   return "mt-5 text-3xl font-black leading-tight tracking-[-0.02em] text-gray-950 break-words md:text-4xl";
 }
 
+/**
+ * Product detail renders related cards only for marketplaces available on the
+ * current product. Discard hidden candidates before resolving their affiliate
+ * tags or serializing them into the loader payload.
+ *
+ * Keep exact marketplace equality: the UI uses the same equality, and
+ * normalizing candidate values here could expose previously hidden cards.
+ */
+export function filterRenderableRelatedProducts<T extends { marketplace: string | null }>(
+  candidates: readonly T[],
+  availableMarketplaces: readonly string[],
+): T[] {
+  const allowed = new Set(availableMarketplaces);
+  return candidates.filter((candidate) =>
+    candidate.marketplace !== null && allowed.has(candidate.marketplace)
+  );
+}
+
 export function getInitialPublicMarketplace(
   availableMarketplaces: string[],
   currentMarketplace: string | null | undefined

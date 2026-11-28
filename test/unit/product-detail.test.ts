@@ -4,6 +4,7 @@ import {
   getProductEditorialSections,
   getProductDetailTitleClass,
   getPublicProductPageCallout,
+  filterRenderableRelatedProducts,
 } from "../../app/utils/product-detail";
 
 describe("product detail helpers", () => {
@@ -33,6 +34,28 @@ describe("product detail helpers", () => {
 
   it("falls back to the first available public marketplace when the current marketplace is missing", () => {
     expect(getInitialPublicMarketplace(["DE", "UK"], "US")).toBe("DE");
+  });
+
+  it("omits unrelated marketplace cards without reordering any renderable cards", () => {
+    const candidates = [
+      { id: 1, marketplace: "DE" },
+      { id: 2, marketplace: "US" },
+      { id: 3, marketplace: "DE" },
+      { id: 4, marketplace: "FR" },
+      { id: 5, marketplace: null },
+      { id: 6, marketplace: "CA" },
+    ];
+    const visible = filterRenderableRelatedProducts(candidates, ["DE", "CA"]);
+    expect(visible.map((row) => row.id)).toEqual([1, 3, 6]);
+    for (const selected of ["DE", "CA"]) {
+      expect(visible.filter((row) => row.marketplace === selected)).toEqual(
+        candidates.filter((row) => row.marketplace === selected)
+      );
+    }
+    expect(filterRenderableRelatedProducts(candidates, [])).toEqual([]);
+    expect(filterRenderableRelatedProducts(candidates, ["US"]).map((row) => row.id)).toEqual([2]);
+    // Do not silently normalize candidate values: the existing UI is exact-match.
+    expect(filterRenderableRelatedProducts([{ id: 7, marketplace: " us " }], ["US"])).toEqual([]);
   });
 
   it("preserves whitespace, bullet order, and multiline editorial sections", () => {
