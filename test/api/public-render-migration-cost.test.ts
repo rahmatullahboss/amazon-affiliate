@@ -28,6 +28,9 @@ describe("publication migration native cost", () => {
     expect(await readScopedRenderRevision(db,request)).not.toBe(originalRevision);
     const installedAll=await measure("installed-4700","UPDATE products SET title=title||' update B' WHERE id BETWEEN 120001 AND 124700");
     const noop=await measure("installed-noop-4700","UPDATE products SET title=title WHERE id BETWEEN 120001 AND 124700");
+    // Editorial/gallery-only edits affect their own product pages, not the
+    // related-card projection of other products in the category.
+    const installedEditorial=await measure("installed-editorial-4700","UPDATE products SET review_content=coalesce(review_content,'')||' updated' WHERE id BETWEEN 120001 AND 124700");
     const input={db,bucket:env.PUBLICATION_SNAPSHOTS,origin:"https://dealsrky.com",version:"qa-cost",render:async()=>new Response("Synthetic HTML",{headers:{"content-type":"text/html"}})};
     for(let i=0;i<13;i++)expect((await publishProductBatch(input)).failed).toBe(0);
     const idleCount=await db.prepare("SELECT COUNT(*) AS n FROM public_render_publication").all();
@@ -38,13 +41,14 @@ describe("publication migration native cost", () => {
     console.log("PUBLICATION_IDLE_D1_COST "+JSON.stringify({enrolled:100,countRowsRead:idleCount.meta.rows_read,dueRowsRead:idleDue.meta.rows_read,totalRowsRead:idleRead,rowsWritten:idleDue.meta.rows_written}));
     // Remove only the prototype's own triggers for the synthetic baseline.
     const triggers=await db.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND (name LIKE 'public_render_scope_%' OR name LIKE 'public_render_publication_%') ORDER BY name").all<{name:string}>();
-    expect(triggers.results.length).toBe(16);
+    expect(triggers.results.length).toBe(19);
     for(const {name} of triggers.results){
       expect(name).toMatch(/^public_render_(scope|publication)_[a-z_]+$/);
       await db.prepare('DROP TRIGGER "'+name+'"').run();
     }
     const baseSmall=await measure("baseline-100","UPDATE products SET title=title||' update C' WHERE id BETWEEN 120001 AND 120100");
     const baseAll=await measure("baseline-4700","UPDATE products SET title=title||' update D' WHERE id BETWEEN 120001 AND 124700");
+    const baseEditorial=await measure("baseline-editorial-4700","UPDATE products SET review_content=coalesce(review_content,'')||' base' WHERE id BETWEEN 120001 AND 124700");
     // Native D1 meta.changes includes trigger effects. Assert the original
     // product writes separately, and retain actual total changes as evidence.
     const updated=await db.prepare("SELECT COUNT(*) AS n FROM products WHERE id BETWEEN 120001 AND 124700 AND title LIKE '% update B% update D'").first<{n:number}>();
@@ -53,6 +57,8 @@ describe("publication migration native cost", () => {
     expect(installedAll.changes).toBeGreaterThanOrEqual(4700);
     expect(baseSmall.changes).toBeGreaterThanOrEqual(100);
     expect(baseAll.changes).toBeGreaterThanOrEqual(4700);
-    console.log("PUBLICATION_MIGRATION_COST "+JSON.stringify({catalog:4700,enrolled:100,installedSmall,installedAll,noop,baseSmall,baseAll}));
+    expect(installedAll.rowsWritten).toBeLessThan(10000);
+    expect(installedEditorial.rowsWritten).toBeLessThanOrEqual(baseEditorial.rowsWritten + 100);
+    console.log("PUBLICATION_MIGRATION_COST "+JSON.stringify({catalog:4700,enrolled:100,installedSmall,installedAll,installedEditorial,noop,baseSmall,baseAll,baseEditorial}));
   },120000);
 });

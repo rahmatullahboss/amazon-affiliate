@@ -187,6 +187,52 @@ describe("publication-first static product documents (native D1/R2)", () => {
     expect(result.hidden).toBe(4);
   });
 
+  it("invalidates only the enrolled product for editorial-only changes, without busting a related page", async()=>{
+    await fixture(2);
+    const input=common();
+    const db=input.db;
+    // Both enrolled products share one related category. Review/gallery values
+    // appear on the product itself but never on the other page's related cards.
+    await db.prepare("UPDATE products SET category='Publication category 001' WHERE id=99102").run();
+    const render=async(request:Request)=>{
+      const asin=new URL(request.url).pathname.split("/").at(-1);
+      const row=await db.prepare("SELECT review_content FROM products WHERE asin=?").bind(asin).first<{review_content:string|null}>();
+      return html("Review "+(row?.review_content??"none"));
+    };
+    expect((await publishProductBatch({...input,render})).generated).toBe(2);
+    const beforeFirst=await readScopedRenderRevision(db,req(1));
+    const beforeSecond=await readScopedRenderRevision(db,req(2));
+    expect(await (await readPublishedProduct({...input,request:req(1)}))?.text()).toBe("Review ");
+    await db.prepare("UPDATE products SET review_content='Editorial revised' WHERE id=99102").run();
+    expect(await readScopedRenderRevision(db,req(1))).toBe(beforeFirst);
+    expect(await readScopedRenderRevision(db,req(2))).not.toBe(beforeSecond);
+    expect(await (await readPublishedProduct({...input,request:req(1)}))?.text()).toBe("Review ");
+    expect(await readPublishedProduct({...input,request:req(2)})).toBeUndefined();
+    expect((await listDuePublicationPaths(db,input.version,Date.now(),8)).map(row=>row.path)).toEqual([path(2)]);
+    expect((await publishProductBatch({...input,render})).generated).toBe(1);
+    expect(await (await readPublishedProduct({...input,request:req(2)}))?.text()).toBe("Review Editorial revised");
+  });
+
+  it("never revives an old snapshot after an enrolled URL is removed and re-enrolled", async()=>{
+    await fixture(1);
+    const input=common();
+    let sequence=0;
+    const render=async()=>html("Re-enrollment document "+(++sequence));
+    expect((await publishProductBatch({...input,render})).generated).toBe(1);
+    const oldRevision=await readScopedRenderRevision(input.db,req(1));
+    expect(await (await readPublishedProduct({...input,request:req(1)}))?.text()).toBe("Re-enrollment document 1");
+
+    await input.db.prepare("DELETE FROM public_render_publication WHERE path=?").bind(path(1)).run();
+    expect(await readPublishedProduct({...input,request:req(1)})).toBeUndefined();
+    await input.db.prepare("INSERT INTO public_render_publication(path) VALUES(?)").bind(path(1)).run();
+
+    const newRevision=await readScopedRenderRevision(input.db,req(1));
+    expect(newRevision).not.toBe(oldRevision);
+    expect(await readPublishedProduct({...input,request:req(1)})).toBeUndefined();
+    expect((await publishProductBatch({...input,render})).generated).toBe(1);
+    expect(await (await readPublishedProduct({...input,request:req(1)}))?.text()).toBe("Re-enrollment document 2");
+  });
+
   it("does not publish a document if the revision changes while rendering", async()=>{
     await fixture(1);
     const input=common();
